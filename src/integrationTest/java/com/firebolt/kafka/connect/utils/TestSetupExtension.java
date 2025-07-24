@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.utils;
 
 
 import com.firebolt.kafka.connect.clients.FireboltClient;
+import com.firebolt.shadow.org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -25,7 +26,10 @@ public class TestSetupExtension implements BeforeAllCallback {
                 log.info("Setting up Integration Test Database");
                 log.info("========================================");
                 
-                setupDatabase();
+                // only create the database when running on core (a.k.a the jdbc.connection.url is not set)
+                if (StringUtils.isEmpty(System.getProperty("jdbc.connection.url"))) {
+                    setupDatabase();
+                }
                 
                 databaseSetupCompleted = true;
                 

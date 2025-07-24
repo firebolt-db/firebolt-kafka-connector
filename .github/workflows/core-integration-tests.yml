@@ -1,4 +1,4 @@
-name: Integration Tests
+name: Core Integration Tests
 
 on:
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
         
     - name: Display Kafka Connect version
       run: |
-        echo "Testing with Kafka Connect version: ${{ github.event.inputs.kafka_connect_version }}"
+        echo "Testing with Kafka Connect version: ${{ inputs.kafka_connect_version }}"
         
     - name: Build project
       run: ./gradlew build --no-daemon
@@ -55,7 +55,7 @@ jobs:
       
     - name: Determine docker-compose file
       run: |
-        KAFKA_CONNECT_VERSION="${{ github.event.inputs.kafka_connect_version }}"
+        KAFKA_CONNECT_VERSION="${{ inputs.kafka_connect_version }}"
         if [ "$KAFKA_CONNECT_VERSION" = "4.0" ]; then
           COMPOSE_FILE="src/integrationTest/docker/kafka-connect-4.0/docker-compose.yml"
         else
@@ -67,7 +67,7 @@ jobs:
     - name: Start Docker services
       run: |
         echo "Starting Docker services with $COMPOSE_FILE"
-        docker-compose -f "$COMPOSE_FILE" up -d
+        docker compose -f "$COMPOSE_FILE" up -d
         
         # Wait for services to be ready
         echo "Waiting for services to be ready..."
@@ -84,12 +84,8 @@ jobs:
         KAFKA_BOOTSTRAP_SERVERS: localhost:9092
         SCHEMA_REGISTRY_URL: http://localhost:8081
         KAFKA_CONNECT_URL: http://localhost:8083
-        KAFKA_CONNECT_VERSION: ${{ github.event.inputs.kafka_connect_version }}
-        FIREBOLT_URL: ${{ secrets.FIREBOLT_URL }}
-        FIREBOLT_USERNAME: ${{ secrets.FIREBOLT_USERNAME }}
-        FIREBOLT_PASSWORD: ${{ secrets.FIREBOLT_PASSWORD }}
-        FIREBOLT_DATABASE: ${{ secrets.FIREBOLT_DATABASE }}
-        
+        KAFKA_CONNECT_VERSION: ${{ inputs.kafka_connect_version }}
+
     - name: Collect Docker logs
       if: always()
       run: |
@@ -97,16 +93,24 @@ jobs:
         mkdir -p docker-logs
         
         # Get logs from all containers
-        docker-compose -f "$COMPOSE_FILE" logs > docker-logs/all-services.log 2>&1 || true
+        docker compose -f "$COMPOSE_FILE" logs > docker-logs/all-services.log 2>&1 || true
         
         # Get individual service logs
-        docker-compose -f "$COMPOSE_FILE" logs kafka-connect > docker-logs/kafka-connect.log 2>&1 || true
-        docker-compose -f "$COMPOSE_FILE" logs kafka > docker-logs/kafka.log 2>&1 || true
-        docker-compose -f "$COMPOSE_FILE" logs zookeeper > docker-logs/zookeeper.log 2>&1 || true
-        docker-compose -f "$COMPOSE_FILE" logs schema-registry > docker-logs/schema-registry.log 2>&1 || true
+        docker compose -f "$COMPOSE_FILE" logs kafka-connect > docker-logs/kafka-connect.log 2>&1 || true
+        docker compose -f "$COMPOSE_FILE" logs kafka > docker-logs/kafka.log 2>&1 || true
+        docker compose -f "$COMPOSE_FILE" logs zookeeper > docker-logs/zookeeper.log 2>&1 || true
+        docker compose -f "$COMPOSE_FILE" logs schema-registry > docker-logs/schema-registry.log 2>&1 || true
         
         # Get container status
-        docker-compose -f "$COMPOSE_FILE" ps > docker-logs/container-status.txt 2>&1 || true
+        docker compose -f "$COMPOSE_FILE" ps > docker-logs/container-status.txt 2>&1 || true
+        
+        # Collect integration test logs
+        if [ -f "logs/integrationTest.log" ]; then
+          echo "Collecting integration test logs..."
+          cp logs/integrationTest.log docker-logs/ || true
+        else
+          echo "No integration test log file found at logs/integrationTest.log"
+        fi
         
         echo "Docker logs collected successfully"
         
@@ -114,14 +118,14 @@ jobs:
       if: always()
       run: |
         echo "Stopping Docker services..."
-        docker-compose -f "$COMPOSE_FILE" down -v
+        docker compose -f "$COMPOSE_FILE" down -v
         echo "Docker services stopped"
         
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: integration-test-results-${{ github.event.inputs.kafka_connect_version }}
+        name: integration-test-results-${{ inputs.kafka_connect_version }}
         path: |
           build/test-results/
           build/reports/tests/
@@ -131,12 +135,12 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: integration-test-reports-${{ github.event.inputs.kafka_connect_version }}
+        name: integration-test-reports-${{ inputs.kafka_connect_version }}
         path: build/reports/
         
     - name: Upload Docker logs
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: docker-logs-${{ github.event.inputs.kafka_connect_version }}
+        name: docker-logs-${{ inputs.kafka_connect_version }}
         path: docker-logs/ 

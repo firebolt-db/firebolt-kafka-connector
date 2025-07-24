@@ -188,6 +188,34 @@ test {
             includeTags System.getProperty('junit.jupiter.includeTags').split(',')
         }
     }
+    
+    // Pass all system properties to the test JVM
+    systemProperties System.properties
+    
+    // Test result summary
+    afterSuite { desc, result ->
+        if (!desc.parent) { // Only print summary for the main test suite, not individual classes
+            def output = "Unit Test Results: "
+            output += "${result.resultType} "
+            output += "(${result.testCount} tests, "
+            output += "${result.successfulTestCount} passed, "
+            output += "${result.failedTestCount} failed, "
+            output += "${result.skippedTestCount} skipped)"
+            
+            def startItem = "|  "
+            def endItem = "  |"
+            def repeatLength = startItem.length() + output.length() + endItem.length()
+            
+            println "\n${'-' * repeatLength}"
+            println "${startItem}${output}${endItem}"
+            println "${'-' * repeatLength}\n"
+            
+            // Additional details if there are failures
+            if (result.failedTestCount > 0) {
+                println "FAILURE: There were failing tests. See the report at: file://${project.buildDir}/reports/tests/test/index.html"
+            }
+        }
+    }
 }
 
 // Configure integration test task to handle tag filtering
@@ -199,6 +227,34 @@ tasks.named('integrationTest', Test) {
         }
         if (System.getProperty('junit.jupiter.includeTags')) {
             includeTags System.getProperty('junit.jupiter.includeTags').split(',')
+        }
+    }
+    
+    // Pass all system properties to the test JVM
+    systemProperties System.properties
+    
+    // Test result summary
+    afterSuite { desc, result ->
+        if (!desc.parent) { // Only print summary for the main test suite, not individual classes
+            def output = "Integration Test Results: "
+            output += "${result.resultType} "
+            output += "(${result.testCount} tests, "
+            output += "${result.successfulTestCount} passed, "
+            output += "${result.failedTestCount} failed, "
+            output += "${result.skippedTestCount} skipped)"
+            
+            def startItem = "|  "
+            def endItem = "  |"
+            def repeatLength = startItem.length() + output.length() + endItem.length()
+            
+            println "\n${'-' * repeatLength}"
+            println "${startItem}${output}${endItem}"
+            println "${'-' * repeatLength}\n"
+            
+            // Additional details if there are failures
+            if (result.failedTestCount > 0) {
+                println "FAILURE: There were failing tests. See the report at: file://${project.buildDir}/reports/tests/integrationTest/index.html"
+            }
         }
     }
 }
@@ -359,9 +415,18 @@ task deployToKafkaConnect {
             into pluginsDir40
         }
         
+        // Copy to Kafka Connect Cloud plugins directory
+        def pluginsDirCloud = file('src/integrationTest/docker/kafka-connect-cloud/plugins/')
+        pluginsDirCloud.mkdirs()
+        copy {
+            from jarFile
+            into pluginsDirCloud
+        }
+        
         println "✅ Deployed ${jarName} to:"
         println "   📁 src/integrationTest/docker/kafka-connect-3.9.1/plugins/"
         println "   📁 src/integrationTest/docker/kafka-connect-4.0/plugins/"
+        println "   📁 src/integrationTest/docker/kafka-connect-cloud/plugins/"
     }
 }
 

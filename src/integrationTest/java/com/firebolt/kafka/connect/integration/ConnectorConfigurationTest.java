@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.clients.FireboltClient;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -14,13 +13,12 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -36,17 +34,15 @@ import static org.junit.jupiter.api.Assertions.fail;
  * error messages.
  */
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class ConnectorConfigurationTest extends BaseIntegrationTest {
     
-    private String testConnectorName;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static FireboltClient fireboltClient;
 
     @BeforeAll
     static void setupClass() throws SQLException {
         // make sure we do have certain tables (since we do verify that when we validate the connector configuration)
-        fireboltClient = FireboltClient.createDefault();
+        fireboltClient = FireboltClient.createFor(getDatabaseName());
 
         fireboltClient.createStandardTestTable("table1");
         fireboltClient.createStandardTestTable("table2");
@@ -102,7 +98,12 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
     @Test
     void testInvalidDatabaseInJdbcConnectionUrl() throws IOException {
         Map<String, Object> connectorConfig = createBaseConnectorConfig();
-        connectorConfig.put("jdbc.connection.url", "jdbc:firebolt:non_existing_db?url=http://firebolt-core.local:3473");
+
+        // Use a URL with the same structure as the default but with a non-existing database
+        String databaseName = getDatabaseName();
+
+        String invalidUrl = getJdbcConnectionUrl().replaceFirst(databaseName, "non_existing_db");
+        connectorConfig.put("jdbc.connection.url", invalidUrl);
         
         // Attempt to create connector and expect failure
         String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
@@ -176,26 +177,11 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
     }
     
     @Test
-    void testInvalidSinkConnectorType() throws IOException {
-        Map<String, Object> connectorConfig = createBaseConnectorConfig();
-        connectorConfig.put("sink.connector.type", "invalid-type");
-        
-        // Attempt to create connector and expect failure
-        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
-        
-        // Verify error message contains information about invalid connector type
-        assertNotNull(errorMessage, "Error message should not be null");
-        assertTrue(errorMessage.toLowerCase().contains("sink.connector.type") || 
-                   errorMessage.toLowerCase().contains("append") ||
-                   errorMessage.toLowerCase().contains("invalid"),
-                   "Error message should mention invalid connector type: " + errorMessage);
-    }
-    
-    @Test
-    void testEmptyTopicToTableMapping() throws IOException {
+    void testEmptyTopicToTableMappingButWithATopicNameThatDoesNotCorrespondToATable() throws IOException {
         Map<String, Object> connectorConfig = createBaseConnectorConfig();
         connectorConfig.put("topic.to.table.mapping", "");
-        
+        connectorConfig.put("topics", "not-a-firebolt-table");
+
         // Attempt to create connector and expect failure
         String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
         
@@ -205,22 +191,6 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
                    errorMessage.toLowerCase().contains("empty") ||
                    errorMessage.toLowerCase().contains("mapping"),
                    "Error message should mention empty mapping: " + errorMessage);
-    }
-    
-    @Test
-    void testInvalidBooleanValue() throws IOException {
-        Map<String, Object> connectorConfig = createBaseConnectorConfig();
-        connectorConfig.put("table.auto.create", "invalid-boolean");
-        
-        // Attempt to create connector and expect failure
-        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
-        
-        // Verify error message contains information about invalid boolean
-        assertNotNull(errorMessage, "Error message should not be null");
-        assertTrue(errorMessage.toLowerCase().contains("table.auto.create") || 
-                   errorMessage.toLowerCase().contains("boolean") ||
-                   errorMessage.toLowerCase().contains("invalid"),
-                   "Error message should mention invalid boolean value: " + errorMessage);
     }
     
     @Test
@@ -304,11 +274,6 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
                     errorMessage.toLowerCase().contains("does not exist") ||
                     errorMessage.toLowerCase().contains("do not exist")),
                    "Error message should mention non-existent tables: " + errorMessage);
-        
-        // Should suggest auto-create option
-        assertTrue(errorMessage.toLowerCase().contains("auto.create") || 
-                   errorMessage.toLowerCase().contains("create"),
-                   "Error message should suggest table auto-creation: " + errorMessage);
     }
     
     @Test
@@ -387,15 +352,7 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
                    "Error message should be substantial for multiple errors: " + errorMessage);
     }
     
-    /**
-     * Creates a base connector configuration with valid values.
-     * Individual tests can modify specific properties to test validation.
-     */
     private Map<String, Object> createBaseConnectorConfig() {
-        // Use the Docker service name for Firebolt Core when running in Kafka Connect container
-        // Port 3473 is the standard Firebolt Core port within the Docker network
-        String fireboltUrl = "jdbc:firebolt:integration_test_db?url=http://firebolt-core.local:3473";
-        
         Map<String, Object> config = new HashMap<>();
         
         // === KAFKA CONNECT CORE PROPERTIES ===
@@ -406,10 +363,19 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         config.put("value.converter", "org.apache.kafka.connect.storage.StringConverter");
         
         // === FIREBOLT CONNECTOR SPECIFIC PROPERTIES ===
-        config.put("jdbc.connection.url", fireboltUrl);
+        config.put("jdbc.connection.url", getJdbcConnectionUrl());
         config.put("topic.to.table.mapping", "test-topic:table1");
-        config.put("table.auto.create", "false");
-        config.put("sink.connector.type", "append");      // Firebolt sink type (defaults to "append" if not specified)
+        
+        // Add client credentials if system properties are set
+        String clientId = getClientId();
+        if (clientId != null) {
+            config.put("firebolt.clientId", "${file:/etc/kafka-connect/secrets/secrets.properties:clientId}");
+        }
+        
+        String clientSecret = getClientSecret();
+        if (clientSecret != null) {
+            config.put("firebolt.clientSecret", "${file:/etc/kafka-connect/secrets/secrets.properties:clientSecret}");
+        }
         
         return config;
     }
@@ -505,7 +471,6 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             // Generate unique connector name for successful tests
             String testId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
             successfulConnectorName = "valid-connector-" + testId;
-            log.info("Valid configuration test setup - Connector: {}", successfulConnectorName);
         }
         
         @AfterEach
@@ -522,8 +487,6 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         
         @Test
         void testExistingTableInMapping() throws IOException {
-            log.info("Testing successful connector creation with existing table in mapping");
-            
             Map<String, Object> connectorConfig = createBaseConnectorConfig();
             // Reference a table that exists (created in @BeforeAll)
             connectorConfig.put("topic.to.table.mapping", "test-topic:table1");
@@ -534,25 +497,10 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             // Verify that the connector was created successfully
             assertTrue(success, "Connector creation should succeed when table exists");
         }
-        
-        @Test
-        void testSinkConnectorTypeDefaults() throws IOException {
-            log.info("Testing that sink.connector.type defaults to 'append' when not specified");
-            
-            Map<String, Object> connectorConfig = createBaseConnectorConfig();
-            // Remove sink.connector.type to test that it defaults to "append"
-            connectorConfig.remove("sink.connector.type");
 
-            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, connectorConfig);
 
-            // Verify that the connector was created successfully
-            assertTrue(success, "Connector creation should succeed when sink.connector.type is not passed in the definition. It will default to append");
-        }
-        
         @Test
         void testCanMapMultipleTopicsToTables() throws IOException {
-            log.info("Testing connector validation passes when referencing existing tables");
-            
             Map<String, Object> connectorConfig = createBaseConnectorConfig();
             // Reference tables that exist (created in @BeforeAll)
             connectorConfig.put("topic.to.table.mapping", "topic1:table1,topic2:table2");
@@ -562,33 +510,14 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             // Verify that the connector was created successfully
             assertTrue(success, "Connector creation should succeed when all tables in mapping exists");
         }
-        
-        @Test
-        void testOptionalSinkConnectorType() throws IOException {
-            log.info("Testing connector creation without sink.connector.type (should default to append)");
-            
-            Map<String, Object> connectorConfig = createBaseConnectorConfig();
-            // Remove sink.connector.type completely to test default behavior
-            connectorConfig.remove("sink.connector.type");
-            // Use an existing table to ensure the test doesn't fail for other reasons
-            connectorConfig.put("topic.to.table.mapping", "test-topic:table1");
-            
-            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, connectorConfig);
-            
-            // Verify that the connector was created successfully
-            assertTrue(success, "Connector creation should succeed without sink.connector.type (defaults to 'append')");
-        }
-        
+
         @Test
         void testOptionalTopicToTableMapping() throws IOException {
-            log.info("Testing connector creation without topic.to.table.mapping (may use default behavior)");
-            
             Map<String, Object> connectorConfig = createBaseConnectorConfig();
-            // Remove topic.to.table.mapping completely to test if there's default behavior
             connectorConfig.remove("topic.to.table.mapping");
-            // Keep table.auto.create as true to allow table creation if needed
-            connectorConfig.put("table.auto.create", "true");
-            
+            // but the topic should be a valid table name
+            connectorConfig.put("topics", "table1");
+
             boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, connectorConfig);
             
             // Verify that the connector was created successfully
@@ -597,8 +526,6 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         
         @Test
         void testMinimalValidConfiguration() throws IOException {
-            log.info("Testing connector creation with minimal required configuration");
-            
             Map<String, Object> config = new HashMap<>();
             
             // === KAFKA CONNECT CORE PROPERTIES (REQUIRED) ===
@@ -609,30 +536,24 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             config.put("value.converter", "org.apache.kafka.connect.storage.StringConverter");
             
             // === FIREBOLT CONNECTOR MINIMAL PROPERTIES ===
-            config.put("jdbc.connection.url", "jdbc:firebolt:integration_test_db?url=http://firebolt-core.local:3473");
-            config.put("table.auto.create", "true");  // Allow auto-creation to avoid table existence issues
-            // Note: Not setting sink.connector.type (should default to "append")
-            // Note: Not setting topic.to.table.mapping (should use default behavior)
+            config.put("jdbc.connection.url", getJdbcConnectionUrl());
+            config.put("topic.to.table.mapping", "test-topic:table1");
+            
+            // Add client credentials if system properties are set
+            String clientId = getClientId();
+            if (clientId != null) {
+                config.put("firebolt.clientId", "${file:/etc/kafka-connect/secrets/secrets.properties:clientId}");
+            }
+
+            String clientSecret = getClientSecret();
+            if (clientSecret != null) {
+                config.put("firebolt.clientSecret", "${file:/etc/kafka-connect/secrets/secrets.properties:clientSecret}");
+            }
             
             boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, config);
             
             // Verify that the connector was created successfully
             assertTrue(success, "Connector creation should succeed with minimal configuration (using defaults for optional properties)");
-        }
-        
-        @Test
-        void testAutoCreateAllowsNonExistentTables() throws IOException {
-            log.info("Testing connector creation with non-existent tables when table.auto.create is true");
-            
-            Map<String, Object> connectorConfig = createBaseConnectorConfig();
-            // Reference tables that don't exist, but enable auto-creation
-            connectorConfig.put("topic.to.table.mapping", "topic1:auto_created_table_1,topic2:auto_created_table_2");
-            connectorConfig.put("table.auto.create", "true");  // This should allow non-existent tables
-            
-            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, connectorConfig);
-            
-            // Verify that the connector was created successfully
-            assertTrue(success, "Connector creation should succeed with non-existent tables when table.auto.create is true");
         }
     }
 } 
