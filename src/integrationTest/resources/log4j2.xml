@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+        
+        <File name="IntegrationTestLog" fileName="logs/integrationTest.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </File>
+    </Appenders>
+    
+    <Loggers>
+        <!-- Integration test loggers -->
+        <Logger name="com.firebolt.kafka.connect.integration" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="IntegrationTestLog"/>
+        </Logger>
+        
+        <!-- Firebolt connector loggers -->
+        <Logger name="com.firebolt.kafka.connect" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="IntegrationTestLog"/>
+        </Logger>
+        
+        <!-- Kafka client loggers -->
+        <Logger name="org.apache.kafka" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="IntegrationTestLog"/>
+        </Logger>
+        
+        <!-- TestContainers -->
+        <Logger name="org.testcontainers" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="IntegrationTestLog"/>
+        </Logger>
+        
+        <!-- HTTP client -->
+        <Logger name="okhttp3" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="IntegrationTestLog"/>
+        </Logger>
+        
+        <!-- Root logger -->
+        <Root level="DEBUG">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="IntegrationTestLog"/>
+        </Root>
+    </Loggers>
+</Configuration> 
