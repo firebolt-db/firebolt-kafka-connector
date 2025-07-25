@@ -72,6 +72,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         "false, 'WITH null fields omitted from JSON entirely'"
     })
     void testTimestamptzSerialization(boolean includeNulls, String testDescription) throws Exception {
+        log.info("Testing timestamptz serialization: {}", testDescription);
+        
         producer = initializeJsonProducer(includeNulls);
         
         List<TimestamptzTestRecord> testRecords = createTestRecords();
@@ -83,7 +85,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         // For sub-millisecond precision tests (records 13-14), we need to use truncated expected values
         // since Kafka Connect's Timestamp logical type only supports millisecond precision
         List<TimestamptzTestRecord> expectedRecords = createExpectedRecordsWithTruncatedNanoseconds(testRecords);
-
+        log.info("Using truncated sub-millisecond values for verification to match Kafka Connect's millisecond precision");
+        
         verifyTimestamptzRecordsInFirebolt(expectedRecords);
     }
 
@@ -308,7 +311,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
      * Creates the Firebolt table with TIMESTAMPTZ columns.
      */
     private Supplier<String> timestamptzTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredTimestamptz\" TIMESTAMPTZ NOT NULL, " +
                 "\"optionalTimestamptz\" TIMESTAMPTZ NULL, " +
@@ -557,6 +560,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
      * Verifies that the published timestamptz records exist in the Firebolt table with correct null handling.
      */
     private void verifyTimestamptzRecordsInFirebolt(List<TimestamptzTestRecord> expectedRecords) throws SQLException {
+        log.info("Verifying timestamptz records in Firebolt table: {}", TABLE_NAME);
+        
         // Count total records
         int actualCount = fireboltDefaultDbClient.countRows(TABLE_NAME);
         assertEquals(expectedRecords.size(), actualCount, 
@@ -567,7 +572,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredTimestamptz\", \"optionalTimestamptz\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\", \"microsecondTimestamptz\", \"timestamptzStringArray\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;
@@ -594,7 +599,13 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 // Retrieve new microsecond precision fields
                 java.sql.Timestamp actualMicrosecondTimestamptz = rs.getTimestamp("microsecondTimestamptz");
                 Array actualTimestamptzStringArray = rs.getArray("timestamptzStringArray");
-
+                
+                // Debug logging for the first few records
+                if (recordIndex < 3) {
+                    log.info("DEBUG: Record {}: actualMicrosecondTimestamptz = {}", recordIndex, actualMicrosecondTimestamptz);
+                    log.info("DEBUG: Record {}: actualTimestamptzStringArray = {}", recordIndex, actualTimestamptzStringArray);
+                }
+                
                 // Basic field verification
                 assertEquals(expected.getRecordId(), actualRecordId, 
                     "RecordId mismatch at index " + recordIndex);
@@ -639,6 +650,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 verifyMicrosecondTimestamptz(expected.getMicrosecondTimestamptz(), actualMicrosecondTimestamptz, recordIndex);
                 verifyTimestamptzStringArray(expected.getTimestamptzStringArray(), actualTimestamptzStringArray.toString(), recordIndex);
                 
+                log.debug("Verified timestamptz record {}: recordId={}, requiredTimestamptz={}", 
+                    recordIndex, actualRecordId, actualRequiredTimestamptz);
                 recordIndex++;
             }
             
@@ -646,6 +659,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 "Expected to verify " + expectedRecords.size() + " records, but only found " + recordIndex);
         }
         
+        log.info("✅ Timestamptz records verification completed successfully");
     }
     
     /**
@@ -702,6 +716,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
      * Handles timezone variations (1-3 hour offsets) that may occur in test environments.
      */
     private void verifyMicrosecondTimestamptz(Long expectedMicroseconds, java.sql.Timestamp actualTimestamp, int recordIndex) {
+        log.info("DEBUG: Record {}: expectedMicroseconds = {}, actualTimestamp = {}", recordIndex, expectedMicroseconds, actualTimestamp);
         assertNotNull(expectedMicroseconds, "Expected microsecondTimestamptz should not be null at index " + recordIndex);
         assertNotNull(actualTimestamp, "Actual microsecondTimestamptz should not be null at index " + recordIndex);
         
@@ -755,7 +770,13 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         
         List<String> actualStrings = parseFireboltTimestamptzStringArray(actualArrayString);
         
-        assertEquals(expectedStrings.size(), actualStrings.size(),
+        // Debug logging for first few records
+        if (recordIndex < 3) {
+            log.info("DEBUG: Record {}: raw actualArrayString = '{}'", recordIndex, actualArrayString);
+            log.info("DEBUG: Record {}: parsed actualStrings = {}", recordIndex, actualStrings);
+        }
+        
+        assertEquals(expectedStrings.size(), actualStrings.size(), 
             "TimestamptzStringArray size mismatch at index " + recordIndex);
         
         for (int i = 0; i < expectedStrings.size(); i++) {

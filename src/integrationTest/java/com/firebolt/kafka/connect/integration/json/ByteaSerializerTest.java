@@ -178,7 +178,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
      * Creates the Firebolt table with proper null/non-null constraints for bytea testing.
      */
     private Supplier<String> byteaTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredBytea\" BYTEA NOT NULL, " +
                 "\"optionalBytea\" BYTEA NULL, " +
@@ -293,7 +293,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

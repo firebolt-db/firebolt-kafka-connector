@@ -168,7 +168,7 @@ public class NumericSerializerTest extends BaseIntegrationTest {
      * Creates the Firebolt table with proper null/non-null constraints for numeric testing.
      */
     private Supplier<String> numericTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredNumeric\" NUMERIC(38,9) NOT NULL, " +
                 "\"optionalNumeric\" NUMERIC(38,9) NULL, " +
@@ -282,7 +282,7 @@ public class NumericSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredNumeric\", \"optionalNumeric\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

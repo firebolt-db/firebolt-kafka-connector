@@ -207,7 +207,7 @@ public class ArraySerializerTest extends BaseIntegrationTest {
      * Creates the Firebolt table with proper null/non-null constraints for array testing.
      */
     private Supplier<String> arrayTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredArrayWithNullableElements\" ARRAY(INTEGER NULL) NOT NULL, " +
                 "\"requiredArrayWithNonNullElements\" ARRAY(INTEGER NOT NULL) NOT NULL, " +
@@ -363,7 +363,7 @@ public class ArraySerializerTest extends BaseIntegrationTest {
                 "SELECT \"recordId\", \"requiredArrayWithNullableElements\", \"requiredArrayWithNonNullElements\", " +
                         "\"optionalArray\", \"optionalArrayWithNonNullElements\", \"requiredArrayOfArraysWithNullableElements\", " +
                         "\"requiredArrayOfArraysWithNonNullElements\", \"optionalArrayOfArrays\", \"optionalArrayOfArraysWithNonNullElements\" " +
-                        "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+                        "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
 
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

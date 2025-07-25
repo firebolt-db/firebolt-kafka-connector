@@ -43,9 +43,9 @@ public abstract class BaseIntegrationTest {
     
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BaseIntegrationTest.class);
     
-    protected static final String KAFKA_CONNECT_HOST = "http://localhost:8083";
-    protected static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:9092";
-    protected static final String SCHEMA_REGISTRY_URL = "http://localhost:8081";
+    protected static final String KAFKA_CONNECT_HOST = System.getenv().getOrDefault("KAFKA_CONNECT_URL", "http://localhost:8083");
+    protected static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
+    protected static final String SCHEMA_REGISTRY_URL = System.getenv().getOrDefault("SCHEMA_REGISTRY_URL", "http://localhost:8081");
     protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
 
     protected static final String DEFAULT_DATABASE_NAME = "integration_test_db";

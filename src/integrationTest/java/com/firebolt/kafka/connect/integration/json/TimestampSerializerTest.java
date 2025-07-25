@@ -311,7 +311,7 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
      * Creates the Firebolt table with TIMESTAMP columns.
      */
     private Supplier<String> timestampTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredTimestamp\" TIMESTAMP NOT NULL, " +
                 "\"optionalTimestamp\" TIMESTAMP NULL, " +
@@ -561,7 +561,7 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredTimestamp\", \"optionalTimestamp\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\", \"microsecondTimestamp\", \"timestampStringArray\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

@@ -364,7 +364,7 @@ public class JsonSchemaSerializerTest extends BaseIntegrationTest {
             "Expected " + expectedRecords.size() + " records in Firebolt table, but found " + actualCount);
         
         // Then verify the actual data
-        String selectQuery = "SELECT id, \"createdAt\", \"recordTimestamp\", title, description FROM " + TABLE_NAME + " ORDER BY id";
+        String selectQuery = "SELECT id, \"createdAt\", \"recordTimestamp\", title, description FROM \"" + TABLE_NAME + "\" ORDER BY id";
         
         try (ResultSet rs = fireboltClient.executeQuery(selectQuery)) {
             int recordIndex = 0;
@@ -721,7 +721,7 @@ public class JsonSchemaSerializerTest extends BaseIntegrationTest {
 
         
         // Verify specific records by checking the integer column (which is unique)
-        String selectQuery = "SELECT \"colInteger\", \"colBigint\", \"colNumeric\", \"colReal\", \"colDoublePrecision\", \"colBoolean\", \"colText\", \"colDate\", \"colTimestamp\", \"colTimestamptz\", \"colBytea\", \"colArrayTextNullable\", \"colArrayTextNotNull\", \"colArrayIntSyntax1\", \"colArrayIntSyntax2\", \"colArrayDate\", \"colArrayReal\", \"colArrayNested\", \"colArrayNumeric\", \"colArrayDoublePrecision\", \"colArrayTimestamptz\", \"colArrayTimestamp\", \"colStruct\" FROM " + ALL_DATA_TYPES_TABLE_NAME + " ORDER BY \"colInteger\"";
+        String selectQuery = "SELECT \"colInteger\", \"colBigint\", \"colNumeric\", \"colReal\", \"colDoublePrecision\", \"colBoolean\", \"colText\", \"colDate\", \"colTimestamp\", \"colTimestamptz\", \"colBytea\", \"colArrayTextNullable\", \"colArrayTextNotNull\", \"colArrayIntSyntax1\", \"colArrayIntSyntax2\", \"colArrayDate\", \"colArrayReal\", \"colArrayNested\", \"colArrayNumeric\", \"colArrayDoublePrecision\", \"colArrayTimestamptz\", \"colArrayTimestamp\", \"colStruct\" FROM \"" + ALL_DATA_TYPES_TABLE_NAME + "\" ORDER BY \"colInteger\"";
         
         try (ResultSet rs = fireboltClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

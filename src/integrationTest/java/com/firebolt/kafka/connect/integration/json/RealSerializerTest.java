@@ -178,7 +178,7 @@ public class RealSerializerTest extends BaseIntegrationTest {
     }
     
     private Supplier<String> realTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredReal\" REAL NOT NULL, " +
                 "\"optionalReal\" REAL NULL, " +
@@ -297,7 +297,7 @@ public class RealSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredReal\", \"optionalReal\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

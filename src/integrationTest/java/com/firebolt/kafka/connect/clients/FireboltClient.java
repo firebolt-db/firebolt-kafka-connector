@@ -113,7 +113,7 @@ public class FireboltClient implements AutoCloseable {
         log.info("Creating database: {}", databaseName);
         
         try (Statement stmt = connection.createStatement()) {
-            String createSql = "CREATE DATABASE IF NOT EXISTS " + databaseName;
+            String createSql = "CREATE DATABASE IF NOT EXISTS \"" + databaseName + "\"";
             stmt.executeUpdate(createSql);
             log.info("✅ Created database: {}", databaseName);
         }
@@ -129,7 +129,7 @@ public class FireboltClient implements AutoCloseable {
         log.info("Dropping database: {}", databaseName);
         
         try (Statement stmt = connection.createStatement()) {
-            String dropSql = "DROP DATABASE IF EXISTS " + databaseName;
+            String dropSql = "DROP DATABASE IF EXISTS \"" + databaseName + "\"";
             stmt.executeUpdate(dropSql);
             log.info("✅ Dropped database: {}", databaseName);
         }
@@ -146,7 +146,7 @@ public class FireboltClient implements AutoCloseable {
         log.info("Creating table: {}", tableName);
         
         try (Statement stmt = connection.createStatement()) {
-            String createSql = "CREATE TABLE IF NOT EXISTS " + tableName + " (" + schema + ")";
+            String createSql = "CREATE TABLE IF NOT EXISTS \"" + tableName + "\" (" + schema + ")";
             stmt.executeUpdate(createSql);
             log.info("✅ Created table: {}", tableName);
         }
@@ -162,36 +162,12 @@ public class FireboltClient implements AutoCloseable {
         log.info("Dropping table: {}", tableName);
         
         try (Statement stmt = connection.createStatement()) {
-            String dropSql = "DROP TABLE IF EXISTS " + tableName;
+            String dropSql = "DROP TABLE IF EXISTS \"" + tableName + "\"";
             stmt.executeUpdate(dropSql);
             log.info("✅ Dropped table: {}", tableName);
         }
     }
-    
-    /**
-     * Checks if a table exists in the database.
-     * 
-     * @param tableName the name of the table to check
-     * @return true if the table exists
-     * @throws SQLException if query fails
-     */
-    public boolean tableExists(String tableName) throws SQLException {
-        log.debug("Checking if table exists: {}", tableName);
-        
-        String query = "SELECT 1 FROM information_schema.tables " +
-                      "WHERE table_schema = 'public' AND LOWER(table_name) = LOWER(?) LIMIT 1";
-        
-        try (PreparedStatement stmt = connection.prepareStatement(query)) {
-            stmt.setString(1, tableName);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                boolean exists = rs.next();
-                log.debug("Table '{}' exists: {}", tableName, exists);
-                return exists;
-            }
-        }
-    }
-    
+
     /**
      * Counts the number of rows in a table.
      * 
@@ -203,7 +179,7 @@ public class FireboltClient implements AutoCloseable {
         log.debug("Counting rows in table: {}", tableName);
         
         try (Statement stmt = connection.createStatement()) {
-            String countSql = "SELECT COUNT(*) FROM " + tableName;
+            String countSql = "SELECT COUNT(*) FROM \"" + tableName + "\"";
             try (ResultSet rs = stmt.executeQuery(countSql)) {
                 if (rs.next()) {
                     int count = rs.getInt(1);

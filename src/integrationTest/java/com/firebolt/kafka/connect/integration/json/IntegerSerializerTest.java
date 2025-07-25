@@ -172,7 +172,7 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
     }
     
     private Supplier<String> integerTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredInteger\" INTEGER NOT NULL, " +
                 "\"optionalInteger\" INTEGER NULL, " +
@@ -280,7 +280,7 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredInteger\", \"optionalInteger\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

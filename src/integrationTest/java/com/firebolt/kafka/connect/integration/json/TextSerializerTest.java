@@ -184,7 +184,7 @@ public class TextSerializerTest extends BaseIntegrationTest {
     }
     
     private Supplier<String> textTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredText\" TEXT NOT NULL, " +
                 "\"optionalText\" TEXT NULL, " +
@@ -298,7 +298,7 @@ public class TextSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredText\", \"optionalText\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

@@ -138,7 +138,7 @@ public class StructSerializerTest extends BaseIntegrationTest {
      * Creates the Firebolt table with proper null/non-null constraints for struct testing.
      */
     private Supplier<String> structTableSchema() {
-        return () -> "CREATE TABLE %s (" +
+        return () -> "CREATE TABLE \"%s\" (" +
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredStruct\" TEXT NOT NULL, " +
                 "\"optionalStruct\" TEXT NULL, " +
@@ -424,7 +424,7 @@ public class StructSerializerTest extends BaseIntegrationTest {
             "SELECT \"recordId\", \"requiredStruct\", \"optionalStruct\", " +
             "\"requiredStructArray\", \"optionalStructArray\", \"requiredStructArrayWithNullableElements\", " +
             "\"optionalStructArrayWithNullableElements\" " +
-            "FROM %s ORDER BY \"recordId\"", TABLE_NAME);
+            "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;

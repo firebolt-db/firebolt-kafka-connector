@@ -57,45 +57,6 @@ public class ArrayTestRecord {
     @JsonSerialize(using = ArrayOfArraysSerializer.class)
     private List<List<Integer>> optionalArrayOfArraysWithNonNullElements;
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ArrayTestRecord that = (ArrayTestRecord) o;
-        return Objects.equals(recordId, that.recordId) &&
-               Objects.equals(requiredArrayWithNullableElements, that.requiredArrayWithNullableElements) &&
-               Objects.equals(requiredArrayWithNonNullElements, that.requiredArrayWithNonNullElements) &&
-               Objects.equals(optionalArray, that.optionalArray) &&
-               Objects.equals(optionalArrayWithNonNullElements, that.optionalArrayWithNonNullElements) &&
-               Objects.equals(requiredArrayOfArraysWithNullableElements, that.requiredArrayOfArraysWithNullableElements) &&
-               Objects.equals(requiredArrayOfArraysWithNonNullElements, that.requiredArrayOfArraysWithNonNullElements) &&
-               Objects.equals(optionalArrayOfArrays, that.optionalArrayOfArrays) &&
-               Objects.equals(optionalArrayOfArraysWithNonNullElements, that.optionalArrayOfArraysWithNonNullElements);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(recordId, requiredArrayWithNullableElements, requiredArrayWithNonNullElements,
-                          optionalArray, optionalArrayWithNonNullElements,
-                          requiredArrayOfArraysWithNullableElements, requiredArrayOfArraysWithNonNullElements,
-                          optionalArrayOfArrays, optionalArrayOfArraysWithNonNullElements);
-    }
-
-    @Override
-    public String toString() {
-        return "ArrayTestRecord{" +
-                "recordId=" + recordId +
-                ", requiredArrayWithNullableElements=" + requiredArrayWithNullableElements +
-                ", requiredArrayWithNonNullElements=" + requiredArrayWithNonNullElements +
-                ", optionalArray=" + optionalArray +
-                ", optionalArrayWithNonNullElements=" + optionalArrayWithNonNullElements +
-                ", requiredArrayOfArraysWithNullableElements=" + requiredArrayOfArraysWithNullableElements +
-                ", requiredArrayOfArraysWithNonNullElements=" + requiredArrayOfArraysWithNonNullElements +
-                ", optionalArrayOfArrays=" + optionalArrayOfArrays +
-                ", optionalArrayOfArraysWithNonNullElements=" + optionalArrayOfArraysWithNonNullElements +
-                '}';
-    }
-
     /**
      * Custom serializer for Integer lists to ensure proper JSON formatting.
      */
