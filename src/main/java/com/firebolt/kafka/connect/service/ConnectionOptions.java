@@ -16,7 +16,10 @@ import lombok.ToString;
 @ToString
 public class ConnectionOptions {
 
-    private static final int DEFAULT_CONNECTION_TIMEOUT_SECONDS = 5;
+    /**
+     * In case engine is stopped we need to have a longer duration to allow the engine to start
+     */
+    private static final int DEFAULT_CONNECTION_TIMEOUT_SECONDS = 300;
 
     @Builder.Default
     private int connectionTimeoutSeconds = DEFAULT_CONNECTION_TIMEOUT_SECONDS;

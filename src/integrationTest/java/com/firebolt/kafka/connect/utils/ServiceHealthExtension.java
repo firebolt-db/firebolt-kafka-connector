@@ -26,7 +26,7 @@ public class ServiceHealthExtension implements BeforeAllCallback {
     private static final String KAFKA_CONNECT_HOST = "http://localhost:8083";
     private static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String SCHEMA_REGISTRY_URL = "http://localhost:8081";
-    private static final Duration HEALTH_CHECK_TIMEOUT = Duration.ofMinutes(1);
+    private static final Duration HEALTH_CHECK_TIMEOUT = Duration.ofMinutes(4);
     
     private static boolean healthCheckCompleted = false;
     private static final Object lock = new Object();

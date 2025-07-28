@@ -198,11 +198,11 @@ class FireboltDbServiceTest {
             try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
                 mockedDriverManager.when(() -> DriverManager.getConnection(eq(connectionUrl), any(Properties.class)))
                         .thenReturn(mockConnection);
-                when(mockConnection.isValid(5)).thenReturn(true);
+                when(mockConnection.isValid(300)).thenReturn(true);
 
                 assertDoesNotThrow(() -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl)));
                 
-                verify(mockConnection).isValid(5);
+                verify(mockConnection).isValid(300);
             }
         }
 
@@ -332,11 +332,11 @@ class FireboltDbServiceTest {
             try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
                 mockedDriverManager.when(() -> DriverManager.getConnection(eq(connectionUrl), any(Properties.class)))
                         .thenReturn(mockConnection);
-                when(mockConnection.isValid(5)).thenReturn(true);
+                when(mockConnection.isValid(300)).thenReturn(true);
 
                 assertDoesNotThrow(() -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl)));
                 
-                verify(mockConnection).isValid(5);
+                verify(mockConnection).isValid(300);
             }
         }
 
@@ -387,7 +387,7 @@ class FireboltDbServiceTest {
         void shouldCreateConnectionOptionsWithDefaultTimeout() {
             ConnectionOptions options = ConnectionOptions.builder().build();
 
-            assertEquals(5, options.getConnectionTimeoutSeconds(), "Default timeout should be 5 seconds");
+            assertEquals(300, options.getConnectionTimeoutSeconds(), "Default timeout should be 300 seconds");
         }
 
         @Test
@@ -403,7 +403,7 @@ class FireboltDbServiceTest {
         void shouldCreateConnectionOptionsWithNoArgsConstructor() {
             ConnectionOptions options = new ConnectionOptions();
 
-            assertEquals(5, options.getConnectionTimeoutSeconds(), "Default timeout should be 5 seconds");
+            assertEquals(300, options.getConnectionTimeoutSeconds(), "Default timeout should be 300 seconds");
         }
 
         @Test
