@@ -12,7 +12,7 @@ plugins {
 // and it will be applied to all dependencies that use that library
 ext {
     lombokVersion = '1.18.30'
-    jacksonVersion = '2.15.2'
+    jacksonVersion = '2.19.2'
     junitJupiterVersion = '5.9.3'
     log4jVersion = '2.23.1'
     okhttpVersion = '5.1.0'
