@@ -1,0 +1,419 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'jacoco'
+    id "org.sonarqube" version "6.2.0.5505"
+}
+
+// Version and group are now defined in gradle.properties
+
+// Library versions
+// To update a library version, simply change the version number here
+// and it will be applied to all dependencies that use that library
+ext {
+    lombokVersion = '1.18.30'
+    jacksonVersion = '2.15.2'
+    junitJupiterVersion = '5.9.3'
+    log4jVersion = '2.23.1'
+    okhttpVersion = '5.1.0'
+    kafkaVersion = '3.9.1'
+    testcontainersVersion = '1.18.3'
+    slf4jVersion = '2.0.7'
+    fireboltJdbcVersion = '3.6.7'
+    guavaVersion = '32.1.2-jre'
+    confluentVersion = '7.4.0'
+    avroVersion = '1.11.2'
+    mockitoVersion = '5.4.0'
+    awaitilityVersion = '4.2.0'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "https://packages.confluent.io/maven/"
+    }
+}
+
+dependencies {
+    // Kafka Connect API - provided at runtime, needed for compilation
+    compileOnly "org.apache.kafka:connect-api:${kafkaVersion}"
+    compileOnly "org.apache.kafka:connect-transforms:${kafkaVersion}"
+    compileOnly "org.apache.kafka:kafka-clients:${kafkaVersion}"
+    
+    // Confluent specific - provided at runtime, needed for compilation  
+    compileOnly("io.confluent:kafka-connect-avro-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    compileOnly("io.confluent:kafka-json-schema-serializer:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    compileOnly("io.confluent:kafka-connect-json-schema-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    compileOnly("org.apache.avro:avro:${avroVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    
+    // Firebolt JDBC Driver - bundle this, exclude any Kafka and logging dependencies
+    implementation("io.firebolt:firebolt-jdbc:${fireboltJdbcVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    
+    // JSON Processing - bundle these, exclude any Kafka and logging dependencies
+    implementation("com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    implementation("com.fasterxml.jackson.core:jackson-core:${jacksonVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    implementation("com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    
+    // Logging - provided by Connect runtime, use compileOnly
+    compileOnly "org.slf4j:slf4j-api:${slf4jVersion}"
+    compileOnly "org.apache.logging.log4j:log4j-core:${log4jVersion}"
+    compileOnly "org.apache.logging.log4j:log4j-api:${log4jVersion}"
+    compileOnly "org.apache.logging.log4j:log4j-slf4j2-impl:${log4jVersion}"
+    
+    // Utilities - bundle this, exclude any Kafka and logging dependencies
+    implementation("com.google.guava:guava:${guavaVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    
+    // Lombok
+    compileOnly "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+    testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+    testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+    
+    // Testing - Unit Tests
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-params:${junitJupiterVersion}"
+    testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+    testImplementation "org.mockito:mockito-junit-jupiter:${mockitoVersion}"
+    
+    // Integration Testing - TestContainers and Kafka
+    testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
+    testImplementation "org.testcontainers:kafka:${testcontainersVersion}"
+    testImplementation "org.apache.kafka:kafka-clients:${kafkaVersion}"
+    testImplementation "org.apache.kafka:connect-api:${kafkaVersion}"
+    testImplementation "org.apache.kafka:connect-transforms:${kafkaVersion}"
+    testImplementation "org.apache.kafka:connect-runtime:${kafkaVersion}"
+    
+    // HTTP Client for REST API testing
+    testImplementation "com.squareup.okhttp3:okhttp:${okhttpVersion}"
+    testImplementation "com.squareup.okhttp3:mockwebserver:${okhttpVersion}"
+    
+    // JSON for test data
+    testImplementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+    testImplementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+    testImplementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
+    
+    // Logging for testing
+    testImplementation "org.slf4j:slf4j-api:${slf4jVersion}"
+    testImplementation "org.apache.logging.log4j:log4j-core:${log4jVersion}"
+    testImplementation "org.apache.logging.log4j:log4j-api:${log4jVersion}"
+    testImplementation "org.apache.logging.log4j:log4j-slf4j2-impl:${log4jVersion}"
+    
+    // JUnit Jupiter for testing
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
+    
+    // Testcontainers for Docker management
+    testImplementation "org.testcontainers:testcontainers:${testcontainersVersion}"
+    testImplementation "org.testcontainers:postgresql:${testcontainersVersion}" // For Firebolt (PostgreSQL wire protocol)
+    
+    // Awaitility for async testing
+    testImplementation "org.awaitility:awaitility:${awaitilityVersion}"
+}
+
+
+
+// Generate version.properties file during build
+processResources {
+    def projectProperties = project.properties
+    filesMatching('**/version.properties') {
+        expand(projectProperties)
+    }
+}
+
+// Configure test suites explicitly to avoid deprecation warnings
+testing {
+    suites {
+        test {
+            useJUnitJupiter()
+        }
+        integrationTest(JvmTestSuite) {
+            useJUnitJupiter()
+        }
+    }
+}
+
+test {
+    useJUnitPlatform {
+        includeEngines 'junit-jupiter'
+        if (System.getProperty('junit.jupiter.excludeTags')) {
+            excludeTags System.getProperty('junit.jupiter.excludeTags').split(',')
+        }
+        if (System.getProperty('junit.jupiter.includeTags')) {
+            includeTags System.getProperty('junit.jupiter.includeTags').split(',')
+        }
+    }
+}
+
+// Configure integration test task to handle tag filtering
+tasks.named('integrationTest', Test) {
+    useJUnitPlatform {
+        includeEngines 'junit-jupiter'
+        if (System.getProperty('junit.jupiter.excludeTags')) {
+            excludeTags System.getProperty('junit.jupiter.excludeTags').split(',')
+        }
+        if (System.getProperty('junit.jupiter.includeTags')) {
+            includeTags System.getProperty('junit.jupiter.includeTags').split(',')
+        }
+    }
+}
+
+// Shared architecture configuration - evaluated only once when needed
+ext.selectedArchitecture = null
+
+// Integration test source set
+sourceSets {
+    integrationTest {
+        java {
+            compileClasspath += main.output + test.output
+            runtimeClasspath += main.output + test.output
+                srcDir 'src/integrationTest/java'
+}
+resources {
+    srcDir 'src/integrationTest/resources'
+        }
+    }
+}
+
+// Configure duplicate handling for integration test resources
+tasks.processIntegrationTestResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestCompileOnly.extendsFrom testCompileOnly
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+// Configure IntelliJ IDEA to recognize integration test source set
+idea {
+    module {
+        testSources.from(sourceSets.integrationTest.java.srcDirs)
+        testResources.from(sourceSets.integrationTest.resources.srcDirs)
+        scopes.TEST.plus += [configurations.integrationTestRuntimeClasspath]
+        scopes.TEST.plus += [configurations.integrationTestCompileClasspath]
+    }
+}
+
+// Integration test specific dependencies
+dependencies {
+    // Lombok for integration testing
+    integrationTestCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+    integrationTestAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+    
+    // JUnit Jupiter for integration testing
+    integrationTestImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+    integrationTestImplementation "org.junit.jupiter:junit-jupiter-params:${junitJupiterVersion}"
+    integrationTestRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
+    
+    // HTTP Client for REST API testing (integration tests)
+    integrationTestImplementation "com.squareup.okhttp3:okhttp:${okhttpVersion}"
+    integrationTestImplementation "com.squareup.okhttp3:mockwebserver:${okhttpVersion}"
+    
+    // JSON for integration tests
+    integrationTestImplementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+    integrationTestImplementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+    integrationTestImplementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
+    
+    // Kafka clients for integration tests
+    integrationTestImplementation "org.apache.kafka:kafka-clients:${kafkaVersion}"
+    integrationTestImplementation "org.apache.kafka:connect-api:${kafkaVersion}"
+    integrationTestImplementation "org.apache.kafka:connect-transforms:${kafkaVersion}"
+    integrationTestImplementation "org.apache.kafka:connect-runtime:${kafkaVersion}"
+    
+    // Awaitility for async testing
+    integrationTestImplementation "org.awaitility:awaitility:${awaitilityVersion}"
+    
+    // TestContainers for integration tests
+    integrationTestImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
+    integrationTestImplementation "org.testcontainers:kafka:${testcontainersVersion}"
+    integrationTestImplementation "org.testcontainers:testcontainers:${testcontainersVersion}"
+    integrationTestImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
+    
+    // Confluent JSON Schema serializer and converter for Schema Registry integration
+    integrationTestImplementation("io.confluent:kafka-json-schema-serializer:${confluentVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    integrationTestImplementation("io.confluent:kafka-connect-json-schema-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    // Additional Schema Registry dependencies for proper runtime support
+    integrationTestImplementation("io.confluent:kafka-schema-registry-client:${confluentVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    integrationTestImplementation("io.confluent:common-utils:${confluentVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    
+    // Logging for integration tests
+    integrationTestImplementation "org.slf4j:slf4j-api:${slf4jVersion}"
+    integrationTestImplementation "org.apache.logging.log4j:log4j-core:${log4jVersion}"
+    integrationTestImplementation "org.apache.logging.log4j:log4j-api:${log4jVersion}"
+    integrationTestImplementation "org.apache.logging.log4j:log4j-slf4j2-impl:${log4jVersion}"
+}
+
+// Create a fat JAR that includes all runtime dependencies
+jar {
+    archiveBaseName = project.property('archivesBaseName')
+    archiveVersion = project.version
+    
+    manifest {
+        attributes(
+            'Implementation-Title': project.property('description'),
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': 'Firebolt',
+            'Built-By': System.getProperty('user.name'),
+            'Built-Date': new Date().toString(),
+            'Built-JDK': System.getProperty('java.version')
+        )
+    }
+    
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    
+    // Exclude files that might cause conflicts
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+    exclude 'META-INF/MANIFEST.MF'
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+} 
+
+// Deploy connector JAR to Kafka Connect plugin directories
+task deployToKafkaConnect {
+    dependsOn jar
+    
+    description = 'Builds and copies the connector JAR to Kafka Connect plugin directories'
+    group = 'distribution'
+    
+    doLast {
+        def jarFile = jar.archiveFile.get().asFile
+        def jarName = jar.archiveFileName.get()
+        
+        // Copy to Kafka Connect 3.9.1 plugins directory
+        def pluginsDir391 = file('src/integrationTest/docker/kafka-connect-3.9.1/plugins/')
+        pluginsDir391.mkdirs()
+        copy {
+            from jarFile
+            into pluginsDir391
+        }
+        
+        // Copy to Kafka Connect 4.0 plugins directory
+        def pluginsDir40 = file('src/integrationTest/docker/kafka-connect-4.0/plugins/')
+        pluginsDir40.mkdirs()
+        copy {
+            from jarFile
+            into pluginsDir40
+        }
+        
+        println "✅ Deployed ${jarName} to:"
+        println "   📁 src/integrationTest/docker/kafka-connect-3.9.1/plugins/"
+        println "   📁 src/integrationTest/docker/kafka-connect-4.0/plugins/"
+    }
+}
+
+// Jacoco configuration
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+    executionData fileTree(dir: layout.buildDirectory.dir('jacoco'), include: '**/*.exec')
+}
+
+sonar {
+    properties {
+        property "sonar.java.source", "11"
+        property "sonar.projectKey", "firebolt-db_kafka-connect"
+        property "sonar.organization", "firebolt-db"
+        property "sonar.host.url", "https://sonarcloud.io"
+        property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
+        property "sonar.junit.reportPaths", "build/test-results/test"
+    }
+}
+
+// Make sure test task finalizes with jacoco report
+test.finalizedBy jacocoTestReport
+
+// Integration test jacoco report
+task jacocoIntegrationTestReport(type: JacocoReport) {
+    dependsOn integrationTest
+    executionData integrationTest
+    sourceSets sourceSets.main
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+// Combined jacoco report for both unit and integration tests
+task jacocoMergedReport(type: JacocoReport) {
+    dependsOn test, integrationTest
+    executionData fileTree(dir: layout.buildDirectory.dir('jacoco'), include: '**/*.exec')
+    sourceSets sourceSets.main
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}

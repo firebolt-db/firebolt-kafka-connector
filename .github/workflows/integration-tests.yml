@@ -1,0 +1,142 @@
+name: Integration Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      kafka_connect_version:
+        description: 'Kafka Connect version to test with'
+        required: true
+        default: '3.9.1'
+        type: choice
+        options:
+          - '3.9.1'
+          - '4.0'
+  workflow_call:
+    inputs:
+      kafka_connect_version:
+        description: 'Kafka Connect version to test with'
+        required: false
+        default: '3.9.1'
+        type: string
+     
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle
+        
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+        
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+        
+    - name: Display Kafka Connect version
+      run: |
+        echo "Testing with Kafka Connect version: ${{ github.event.inputs.kafka_connect_version }}"
+        
+    - name: Build project
+      run: ./gradlew build --no-daemon
+      
+    - name: Deploy to Kafka Connect
+      run: ./gradlew deployToKafkaConnect --no-daemon
+      
+    - name: Determine docker-compose file
+      run: |
+        KAFKA_CONNECT_VERSION="${{ github.event.inputs.kafka_connect_version }}"
+        if [ "$KAFKA_CONNECT_VERSION" = "4.0" ]; then
+          COMPOSE_FILE="src/integrationTest/docker/kafka-connect-4.0/docker-compose.yml"
+        else
+          COMPOSE_FILE="src/integrationTest/docker/kafka-connect-3.9.1/docker-compose.yml"
+        fi
+        echo "COMPOSE_FILE=$COMPOSE_FILE" >> $GITHUB_ENV
+        echo "Using docker-compose file: $COMPOSE_FILE"
+        
+    - name: Start Docker services
+      run: |
+        echo "Starting Docker services with $COMPOSE_FILE"
+        docker-compose -f "$COMPOSE_FILE" up -d
+        
+        # Wait for services to be ready
+        echo "Waiting for services to be ready..."
+        sleep 30
+        
+        # Verify Kafka Connect is ready
+        echo "Checking if Kafka Connect is ready..."
+        timeout 60 bash -c 'until curl -f http://localhost:8083/connectors; do sleep 2; done'
+        echo "Kafka Connect is ready!"
+        
+    - name: Run integration tests (excluding NOT_IMPLEMENTED)
+      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented --no-daemon
+      env:
+        KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+        SCHEMA_REGISTRY_URL: http://localhost:8081
+        KAFKA_CONNECT_URL: http://localhost:8083
+        KAFKA_CONNECT_VERSION: ${{ github.event.inputs.kafka_connect_version }}
+        FIREBOLT_URL: ${{ secrets.FIREBOLT_URL }}
+        FIREBOLT_USERNAME: ${{ secrets.FIREBOLT_USERNAME }}
+        FIREBOLT_PASSWORD: ${{ secrets.FIREBOLT_PASSWORD }}
+        FIREBOLT_DATABASE: ${{ secrets.FIREBOLT_DATABASE }}
+        
+    - name: Collect Docker logs
+      if: always()
+      run: |
+        echo "Collecting Docker logs..."
+        mkdir -p docker-logs
+        
+        # Get logs from all containers
+        docker-compose -f "$COMPOSE_FILE" logs > docker-logs/all-services.log 2>&1 || true
+        
+        # Get individual service logs
+        docker-compose -f "$COMPOSE_FILE" logs kafka-connect > docker-logs/kafka-connect.log 2>&1 || true
+        docker-compose -f "$COMPOSE_FILE" logs kafka > docker-logs/kafka.log 2>&1 || true
+        docker-compose -f "$COMPOSE_FILE" logs zookeeper > docker-logs/zookeeper.log 2>&1 || true
+        docker-compose -f "$COMPOSE_FILE" logs schema-registry > docker-logs/schema-registry.log 2>&1 || true
+        
+        # Get container status
+        docker-compose -f "$COMPOSE_FILE" ps > docker-logs/container-status.txt 2>&1 || true
+        
+        echo "Docker logs collected successfully"
+        
+    - name: Stop Docker services
+      if: always()
+      run: |
+        echo "Stopping Docker services..."
+        docker-compose -f "$COMPOSE_FILE" down -v
+        echo "Docker services stopped"
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results-${{ github.event.inputs.kafka_connect_version }}
+        path: |
+          build/test-results/
+          build/reports/tests/
+          logs/
+          
+    - name: Upload test reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-reports-${{ github.event.inputs.kafka_connect_version }}
+        path: build/reports/
+        
+    - name: Upload Docker logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: docker-logs-${{ github.event.inputs.kafka_connect_version }}
+        path: docker-logs/ 
