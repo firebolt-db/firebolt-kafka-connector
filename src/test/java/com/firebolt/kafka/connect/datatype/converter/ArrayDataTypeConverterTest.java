@@ -1,0 +1,205 @@
+package com.firebolt.kafka.connect.datatype.converter;
+
+import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.TableSchema;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import java.sql.Array;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+public class ArrayDataTypeConverterTest {
+
+    @Mock
+    private PreparedStatement mockStatement;
+
+    @Mock
+    private Connection mockConnection;
+
+    @Mock
+    private Array mockArray;
+
+    private ArrayDataTypeConverter converter;
+    private TableSchema.Column integerArrayColumn;
+    private TableSchema.Column textArrayColumn;
+
+    @BeforeEach
+    void setUp() throws SQLException {
+        MockitoAnnotations.openMocks(this);
+        converter = new ArrayDataTypeConverter();
+        integerArrayColumn = new TableSchema.Column("test_column", "array(integer)", 2003, true);
+        textArrayColumn = new TableSchema.Column("test_column", "array(text)", 2003, true);
+        
+        when(mockStatement.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createArrayOf(any(String.class), any(Object[].class))).thenReturn(mockArray);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "1, 'Single positive value'",
+        "-1, 'Single negative value'",
+        "0, 'Single zero value'",
+        "2147483647, 'Integer.MAX_VALUE'",
+        "-2147483648, 'Integer.MIN_VALUE'"
+    })
+    void testConvertAndSetWithSingleValueArrays(long value, String description) throws SQLException {
+        List<Long> arrayValues = Arrays.asList(value);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("integer"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithMultipleIntegerValues() throws SQLException {
+        List<Long> arrayValues = Arrays.asList(
+                (long) Integer.MIN_VALUE, 
+                -1000L, 
+                -1L, 
+                0L, 
+                1L, 
+                1000L, 
+                (long) Integer.MAX_VALUE
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("integer"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithEmptyArray() throws SQLException {
+        List<Long> emptyArray = new ArrayList<>();
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(emptyArray)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("integer"), eq(emptyArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithArrayContainingZerosAndNulls() throws SQLException {
+        List<Long> arrayValues = Arrays.asList(0L, 0L, 0L, null, null);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("integer"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithLargeArray() throws SQLException {
+        List<Long> largeArray = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            largeArray.add((long) i);
+        }
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(largeArray)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("integer"), eq(largeArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTextArrayType() throws SQLException {
+        List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, textArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "array(bigint)",
+        "array(real)",
+        "array(boolean)",
+        "array(date)",
+        "unsupported_array_type"
+    })
+    void testConvertAndSetWithUnsupportedArrayTypesDefaultsToString(String dataType) throws SQLException {
+        TableSchema.Column unsupportedColumn = new TableSchema.Column("test_column", dataType, 2003, true);
+        List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, unsupportedColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithNullValueThrowsException() {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(null)
+                .build();
+
+        assertThrows(NullPointerException.class, () -> {
+            converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+        });
+    }
+
+    @Test
+    void testConvertAndSetWithNonListValueThrowsException() {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value("not a list")
+                .build();
+
+        assertThrows(ClassCastException.class, () -> {
+            converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+        });
+    }
+
+    @Test
+    void testConvertAndSetWithSQLExceptionFromConnection() throws SQLException {
+        List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .build();
+        
+        when(mockConnection.createArrayOf(any(String.class), any(Object[].class)))
+                .thenThrow(new SQLException("Database connection error"));
+
+        assertThrows(SQLException.class, () -> {
+            converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
+        });
+    }
+} 
