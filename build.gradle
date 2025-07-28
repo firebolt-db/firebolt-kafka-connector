@@ -14,7 +14,7 @@ ext {
     lombokVersion = '1.18.30'
     jacksonVersion = '2.15.2'
     junitJupiterVersion = '5.9.3'
-    log4jVersion = '2.23.1'
+    log4jVersion = '2.25.1'
     okhttpVersion = '5.1.0'
     kafkaVersion = '3.9.1'
     testcontainersVersion = '1.18.3'
