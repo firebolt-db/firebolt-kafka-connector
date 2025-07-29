@@ -65,6 +65,7 @@ services:
         condition: service_started
     ports:
       - "8083:8083"
+      - "5005:5005"  # Debug port
     environment:
       CONNECT_BOOTSTRAP_SERVERS: 'kafka:29092'
       CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
@@ -90,6 +91,8 @@ services:
       CONNECT_CONFIG_PROVIDERS_FILE_CLASS: 'org.apache.kafka.common.config.provider.FileConfigProvider'
       # Configure to use latest Kafka Connect runtime
       KAFKA_VERSION: "7.4.0"
+      # Enable JVM debugging
+      KAFKA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     volumes:
       - ./plugins:/etc/kafka-connect/jars
       - ./configs:/etc/kafka-connect/configs
