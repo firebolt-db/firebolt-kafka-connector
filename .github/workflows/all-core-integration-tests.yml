@@ -1,0 +1,19 @@
+name: All Core Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  integration-tests-3-9-1:
+    name: Integration Tests (Kafka Connect 3.9.1)
+    uses: ./.github/workflows/core-integration-tests.yml
+    with:
+      kafka_connect_version: '3.9.1'
+
+  integration-tests-4-0:
+    name: Integration Tests (Kafka Connect 4.0)
+    uses: ./.github/workflows/core-integration-tests.yml
+    with:
+      kafka_connect_version: '4.0' 

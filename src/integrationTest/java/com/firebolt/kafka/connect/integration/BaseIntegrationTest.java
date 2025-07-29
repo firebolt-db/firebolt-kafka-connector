@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.clients.FireboltClient;
 import com.firebolt.kafka.connect.clients.SchemaRegistryClient;
+import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import com.firebolt.kafka.connect.utils.ServiceHealthExtension;
 import com.firebolt.kafka.connect.utils.TestSetupExtension;
 import com.firebolt.kafka.connect.utils.TopicOptions;
@@ -70,7 +71,7 @@ public abstract class BaseIntegrationTest {
         this.kafkaConnectVersion = System.getProperty("kafka.connect.version", "unknown");
         
         try {
-            this.fireboltDefaultDbClient = FireboltClient.createFor(DEFAULT_DATABASE_NAME);
+            this.fireboltDefaultDbClient = FireboltClient.createFor(getDatabaseName());
             this.schemaRegistryClient = new SchemaRegistryClient(SCHEMA_REGISTRY_URL, httpClient, objectMapper);
         } catch (SQLException e) {
             log.error("Failed to create FireboltClient: {}", e.getMessage(), e);
@@ -217,11 +218,19 @@ public abstract class BaseIntegrationTest {
         connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
         
         // Firebolt connector specific properties
-        String dockerFireboltUrl = "jdbc:firebolt:" + DEFAULT_DATABASE_NAME + "?url=http://firebolt-core.local:3473";
-        connectorConfig.put("jdbc.connection.url", dockerFireboltUrl);
+        connectorConfig.put("jdbc.connection.url", getJdbcConnectionUrl());
         connectorConfig.put("topic.to.table.mapping", topicToTableMappings);
-        connectorConfig.put("table.auto.create", "false");
-        connectorConfig.put("sink.connector.type", "append");
+        
+        // Add client credentials if system properties are set
+        String clientId = getClientId();
+        if (clientId != null) {
+            connectorConfig.put("firebolt.clientId", "${file:/etc/kafka-connect/secrets/secrets.properties:clientId}");
+        }
+
+        String clientSecret = getClientSecret();
+        if (clientSecret != null) {
+            connectorConfig.put("firebolt.clientSecret", "${file:/etc/kafka-connect/secrets/secrets.properties:clientSecret}");
+        }
         
         // Create the connector
         createConnector(connectorName, connectorConfig);
@@ -510,6 +519,47 @@ public abstract class BaseIntegrationTest {
             log.error("Failed to set up test resources: {}", e.getMessage());
             throw new RuntimeException("Test resources setup failed", e);
         }
+    }
+
+    protected static String getJdbcConnectionUrl() {
+        String systemPropertyUrl = System.getProperty("jdbc.connection.url");
+        if (systemPropertyUrl != null && !systemPropertyUrl.trim().isEmpty()) {
+            log.info("Using JDBC connection URL from system property: {}", systemPropertyUrl);
+            return systemPropertyUrl;
+        }
+        
+        // Default to local Firebolt Core for integration tests
+        String defaultUrl = "jdbc:firebolt:" + DEFAULT_DATABASE_NAME + "?url=http://firebolt-core.local:3473";
+        log.info("Using default JDBC connection URL: {}", defaultUrl);
+        return defaultUrl;
+    }
+
+    protected String getClientId() {
+        String clientId = System.getProperty("clientId");
+        if (clientId != null && !clientId.trim().isEmpty()) {
+            log.info("Using client ID from system property");
+            return clientId;
+        }
+        
+        log.debug("No client ID system property set, returning null");
+        return null;
+    }
+
+    protected String getClientSecret() {
+        String clientSecret = System.getProperty("clientSecret");
+        if (clientSecret != null && !clientSecret.trim().isEmpty()) {
+            log.info("Using client secret from system property");
+            return clientSecret;
+        }
+        
+        log.debug("No client secret system property set, returning null");
+        return null;
+    }
+
+    protected static String getDatabaseName() {
+        // Use a URL with the same structure as the default but with a non-existing database
+        return JdbcConnectionParser.getDatabase(getJdbcConnectionUrl());
+
     }
 
 }

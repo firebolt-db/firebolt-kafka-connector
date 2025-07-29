@@ -1,11 +1,15 @@
 package com.firebolt.kafka.connect.clients;
 
+import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
+import com.firebolt.shadow.org.apache.commons.lang3.StringUtils;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Properties;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Client class for Firebolt database operations used in integration tests.
@@ -19,11 +23,10 @@ import java.sql.Statement;
  * - firebolt.host: Hostname (default: localhost)
  * - firebolt.port: Port number (default: 3473)
  */
+@Slf4j
 public class FireboltClient implements AutoCloseable {
     
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FireboltClient.class);
-
-    private static final String JDBC_CONNECTION_URL_FORMAT = "jdbc:firebolt:%s?url=http://%s:%s";
+    private static final String JDBC_CONNECTION_URL_FORMAT = "jdbc:firebolt:%s?url=http://localhost:3473";
 
     private final String jdbcUrl;
     private final Connection connection;
@@ -35,45 +38,42 @@ public class FireboltClient implements AutoCloseable {
      * @param jdbcUrl the Firebolt JDBC connection URL
      * @throws SQLException if connection fails
      */
-    public FireboltClient(String jdbcUrl) throws SQLException {
+    private FireboltClient(String jdbcUrl) throws SQLException {
         this.jdbcUrl = jdbcUrl;
         this.connection = DriverManager.getConnection(jdbcUrl);
-        log.debug("FireboltClient connected to: {}", jdbcUrl.replaceAll("password=[^&]*", "password=***"));
     }
 
-    /**
-     * Creates a new FireboltClient using default connection settings.
-     * Uses environment variables or default ports for flexibility.
-     *
-     * @return a new FireboltClient instance
-     * @throws SQLException if connection fails
-     */
+    private FireboltClient(String jdbcUrl, String clientId, String clientSecret) throws SQLException {
+        this.jdbcUrl = jdbcUrl;
+
+        Properties props = new Properties();
+        props.put("client_id", clientId);
+        props.put("client_secret", clientSecret);
+
+        this.connection = DriverManager.getConnection(jdbcUrl, props);
+    }
+
     public static FireboltClient createDefault() throws SQLException {
         return createFor("");
     }
 
-    /**
-     * Creates a new FireboltClient for a particular database.
-     * Uses environment variables or default ports for flexibility.
-     *
-     * @param database the database name (empty string for default)
-     * @return a new FireboltClient instance
-     * @throws SQLException if connection fails
-     */
     public static FireboltClient createFor(String database) throws SQLException {
-        // Check if URL is explicitly configured
-        String explicitUrl = System.getProperty("firebolt.url");
-        if (explicitUrl != null && !explicitUrl.isEmpty()) {
-            log.debug("Using explicit Firebolt URL from system property: {}", explicitUrl);
-            return new FireboltClient(explicitUrl);
+        // Check if clientId/clientSecret is explicitly configured
+        String clientId = System.getProperty("clientId", null);
+        String clientSecret = System.getProperty("clientSecret", null);
+
+        if (StringUtils.isNotEmpty(clientId) && StringUtils.isNotEmpty(clientSecret)) {
+            log.info("Using firebolt cloud");
+
+            String jdbcUrl = System.getProperty("jdbc.connection.url");
+            String databaseName = JdbcConnectionParser.getDatabase(jdbcUrl);
+
+            return new FireboltClient(jdbcUrl.replaceFirst(databaseName, database), clientId, clientSecret);
         }
-        
-        // Build URL using system properties
-        String host = System.getProperty("firebolt.host", "localhost");
-        String port = System.getProperty("firebolt.port", "3473");
-        String url = String.format(JDBC_CONNECTION_URL_FORMAT, database, host, port);
-        
-        log.debug("Using Firebolt connection: {}:{}", host, port);
+
+        // Build URL for core url
+        log.info("Using firebolt core");
+        String url = String.format(JDBC_CONNECTION_URL_FORMAT, database);
         return new FireboltClient(url);
     }
 
