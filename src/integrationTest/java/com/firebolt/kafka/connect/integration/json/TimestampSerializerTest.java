@@ -2,18 +2,23 @@ package com.firebolt.kafka.connect.integration.json;
 
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.TimestampTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +26,6 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -32,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class TimestampSerializerTest extends BaseIntegrationTest {
 
     private static final String TOPIC_NAME = "timestamp-test-topic";
@@ -197,8 +200,14 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                 .microsecondTimestamp(1705334445123456L) // 2024-01-15T14:30:45.123456 in microseconds since epoch
                 .timestampStringArray(Arrays.asList(
                     "2024-03-01T10:00:00.500123",   // 500.123 milliseconds precision
-                    "2024-08-15T16:45:12.123456",   // 123.456 milliseconds precision  
+                    "2024-08-15T16:45:12.123456",   // 123.456 milliseconds precision
                     "2024-05-20T08:30:45.750789"))  // 750.789 milliseconds precision
+                .microsecondTimestampList(Arrays.asList(
+                    1709204400500123L, // 2024-03-01T10:00:00.500123
+                    1723737912123456L, // 2024-08-15T16:45:12.123456
+                    1716138045750789L  // 2024-05-20T08:30:45.750789
+                ))
+                .timestampString("2024-07-04T12:30:15.987654")   // Independence Day with precision
                 .build(),
 
             // Record with nanosecond precision (should be truncated to milliseconds)
@@ -228,6 +237,13 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                     "2024-08-15T16:45:12.999999",   // Maximum microsecond precision
                     "2024-02-14T12:00:00.222333",   // Mixed precision values
                     "2024-07-04T18:30:45.888777"))  // Different microsecond values
+                .microsecondTimestampList(Arrays.asList(
+                    1709204400500999L, // 2024-03-01T10:00:00.500999
+                    1723737912999999L, // 2024-08-15T16:45:12.999999
+                    1707912000222333L, // 2024-02-14T12:00:00.222333
+                    1720116645888777L  // 2024-07-04T18:30:45.888777
+                ))
+                .timestampString("2024-12-25T00:00:00.121212")   // Christmas with palindromic microseconds
                 .build()
         );
     }
@@ -304,7 +320,13 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                 .timestampStringArray(Arrays.asList(
                     "2024-01-15T14:30:45.123456", 
                     "2024-02-28T16:45:30.987654", 
-                    "2024-03-15T12:00:00.500000"));
+                    "2024-03-15T12:00:00.500000"))
+                .microsecondTimestampList(Arrays.asList(
+                    1705334445123456L, // 2024-01-15T14:30:45.123456
+                    1709139930987654L, // 2024-02-28T16:45:30.987654
+                    1710504000500000L  // 2024-03-15T12:00:00.500000
+                ))
+                .timestampString("2024-04-01T08:15:30.111222");
     }
     
     /**
@@ -320,7 +342,9 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                 "\"optionalList\" ARRAY(TIMESTAMP NULL) NULL, " +
                 "\"optionalListWithNonNullElements\" ARRAY(TIMESTAMP NOT NULL) NULL, " +
                 "\"microsecondTimestamp\" TIMESTAMP NOT NULL, " +
-                "\"timestampStringArray\" ARRAY(TIMESTAMP NOT NULL) NOT NULL" +
+                "\"timestampStringArray\" ARRAY(TIMESTAMP NOT NULL) NOT NULL, " +
+                "\"microsecondTimestampList\" ARRAY(TIMESTAMP NOT NULL) NOT NULL, " +
+                "\"timestampString\" TIMESTAMP NOT NULL" +
                 ")";
     }
     
@@ -337,35 +361,25 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                     "}," +
                     "\"requiredTimestamp\": {" +
                         "\"type\": \"integer\"," +
-                        "\"connect.type\": \"int64\"," +
+                        "\"format\": \"int64\"," +
                         "\"connect.version\": 1," +
                         "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"," +
                         "\"description\": \"Required timestamp field\"" +
                     "}," +
                     "\"optionalTimestamp\": {" +
-                        "\"oneOf\": [" +
-                            "{\"type\": \"null\"}," +
-                            "{" +
-                                "\"type\": \"integer\"," +
-                                "\"connect.type\": \"int64\"," +
-                                "\"connect.version\": 1," +
-                                "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
-                            "}" +
-                        "]," +
+                        "\"type\": [\"null\", \"integer\"]," +
+                        "\"format\": \"int64\"," +
+                        "\"connect.version\": 1," +
+                        "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"," +
                         "\"description\": \"Optional timestamp field\"" +
                     "}," +
                     "\"requiredListWithNullableElements\": {" +
                         "\"type\": \"array\"," +
                         "\"items\": {" +
-                            "\"oneOf\": [" +
-                                "{\"type\": \"null\"}," +
-                                "{" +
-                                    "\"type\": \"integer\"," +
-                                    "\"connect.type\": \"int64\"," +
-                                    "\"connect.version\": 1," +
-                                    "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
-                                "}" +
-                            "]" +
+                            "\"type\": [\"null\", \"integer\"]," +
+                            "\"format\": \"int64\"," +
+                            "\"connect.version\": 1," +
+                            "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
                         "}," +
                         "\"description\": \"Required list with nullable elements\"" +
                     "}," +
@@ -373,49 +387,60 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                         "\"type\": \"array\"," +
                         "\"items\": {" +
                             "\"type\": \"integer\"," +
-                            "\"connect.type\": \"int64\"," +
+                            "\"format\": \"int64\"," +
                             "\"connect.version\": 1," +
                             "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
                         "}," +
                         "\"description\": \"Required list with non-null elements\"" +
                     "}," +
                     "\"optionalList\": {" +
-                        "\"oneOf\": [" +
-                            "{\"type\": \"null\"}," +
-                            "{" +
-                                "\"type\": \"array\"," +
-                                "\"items\": {" +
-                                    "\"oneOf\": [" +
-                                        "{\"type\": \"null\"}," +
-                                        "{" +
-                                            "\"type\": \"integer\"," +
-                                            "\"connect.type\": \"int64\"," +
-                                            "\"connect.version\": 1," +
-                                            "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
-                                        "}" +
-                                    "]" +
-                                "}" +
-                            "}" +
-                        "]," +
+                        "\"type\": [\"null\", \"array\"]," +
+                        "\"items\": {" +
+                            "\"type\": [\"null\", \"integer\"]," +
+                            "\"format\": \"int64\"," +
+                            "\"connect.version\": 1," +
+                            "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
+                        "}," +
                         "\"description\": \"Optional list with nullable elements\"" +
                     "}," +
                     "\"optionalListWithNonNullElements\": {" +
-                        "\"oneOf\": [" +
-                            "{\"type\": \"null\"}," +
-                            "{" +
-                                "\"type\": \"array\"," +
-                                "\"items\": {" +
-                                    "\"type\": \"integer\"," +
-                                    "\"connect.type\": \"int64\"," +
-                                    "\"connect.version\": 1," +
-                                    "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
-                                "}" +
-                            "}" +
-                        "]," +
+                        "\"type\": [\"null\", \"array\"]," +
+                        "\"items\": {" +
+                            "\"type\": \"integer\"," +
+                            "\"format\": \"int64\"," +
+                            "\"connect.version\": 1," +
+                            "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
+                        "}," +
                         "\"description\": \"Optional list with non-null elements\"" +
+                    "}," +
+                    "\"microsecondTimestamp\": {" +
+                        "\"type\": \"integer\"," +
+                        "\"format\": \"int64\"," +
+                        "\"description\": \"Timestamp with microsecond precision (microseconds since epoch)\"" +
+                    "}," +
+                    "\"timestampStringArray\": {" +
+                        "\"type\": \"array\"," +
+                        "\"items\": {" +
+                            "\"type\": \"string\"," +
+                            "\"format\": \"date-time\"" +
+                        "}," +
+                        "\"description\": \"Array of timestamp strings with microsecond precision\"" +
+                    "}," +
+                    "\"microsecondTimestampList\": {" +
+                        "\"type\": \"array\"," +
+                        "\"items\": {" +
+                            "\"type\": \"integer\"," +
+                            "\"format\": \"int64\"" +
+                        "}," +
+                        "\"description\": \"Array of microsecond precision timestamps (microseconds since epoch)\"" +
+                    "}," +
+                    "\"timestampString\": {" +
+                        "\"type\": \"string\"," +
+                        "\"format\": \"date-time\"," +
+                        "\"description\": \"Single timestamp string with microsecond precision\"" +
                     "}" +
                 "}," +
-                "\"required\": [\"recordId\", \"requiredTimestamp\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]" +
+                "\"required\": [\"recordId\", \"requiredTimestamp\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"microsecondTimestamp\", \"timestampStringArray\", \"microsecondTimestampList\", \"timestampString\"]" +
                 "}";
     }
     
@@ -443,9 +468,13 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
             // Convert new microsecond precision fields
             Long microsecondValue = record.getMicrosecondTimestamp();
             List<String> stringArrayValue = record.getTimestampStringArray();
+            List<Long> microsecondListValue = record.getMicrosecondTimestampList();
+            String timestampStringValue = record.getTimestampString();
 
             recordMap.put("microsecondTimestamp", microsecondValue); // Already in microseconds, send as-is
             recordMap.put("timestampStringArray", stringArrayValue); // Already formatted strings, send as-is
+            recordMap.put("microsecondTimestampList", microsecondListValue); // Already in microseconds, send as-is
+            recordMap.put("timestampString", timestampStringValue); // Already formatted string, send as-is
             
             ProducerRecord<String, Object> producerRecord = 
                 new ProducerRecord<>(TOPIC_NAME, key, recordMap);
@@ -515,6 +544,8 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
             // Add the new microsecond precision fields (these should be preserved as-is)
             builder.microsecondTimestamp(record.getMicrosecondTimestamp());
             builder.timestampStringArray(record.getTimestampStringArray());
+            builder.microsecondTimestampList(record.getMicrosecondTimestampList());
+            builder.timestampString(record.getTimestampString());
             
             expectedRecords.add(builder.build());
         }
@@ -560,7 +591,8 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredTimestamp\", \"optionalTimestamp\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\", \"microsecondTimestamp\", \"timestampStringArray\" " +
+            "\"optionalListWithNonNullElements\", \"microsecondTimestamp\", \"timestampStringArray\", " +
+            "\"microsecondTimestampList\", \"timestampString\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -595,7 +627,9 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                 
                 // Retrieve new microsecond precision fields
                 java.sql.Timestamp actualMicrosecondTimestamp = rs.getTimestamp("microsecondTimestamp");
-                Array actualTimestampStringArray = rs.getArray("timestampStringArray");
+                Array actualTimestampArray = rs.getArray("timestampStringArray");
+                Array actualMicrosecondTimestampListArray = rs.getArray("microsecondTimestampList");
+                java.sql.Timestamp actualTimestampString = rs.getTimestamp("timestampString");
                 
                 // Basic field verification
                 assertEquals(expected.getRecordId(), actualRecordId, 
@@ -614,10 +648,10 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                 
                 // Array verification using getArray()
                 verifyTimestampArray("requiredListWithNullableElements", 
-                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
+                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
                     
                 verifyTimestampArray("requiredListWithNonNullElements", 
-                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
+                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex);
                 
                 // Optional list verification
                 if (expected.getOptionalList() == null) {
@@ -625,7 +659,7 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                         "OptionalList should be null at index " + recordIndex);
                 } else {
                     verifyTimestampArray("optionalList", 
-                        expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
+                        expected.getOptionalList(), actualOptionalListArray, recordIndex);
                 }
                 
                 // Optional list with non-null elements verification
@@ -634,12 +668,14 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                         "OptionalListWithNonNullElements should be null at index " + recordIndex);
                 } else {
                     verifyTimestampArray("optionalListWithNonNullElements", 
-                        expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
+                        expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
                 }
                 
                 // Verify microsecond precision fields (all records should have these fields)
                 verifyMicrosecondTimestamp(expected.getMicrosecondTimestamp(), actualMicrosecondTimestamp, recordIndex);
-                verifyTimestampStringArray(expected.getTimestampStringArray(), actualTimestampStringArray.toString(), recordIndex);
+                verifyTimestampStringArray(expected.getTimestampStringArray(), actualTimestampArray, recordIndex);
+                verifyMicrosecondTimestampListArray(expected.getMicrosecondTimestampList(), actualMicrosecondTimestampListArray, recordIndex);
+                verifyTimestampString(expected.getTimestampString(), actualTimestampString, recordIndex);
                 
                 recordIndex++;
             }
@@ -654,7 +690,7 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
      * Verifies a timestamp array field using Array object instead of string parsing.
      */
     private void verifyTimestampArray(String fieldName, List<LocalDateTime> expected, Array actualArray, 
-                                    int recordIndex, boolean allowNullElements) throws SQLException {
+                                    int recordIndex) throws SQLException {
         if (expected == null) {
             assertNull(actualArray, fieldName + " should be null at index " + recordIndex);
             return;
@@ -675,21 +711,7 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
             .collect(Collectors.toList());
 
         // Direct list comparison
-        assertEquals(expected.size(), actualList.size(),
-            fieldName + " size mismatch at index " + recordIndex);
-        
-        for (int i = 0; i < expected.size(); i++) {
-            LocalDateTime expectedElement = expected.get(i);
-            LocalDateTime actualElement = actualList.get(i);
-            
-            if (expectedElement == null) {
-                assertNull(actualElement, 
-                    fieldName + " element " + i + " should be null at index " + recordIndex);
-            } else {
-                assertEquals(expectedElement, actualElement,
-                    fieldName + " element " + i + " mismatch at index " + recordIndex);
-            }
-        }
+       assertEqualLocalDateTime(expected, actualList, recordIndex);
     }
     
     /**
@@ -699,133 +721,103 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
     private void verifyMicrosecondTimestamp(Long expectedMicroseconds, java.sql.Timestamp actualTimestamp, int recordIndex) {
         assertNotNull(expectedMicroseconds, "Expected microsecondTimestamp should not be null at index " + recordIndex);
         assertNotNull(actualTimestamp, "Actual microsecondTimestamp should not be null at index " + recordIndex);
-        
-        // Convert expected microseconds to expected timestamp
-        long expectedMillis = expectedMicroseconds / 1000; // Convert microseconds to milliseconds
-        int expectedMicros = (int) (expectedMicroseconds % 1000000); // Remaining microseconds
-        
-        // Firebolt should preserve microsecond precision
-        long actualMillis = actualTimestamp.getTime();
-        int actualNanos = actualTimestamp.getNanos();
-        int actualMicros = actualNanos / 1000; // Convert nanoseconds to microseconds
-        
-        // Account for timezone offset (Firebolt may apply different offsets: +1, +2, or +3 hours)
-        long timezoneOffset1Hr = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
-        long timezoneOffset2Hr = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
-        long timezoneOffset3Hr = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
-        
-        long adjustedExpected1Hr = expectedMillis - timezoneOffset1Hr;
-        long adjustedExpected2Hr = expectedMillis - timezoneOffset2Hr;
-        long adjustedExpected3Hr = expectedMillis - timezoneOffset3Hr;
-        
-        // Check if the actual value matches any of the expected timezone offsets
-        boolean matchesTimezone = (actualMillis == adjustedExpected1Hr) || 
-                                 (actualMillis == adjustedExpected2Hr) || 
-                                 (actualMillis == adjustedExpected3Hr);
-        
-        if (!matchesTimezone) {
-            // If no offset works, show detailed error
-            long actualOffset = (expectedMillis - actualMillis) / (60 * 60 * 1000);
-            throw new AssertionError(String.format(
-                "Microsecond timestamp offset unexpected at index %d. Expected: %d, Actual: %d, " +
-                "Actual offset: %d hours. Expected 1, 2, or 3 hour offset.",
-                recordIndex, expectedMillis, actualMillis, actualOffset));
-        }
-        
-        assertEquals(expectedMicros, actualMicros, 
-            "Microsecond timestamp microseconds precision mismatch at index " + recordIndex);
+        assertEquals(fromMicros(expectedMicroseconds), actualTimestamp.toInstant());
     }
-    
+
+    // Convert expected microseconds to expected timestamp. Firebolt stores the data in UTC. We need to substract the default timezone of the test machine
+    private Instant fromMicros(long micros) {
+        Timestamp timestamp = asTimestamp(micros);
+
+        LocalDateTime ldt = timestamp.toLocalDateTime();
+
+        ZoneId zone = ZoneId.of(java.util.TimeZone.getDefault().getID());
+        ZonedDateTime zdt = ldt.atZone(zone);
+        ZoneOffset offset = zdt.getOffset();
+        return timestamp.toInstant().minus(offset.getTotalSeconds(), ChronoUnit.SECONDS);
+    }
+
+    /**
+     * Verifies microsecond timestamp array by comparing expected Long array (microseconds since epoch)
+     * with actual Timestamp array retrieved from Firebolt.
+     */
+    private void verifyMicrosecondTimestampListArray(List<Long> expectedMicroseconds, Array actualArray, int recordIndex) throws SQLException {
+        assertNotNull(expectedMicroseconds, "Expected microsecondTimestampList should not be null at index " + recordIndex);
+        assertNotNull(actualArray, "Actual microsecondTimestampList should not be null at index " + recordIndex);
+        
+        // Check that the array base type is TIMESTAMP (Types.TIMESTAMP = 93)
+        int baseType = actualArray.getBaseType();
+        assertEquals(Types.TIMESTAMP, baseType);
+
+        // Get the array as Timestamp array and convert to List<Long> (microseconds since epoch)
+        java.sql.Timestamp[] arrayElements = (java.sql.Timestamp[]) actualArray.getArray();
+        assertEquals(expectedMicroseconds.size(), arrayElements.length,
+            "MicrosecondTimestampList size mismatch at index " + recordIndex);
+
+        for (int i = 0; i < expectedMicroseconds.size(); i++) {
+            Long expectedElement = expectedMicroseconds.get(i);
+            assertEquals(fromMicros(expectedElement), arrayElements[i].toInstant());
+        }
+    }
+
     /**
      * Verifies timestamp string array by parsing both expected and actual string arrays
      * and comparing their timestamp values.
      */
-    private void verifyTimestampStringArray(List<String> expectedStrings, String actualArrayString, int recordIndex) {
+    private void verifyTimestampStringArray(List<String> expectedStrings, Array actualArray, int recordIndex) throws SQLException {
         assertNotNull(expectedStrings, "Expected timestampStringArray should not be null at index " + recordIndex);
-        assertNotNull(actualArrayString, "Actual timestampStringArray should not be null at index " + recordIndex);
-        
-        // Parse Firebolt array string (e.g., "[2024-01-15 14:30:45.123456,2024-02-28 16:45:30.987654]")
-        List<String> actualParsedStrings = parseFireboltTimestampStringArray(actualArrayString);
-        
-        assertEquals(expectedStrings.size(), actualParsedStrings.size(),
-            "TimestampStringArray size mismatch at index " + recordIndex);
-        
-        for (int i = 0; i < expectedStrings.size(); i++) {
-            String expectedStr = expectedStrings.get(i);
-            String actualStr = actualParsedStrings.get(i);
-            
-            // Convert both to timestamps for comparison (accounting for format differences)
-            String normalizedExpected = expectedStr.replace("T", " "); // Convert ISO format to Firebolt format
-            String normalizedActual = actualStr;
-            
-            // Normalize fractional seconds (Firebolt trims trailing zeros)
-            normalizedExpected = normalizeFractionalSeconds(normalizedExpected);
-            normalizedActual = normalizeFractionalSeconds(normalizedActual);
-            
-            assertEquals(normalizedExpected, normalizedActual,
-                "TimestampStringArray element " + i + " mismatch at index " + recordIndex);
-        }
-        
+        assertNotNull(actualArray, "Actual timestampStringArray should not be null at index " + recordIndex);
+
+        // Check that the array base type is TIMESTAMP (Types.TIMESTAMP = 93)
+        int baseType = actualArray.getBaseType();
+        assertEquals(Types.TIMESTAMP, baseType);
+
+        // Get the array as Timestamp array and convert to List<LocalDateTime>
+        java.sql.Timestamp[] arrayElements = (java.sql.Timestamp[]) actualArray.getArray();
+        List<LocalDateTime> actualList = Arrays.stream(arrayElements)
+                .map(timestamp -> timestamp != null ? timestamp.toLocalDateTime() : null)
+                .collect(Collectors.toList());
+
+        List<LocalDateTime> expectedList = expectedStrings.stream().map(LocalDateTime::parse).collect(Collectors.toList());
+        assertEqualLocalDateTime(expectedList, actualList, recordIndex);
     }
-    
+
     /**
-     * Parses Firebolt timestamp string array format into individual timestamp strings.
-     * Example: "[2024-01-15 14:30:45.123456,2024-02-28 16:45:30.987654]"
+     * Verifies single timestamp string by parsing expected string and comparing with actual Timestamp.
      */
-    private List<String> parseFireboltTimestampStringArray(String arrayString) {
-        List<String> result = new ArrayList<>();
+    private void verifyTimestampString(String expectedString, java.sql.Timestamp actualTimestamp, int recordIndex) {
+        assertNotNull(expectedString, "Expected timestampString should not be null at index " + recordIndex);
+        assertNotNull(actualTimestamp, "Actual timestampString should not be null at index " + recordIndex);
         
-        if (arrayString == null || arrayString.trim().isEmpty()) {
-            return result;
-        }
+        // Parse the expected string to LocalDateTime
+        LocalDateTime expectedLocalDateTime = LocalDateTime.parse(expectedString);
+        LocalDateTime actualLocalDateTime = actualTimestamp.toLocalDateTime();
         
-        // Remove brackets (both [] and {} formats) and split by comma
-        String cleaned = arrayString.trim().replaceAll("^[\\[{]|[\\]}]$", "");
-        if (cleaned.isEmpty()) {
-            return result;
-        }
-        
-        String[] elements = cleaned.split(",");
-        for (String element : elements) {
-            String trimmed = element.trim();
-            // Remove quotes if present
-            if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
-                trimmed = trimmed.substring(1, trimmed.length() - 1);
-            }
-            if (!trimmed.isEmpty()) {
-                result.add(trimmed);
-            }
-        }
-        
-        return result;
+        assertEquals(expectedLocalDateTime, actualLocalDateTime,
+            "TimestampString mismatch at index " + recordIndex);
     }
-    
-    /**
-     * Normalizes fractional seconds in timestamp strings for consistent comparison.
-     */
-    private String normalizeFractionalSeconds(String timestamp) {
-        if (timestamp == null) {
-            return null;
-        }
-        
-        // If the timestamp has fractional seconds, normalize to 6 digits (microseconds)
-        if (timestamp.contains(".")) {
-            String[] parts = timestamp.split("\\.");
-            if (parts.length == 2) {
-                String baseTime = parts[0];
-                String fractional = parts[1];
-                
-                // Pad or truncate fractional part to 6 digits
-                if (fractional.length() < 6) {
-                    fractional = fractional + "0".repeat(6 - fractional.length());
-                } else if (fractional.length() > 6) {
-                    fractional = fractional.substring(0, 6);
-                }
-                
-                return baseTime + "." + fractional;
+
+    private static Timestamp asTimestamp(long micros) {
+        long seconds = micros / 1_000_000;
+        long microRemainder = micros % 1_000_000;
+        Instant instant = Instant.ofEpochSecond(seconds, microRemainder * 1000);
+        return Timestamp.from(instant);
+    }
+
+    private void assertEqualLocalDateTime(List<LocalDateTime> expected, List<LocalDateTime> actual, int recordIndex) {
+        // Direct list comparison
+        assertEquals(expected.size(), actual.size());
+
+        for (int i = 0; i < actual.size(); i++) {
+            LocalDateTime expectedElement = expected.get(i);
+            LocalDateTime actualElement = actual.get(i);
+
+            if (expectedElement == null) {
+                assertNull(actualElement,
+                        " element " + i + " should be null at index " + recordIndex);
+            } else {
+                assertEquals(expectedElement, actualElement,
+                        " element " + i + " mismatch at index " + recordIndex);
             }
         }
-        
-        return timestamp;
     }
-} 
+}

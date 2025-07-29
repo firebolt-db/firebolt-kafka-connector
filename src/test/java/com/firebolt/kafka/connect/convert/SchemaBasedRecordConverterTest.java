@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 public class SchemaBasedRecordConverterTest {
@@ -306,6 +305,10 @@ public class SchemaBasedRecordConverterTest {
     void testConvertRecordValueWithArrayField() throws RecordConversionException {
         List<String> arrayValue = Arrays.asList("item1", "item2", "item3");
         
+        // Setup mock for array element schema
+        Schema mockArrayElementSchema = org.mockito.Mockito.mock(Schema.class);
+        when(mockArrayElementSchema.type()).thenReturn(Schema.Type.STRING);
+        
         when(mockSinkRecord.value()).thenReturn(mockStruct);
         when(mockSinkRecord.valueSchema()).thenReturn(mockSchema);
         
@@ -313,6 +316,7 @@ public class SchemaBasedRecordConverterTest {
         when(mockField.schema()).thenReturn(mockFieldSchema);
         when(mockFieldSchema.type()).thenReturn(Schema.Type.ARRAY);
         when(mockFieldSchema.parameters()).thenReturn(null);
+        when(mockFieldSchema.valueSchema()).thenReturn(mockArrayElementSchema); // Add missing mock setup
         when(mockSchema.fields()).thenReturn(Collections.singletonList(mockField));
         when(mockStruct.get("arrayField")).thenReturn(arrayValue);
 
@@ -323,6 +327,36 @@ public class SchemaBasedRecordConverterTest {
         assertNotNull(columnValue);
         assertEquals(arrayValue, columnValue.getValue());
         assertEquals(Schema.Type.ARRAY, columnValue.getSchemaType());
+        assertEquals(Schema.Type.STRING, columnValue.getSchemaSubType()); // Also verify the subtype is set correctly
+    }
+
+    @Test
+    void testConvertRecordValueWithTimestampArrayField() throws RecordConversionException {
+        List<Long> timestampArrayValue = Arrays.asList(1609459200000L, 1609459260000L, 1609459320000L);
+        
+        // Setup mock for array element schema (INT64 for timestamp values)
+        Schema mockArrayElementSchema = org.mockito.Mockito.mock(Schema.class);
+        when(mockArrayElementSchema.type()).thenReturn(Schema.Type.INT64);
+        
+        when(mockSinkRecord.value()).thenReturn(mockStruct);
+        when(mockSinkRecord.valueSchema()).thenReturn(mockSchema);
+        
+        when(mockField.name()).thenReturn("timestampArrayField");
+        when(mockField.schema()).thenReturn(mockFieldSchema);
+        when(mockFieldSchema.type()).thenReturn(Schema.Type.ARRAY);
+        when(mockFieldSchema.parameters()).thenReturn(null);
+        when(mockFieldSchema.valueSchema()).thenReturn(mockArrayElementSchema);
+        when(mockSchema.fields()).thenReturn(Collections.singletonList(mockField));
+        when(mockStruct.get("timestampArrayField")).thenReturn(timestampArrayValue);
+
+        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+
+        assertNotNull(result);
+        KafkaMessageColumnValue columnValue = result.get("timestampArrayField");
+        assertNotNull(columnValue);
+        assertEquals(timestampArrayValue, columnValue.getValue());
+        assertEquals(Schema.Type.ARRAY, columnValue.getSchemaType());
+        assertEquals(Schema.Type.INT64, columnValue.getSchemaSubType()); // Verify timestamp array subtype
     }
 
 

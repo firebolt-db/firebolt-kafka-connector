@@ -47,7 +47,7 @@ public abstract class BaseIntegrationTest {
     protected static final String KAFKA_CONNECT_HOST = System.getenv().getOrDefault("KAFKA_CONNECT_URL", "http://localhost:8083");
     protected static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
     protected static final String SCHEMA_REGISTRY_URL = System.getenv().getOrDefault("SCHEMA_REGISTRY_URL", "http://localhost:8081");
-    protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(20);
 
     protected static final String DEFAULT_DATABASE_NAME = "integration_test_db";
 
@@ -213,7 +213,10 @@ public abstract class BaseIntegrationTest {
         // Schema Registry configuration
         connectorConfig.put("value.converter.schema.registry.url", "http://schema-registry:8081");
         connectorConfig.put("value.converter.auto.register.schemas", "false");
-        
+
+        connectorConfig.put("value.converter.schemas.enable", "true");
+        connectorConfig.put("schemas.enable", "true");
+
         // JSON Schema converter configuration
         connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
         

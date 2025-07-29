@@ -21,12 +21,15 @@ public class ColumnDataTypeConverterFactoryTest {
     @Mock
     private ArrayDataTypeConverter mockArrayDataTypeConverter;
 
+    @Mock
+    private TimestampDataTypeConverter mockTimestampDataTypeConverter;
+
     private ColumnDataTypeConverterFactory factory;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter);
+        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -63,6 +66,20 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockArrayDataTypeConverter, result);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "timestamp",
+        "TIMESTAMP",
+        "Timestamp"
+    })
+    void testGetConverterForTimestampTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 93, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockTimestampDataTypeConverter, result);
+    }
+
     @Test
     void testGetConverterThrowsExceptionForUnsupportedType() {
         TableSchema.Column column = new TableSchema.Column("test_column", "unsupported_type", 12, true);
@@ -92,14 +109,16 @@ public class ColumnDataTypeConverterFactoryTest {
     @Test
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
-            mockIntegerDataTypeConverter, mockArrayDataTypeConverter);
+            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter);
         
         assertNotNull(testFactory);
         
         TableSchema.Column intColumn = new TableSchema.Column("int_col", "integer", 4, true);
         TableSchema.Column arrayColumn = new TableSchema.Column("array_col", "array(text)", 2003, true);
+        TableSchema.Column timestampColumn = new TableSchema.Column("timestamp_col", "timestamp", 93, true);
         
         assertSame(mockIntegerDataTypeConverter, testFactory.getConverter(intColumn));
         assertSame(mockArrayDataTypeConverter, testFactory.getConverter(arrayColumn));
+        assertSame(mockTimestampDataTypeConverter, testFactory.getConverter(timestampColumn));
     }
 } 

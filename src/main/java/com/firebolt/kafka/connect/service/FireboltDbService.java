@@ -165,6 +165,9 @@ public class FireboltDbService {
             props.setProperty(JDBC_CLIENT_SECRET, clientSecret.get());
         }
 
+        // always batch prepared statements
+        props.put("merge_prepared_statement_batches", "true");
+
         // Attempt to create the connection
         return DriverManager.getConnection(jdbcConfig.getJdbcConnectionUrl(), props);
     }

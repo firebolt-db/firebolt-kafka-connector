@@ -11,7 +11,8 @@ public enum FireboltColumnDataType {
 
     // have all the data types in lowercase
     INTEGER(value -> Set.of("integer", "int", "int4").contains(value.toLowerCase())),
-    ARRAY(value -> value.toLowerCase().startsWith("array("));
+    ARRAY(value -> value.toLowerCase().startsWith("array(")),
+    TIMESTAMP(value -> Set.of("timestamp").contains(value.toLowerCase()));
 
     private Predicate<String> equalityPredicate;
 

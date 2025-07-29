@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import org.apache.kafka.connect.data.Schema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,6 +14,7 @@ import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -37,6 +39,7 @@ public class ArrayDataTypeConverterTest {
     private ArrayDataTypeConverter converter;
     private TableSchema.Column integerArrayColumn;
     private TableSchema.Column textArrayColumn;
+    private TableSchema.Column timestampArrayColumn;
 
     @BeforeEach
     void setUp() throws SQLException {
@@ -44,6 +47,7 @@ public class ArrayDataTypeConverterTest {
         converter = new ArrayDataTypeConverter();
         integerArrayColumn = new TableSchema.Column("test_column", "array(integer)", 2003, true);
         textArrayColumn = new TableSchema.Column("test_column", "array(text)", 2003, true);
+        timestampArrayColumn = new TableSchema.Column("test_column", "array(timestamp)", 2003, true);
         
         when(mockStatement.getConnection()).thenReturn(mockConnection);
         when(mockConnection.createArrayOf(any(String.class), any(Object[].class))).thenReturn(mockArray);
@@ -163,6 +167,104 @@ public class ArrayDataTypeConverterTest {
         converter.convertAndSet(mockStatement, 1, kafkaValue, unsupportedColumn);
 
         verify(mockConnection).createArrayOf(eq("string"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "0",                    // Epoch
+        "1000",                 // 1 second in millis
+        "1609459200000",        // 2021-01-01 00:00:00 UTC in millis
+        "10000000000000",       // Threshold value (treated as millis)
+        "10000000000001"        // Just above threshold (treated as micros)
+    })
+    void testConvertAndSetWithTimestampArrayInt64Schema(long timestampValue) throws SQLException {
+        List<Long> timestampValues = Arrays.asList(timestampValue, timestampValue + 1000);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestampArrayColumn);
+
+        // Verify that TimestampUtil.asTimestamp() is called for each element
+        Timestamp[] expectedTimestamps = timestampValues.stream()
+                .map(TimestampUtil::asTimestamp)
+                .toArray(Timestamp[]::new);
+
+        verify(mockConnection).createArrayOf(eq("timestamp"), eq(expectedTimestamps));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTimestampArrayStringSchema() throws SQLException {
+        List<String> timestampStrings = Arrays.asList("2021-01-01 00:00:00", "2024-12-31 23:59:59");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampStrings)
+                .schemaSubType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestampArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(timestampStrings.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithEmptyTimestampArray() throws SQLException {
+        List<Long> emptyArray = new ArrayList<>();
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(emptyArray)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestampArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("timestamp"), eq(emptyArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTimestampArrayContainingNulls() throws SQLException {
+        List<Long> timestampValues = Arrays.asList(1609459200000L, null, 1609459260000L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestampArrayColumn);
+
+        // Verify that TimestampUtil.asTimestamp() is called for each element (including null)
+        Timestamp[] expectedTimestamps = new Timestamp[]{
+            TimestampUtil.asTimestamp(1609459200000L),
+            TimestampUtil.asTimestamp(null),
+            TimestampUtil.asTimestamp(1609459260000L)
+        };
+
+        verify(mockConnection).createArrayOf(eq("timestamp"), eq(expectedTimestamps));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithMixedTimestampValues() throws SQLException {
+        // Test with millisecond and microsecond values mixed
+        List<Long> timestampValues = Arrays.asList(
+                1000L,              // Milliseconds
+                10000000000001L,    // Microseconds (above threshold)
+                1609459200000L      // Milliseconds
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestampArrayColumn);
+
+        Timestamp[] expectedTimestamps = timestampValues.stream()
+                .map(TimestampUtil::asTimestamp)
+                .toArray(Timestamp[]::new);
+
+        verify(mockConnection).createArrayOf(eq("timestamp"), eq(expectedTimestamps));
         verify(mockStatement).setArray(1, mockArray);
     }
 
