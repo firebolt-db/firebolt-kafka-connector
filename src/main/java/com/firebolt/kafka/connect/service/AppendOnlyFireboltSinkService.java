@@ -135,24 +135,10 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
     private void processIndividualRecord(SinkRecord record, TableSchema tableSchema) {
         try {
-            log.info("DEBUG: processIndividualRecord() called for topic={}, partition={}, offset={}",
-                    record.topic(), record.kafkaPartition(), record.kafkaOffset());
-
-            // Log details about the record we're about to convert
-            log.info("DEBUG: Record details - hasSchema={}, valueType={}, schemaName={}",
-                    record.valueSchema() != null,
-                    record.value() != null ? record.value().getClass().getSimpleName() : "null",
-                    record.valueSchema() != null ? record.valueSchema().name() : "null");
-
-            log.info("DEBUG: About to call recordConverterFactory.convert() for record");
             // Convert the record to a format suitable for Firebolt
             FireboltRecord fireboltRecord = recordConverterFactory.convert(record);
-            log.info("DEBUG: recordConverterFactory.convert() completed successfully, got FireboltRecord: {}", fireboltRecord);
-
-            log.info("DEBUG: About to write FireboltRecord to database");
             // Write to Firebolt
             fireboltWriter.write(fireboltRecord, tableSchema);
-            log.info("DEBUG: fireboltWriter.write() completed successfully");
 
         } catch (RecordConversionException e) {
             log.error("Error converting record: topic={}, partition={}, offset={}",
