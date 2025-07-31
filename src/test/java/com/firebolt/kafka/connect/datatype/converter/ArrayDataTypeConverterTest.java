@@ -166,9 +166,23 @@ public class ArrayDataTypeConverterTest {
         verify(mockStatement).setArray(1, mockArray);
     }
 
+    @Test
+    void testConvertAndSetWithRealArrayType() throws SQLException {
+        List<Float> realValues = Arrays.asList(1.5f, 2.7f, 3.14f);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(realValues)
+                .build();
+
+        TableSchema.Column realArrayColumn = new TableSchema.Column("test_column", "array(real)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, realArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("real"), eq(realValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
     @ParameterizedTest
     @CsvSource({
-        "array(real)",
         "array(boolean)",
         "array(date)",
         "unsupported_array_type"

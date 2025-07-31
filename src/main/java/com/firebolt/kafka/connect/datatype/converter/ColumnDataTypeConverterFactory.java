@@ -14,10 +14,13 @@ public class ColumnDataTypeConverterFactory {
     private TimestamptzDataTypeConverter timestamptzDataTypeConverter;
     private DecimalDataTypeConverter decimalDataTypeConverter;
     private BigIntDataTypeConverter bigIntDataTypeConverter;
+    private RealDataTypeConverter realDataTypeConverter;
 
     private ColumnDataTypeConverterFactory() {
         // use the static method to create the object
-        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(), new TimestamptzDataTypeConverter(), new DecimalDataTypeConverter(), new BigIntDataTypeConverter());
+        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(),
+             new TimestamptzDataTypeConverter(), new DecimalDataTypeConverter(), new BigIntDataTypeConverter(),
+             new RealDataTypeConverter());
     }
 
     @VisibleForTesting
@@ -26,13 +29,15 @@ public class ColumnDataTypeConverterFactory {
                                    TimestampDataTypeConverter timestampDataTypeConverter,
                                    TimestamptzDataTypeConverter timestamptzDataTypeConverter,
                                    DecimalDataTypeConverter decimalDataTypeConverter,
-                                   BigIntDataTypeConverter bigIntDataTypeConverter) {
+                                   BigIntDataTypeConverter bigIntDataTypeConverter,
+                                   RealDataTypeConverter realDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
         this.timestamptzDataTypeConverter = timestamptzDataTypeConverter;
         this.decimalDataTypeConverter = decimalDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
+        this.realDataTypeConverter = realDataTypeConverter;
     }
 
     public static ColumnDataTypeConverterFactory getInstance() {
@@ -59,6 +64,8 @@ public class ColumnDataTypeConverterFactory {
                 return decimalDataTypeConverter;
             case BIGINT:
                 return bigIntDataTypeConverter;
+            case REAL:
+                return realDataTypeConverter;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());

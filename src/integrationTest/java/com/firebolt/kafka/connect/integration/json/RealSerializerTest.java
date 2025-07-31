@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class RealSerializerTest extends BaseIntegrationTest {
     
     private static final String TABLE_NAME = "real_test_table";
@@ -67,8 +66,6 @@ public class RealSerializerTest extends BaseIntegrationTest {
         "false, 'WITH null fields omitted from JSON entirely'"
     })
     void testRealSerialization(boolean includeNulls, String testDescription) throws Exception {
-        log.info("Testing real serialization: {}", testDescription);
-        
         producer = initializeJsonProducer(includeNulls);
         
         List<RealTestRecord> testRecords = createTestRecords();
@@ -84,17 +81,10 @@ public class RealSerializerTest extends BaseIntegrationTest {
      * Creates test records covering all scenarios.
      */
     private List<RealTestRecord> createTestRecords() {
-        log.info("=== CREATING COMPREHENSIVE REAL TEST RECORDS ===");
-        
         // Note: Float.MIN_VALUE is actually the smallest positive non-zero value (1.4E-45), not negative minimum
         // For realistic testing, we use actual negative and positive ranges
         float realisticMinimum = -999999.99f;  // Realistic negative value
         float realisticMaximum = 999999.99f;   // Realistic positive value
-        
-        log.info("Using realistic minimum = {}", realisticMinimum);
-        log.info("Using realistic maximum = {}", realisticMaximum);
-        log.info("Float.MIN_VALUE (smallest positive) = {}", Float.MIN_VALUE);
-        log.info("Float.MAX_VALUE (largest possible) = {}", Float.MAX_VALUE);
         
         List<RealTestRecord> records = Arrays.asList(
             // Complete record with typical values
@@ -107,7 +97,7 @@ public class RealSerializerTest extends BaseIntegrationTest {
                 .optionalReal(-12345.67f)
                 .build(),
 
-            // Record with realistic positive values  
+            // Record with realistic positive values
             aValidTestRecord(3)
                 .requiredReal(realisticMaximum)
                 .optionalReal(98765.43f)
@@ -123,7 +113,7 @@ public class RealSerializerTest extends BaseIntegrationTest {
                 .requiredListWithNullableElements(Arrays.asList(-1234.5f, null, 5678.9f))
                 .requiredListWithNonNullElements(Arrays.asList(100.25f, 250.75f, 500.125f))
                 .build(),
-            
+
             // Record with actual Float.MIN_VALUE (smallest positive non-zero)
             aValidTestRecord(6)
                 .requiredReal(Float.MIN_VALUE)
