@@ -94,15 +94,34 @@ public class FireboltColumnDataTypeTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+        "bigint",
+        "int8",
+        "long",
+        "BIGINT",
+        "INT8",
+        "LONG",
+        "BigInt",
+        "Int8",
+        "Long",
+        "BiGiNt",
+        "InT8",
+        "LoNg"
+    })
+    void testFromStringReturnsBigintForValidBigintTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.BIGINT, result);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "text",
         "varchar", 
-        "bigint",
         "real",
         "boolean",
         "date",
         "unsupported_type",
-        "int8",
         "int32",
         "array",
         "array)",
@@ -137,12 +156,13 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(5, values.length);
+        assertEquals(6, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
         assertEquals(FireboltColumnDataType.TIMESTAMPTZ, values[3]);
         assertEquals(FireboltColumnDataType.DECIMAL, values[4]);
+        assertEquals(FireboltColumnDataType.BIGINT, values[5]);
     }
 
     @Test
@@ -152,6 +172,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.TIMESTAMP, FireboltColumnDataType.valueOf("TIMESTAMP"));
         assertEquals(FireboltColumnDataType.TIMESTAMPTZ, FireboltColumnDataType.valueOf("TIMESTAMPTZ"));
         assertEquals(FireboltColumnDataType.DECIMAL, FireboltColumnDataType.valueOf("DECIMAL"));
+        assertEquals(FireboltColumnDataType.BIGINT, FireboltColumnDataType.valueOf("BIGINT"));
     }
 
     @Test

@@ -14,7 +14,8 @@ public enum FireboltColumnDataType {
     ARRAY(value -> value.toLowerCase().startsWith("array(")),
     TIMESTAMP(value -> Set.of("timestamp").contains(value.toLowerCase())),
     TIMESTAMPTZ(value -> Set.of("timestamptz").contains(value.toLowerCase())),
-    DECIMAL(value -> Set.of("numeric", "decimal").contains(value.toLowerCase()));
+    DECIMAL(value -> Set.of("numeric", "decimal").contains(value.toLowerCase())),
+    BIGINT(value -> Set.of("bigint", "int8", "long").contains(value.toLowerCase()));
 
     private Predicate<String> equalityPredicate;
 

@@ -62,6 +62,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return "timestamptz";
         } else if (fireboltColumn.getDataType().equals("array(numeric)")) {
             return "numeric";
+        } else if (fireboltColumn.getDataType().equals("array(bigint)")) {
+            return "bigint";
         }
 
         // add more data types
