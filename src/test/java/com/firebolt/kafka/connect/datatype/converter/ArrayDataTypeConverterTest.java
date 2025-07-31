@@ -40,6 +40,7 @@ public class ArrayDataTypeConverterTest {
     private TableSchema.Column integerArrayColumn;
     private TableSchema.Column textArrayColumn;
     private TableSchema.Column timestampArrayColumn;
+    private TableSchema.Column numericArrayColumn;
 
     @BeforeEach
     void setUp() throws SQLException {
@@ -48,6 +49,7 @@ public class ArrayDataTypeConverterTest {
         integerArrayColumn = new TableSchema.Column("test_column", "array(integer)", 2003, true);
         textArrayColumn = new TableSchema.Column("test_column", "array(text)", 2003, true);
         timestampArrayColumn = new TableSchema.Column("test_column", "array(timestamp)", 2003, true);
+        numericArrayColumn = new TableSchema.Column("test_column", "array(numeric)", 2003, true);
         
         when(mockStatement.getConnection()).thenReturn(mockConnection);
         when(mockConnection.createArrayOf(any(String.class), any(Object[].class))).thenReturn(mockArray);
@@ -265,6 +267,134 @@ public class ArrayDataTypeConverterTest {
                 .toArray(Timestamp[]::new);
 
         verify(mockConnection).createArrayOf(eq("timestamp"), eq(expectedTimestamps));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "'123.45'",
+        "'0.00'",
+        "'-123.45'",
+        "'999999.99'",
+        "'0.01'",
+        "'1000000.00'",
+        "'123456789.123456789'",
+        "'0'",
+        "'-0.001'",
+        "'1.23E-10'",
+        "'12345678901234567890123456789.123456789'"
+    })
+    void testConvertAndSetWithNumericArrayStringSchema(String decimalString) throws SQLException {
+        List<String> decimalValues = Arrays.asList(decimalString, "456.78", "0.99");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(decimalValues)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(decimalValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithEmptyNumericArray() throws SQLException {
+        List<String> emptyArray = new ArrayList<>();
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(emptyArray)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("numeric"), eq(emptyArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithNumericArrayContainingNulls() throws SQLException {
+        List<String> decimalValues = Arrays.asList("123.45", null, "456.78");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(decimalValues)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(decimalValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithLargeNumericArray() throws SQLException {
+        List<String> largeArray = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            largeArray.add(String.valueOf(i) + ".99");
+        }
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(largeArray)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(largeArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithNumericArrayMixedPrecision() throws SQLException {
+        List<String> mixedPrecisionValues = Arrays.asList(
+            "123.45",           // 2 decimal places
+            "123.456",          // 3 decimal places
+            "123.4567",         // 4 decimal places
+            "123.456789012345678901234567890", // Very high precision
+            "0",                // Integer
+            "-123.45"           // Negative
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(mixedPrecisionValues)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(mixedPrecisionValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithNumericArrayScientificNotation() throws SQLException {
+        List<String> scientificNotationValues = Arrays.asList(
+            "1.23E-10",
+            "1.23E+10",
+            "1.23e-10",
+            "1.23e+10",
+            "1.23E0"
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(scientificNotationValues)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(scientificNotationValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithNumericArrayUnsupportedSchemaType() throws SQLException {
+        List<Long> numericValues = Arrays.asList(123L, 456L, 789L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(numericValues)
+                .schemaType(Schema.Type.INT64)
+                .build();
+
+        // Should default to "numeric" type since it's not STRING
+        converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("numeric"), eq(numericValues.toArray()));
         verify(mockStatement).setArray(1, mockArray);
     }
 

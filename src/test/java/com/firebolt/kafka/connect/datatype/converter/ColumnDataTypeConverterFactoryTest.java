@@ -24,12 +24,15 @@ public class ColumnDataTypeConverterFactoryTest {
     @Mock
     private TimestampDataTypeConverter mockTimestampDataTypeConverter;
 
+    @Mock
+    private DecimalDataTypeConverter mockDecimalDataTypeConverter;
+
     private ColumnDataTypeConverterFactory factory;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter);
+        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockDecimalDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -109,7 +112,7 @@ public class ColumnDataTypeConverterFactoryTest {
     @Test
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
-            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter);
+            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockDecimalDataTypeConverter);
         
         assertNotNull(testFactory);
         
