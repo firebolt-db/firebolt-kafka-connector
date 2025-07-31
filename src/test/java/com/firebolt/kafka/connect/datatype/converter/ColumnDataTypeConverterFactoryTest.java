@@ -25,6 +25,9 @@ public class ColumnDataTypeConverterFactoryTest {
     private TimestampDataTypeConverter mockTimestampDataTypeConverter;
 
     @Mock
+    private TimestamptzDataTypeConverter mockTimestamptzDataTypeConverter;
+
+    @Mock
     private DecimalDataTypeConverter mockDecimalDataTypeConverter;
 
     private ColumnDataTypeConverterFactory factory;
@@ -32,7 +35,7 @@ public class ColumnDataTypeConverterFactoryTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockDecimalDataTypeConverter);
+        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -83,6 +86,38 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockTimestampDataTypeConverter, result);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "timestamptz",
+        "TIMESTAMPTZ",
+        "TimestampTz",
+        "TimeStampTz"
+    })
+    void testGetConverterForTimestamptzTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 2014, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockTimestamptzDataTypeConverter, result);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "numeric",
+        "decimal",
+        "NUMERIC",
+        "DECIMAL",
+        "Numeric",
+        "Decimal"
+    })
+    void testGetConverterForDecimalTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 2, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockDecimalDataTypeConverter, result);
+    }
+
     @Test
     void testGetConverterThrowsExceptionForUnsupportedType() {
         TableSchema.Column column = new TableSchema.Column("test_column", "unsupported_type", 12, true);
@@ -112,7 +147,7 @@ public class ColumnDataTypeConverterFactoryTest {
     @Test
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
-            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockDecimalDataTypeConverter);
+            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter);
         
         assertNotNull(testFactory);
         

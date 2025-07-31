@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.data.Schema;
 
@@ -31,9 +32,15 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         }
 
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
-        if (typeName.equals("timestamp")) {
+        if (Set.of("timestamp").contains(typeName)) {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
                 return connection.createArrayOf(typeName, elements.stream().map(objectValue -> TimestampUtil.asTimestamp((Long) objectValue)).toArray());
+            } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
+                return connection.createArrayOf("string", elements.toArray());
+            }
+        } else if (Set.of("timestamptz").contains(typeName)) {
+            if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
+                return connection.createArrayOf(typeName, elements.stream().map(objectValue -> TimestampUtil.asOffsetDateTime((Long) objectValue)).toArray());
             } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
                 return connection.createArrayOf("string", elements.toArray());
             }
@@ -51,6 +58,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return "integer";
         } else if (fireboltColumn.getDataType().equals("array(timestamp)")) {
             return "timestamp";
+        } else if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
+            return "timestamptz";
         } else if (fireboltColumn.getDataType().equals("array(numeric)")) {
             return "numeric";
         }
