@@ -32,7 +32,7 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         }
 
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
-        if (typeName.contains("timestamp")) {
+        if (typeName.equals("timestamp")) {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
                 return connection.createArrayOf(typeName, elements.stream().map(objectValue -> TimestampUtil.asTimestamp((Long) objectValue)).toArray());
             } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
