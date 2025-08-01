@@ -12,6 +12,7 @@ public class ColumnDataTypeConverterFactory {
     private ArrayDataTypeConverter arrayDataTypeConverter;
     private TimestampDataTypeConverter timestampDataTypeConverter;
     private TimestamptzDataTypeConverter timestamptzDataTypeConverter;
+    private DateDataTypeConverter dateDataTypeConverter;
     private DecimalDataTypeConverter decimalDataTypeConverter;
     private BigIntDataTypeConverter bigIntDataTypeConverter;
     private RealDataTypeConverter realDataTypeConverter;
@@ -22,7 +23,7 @@ public class ColumnDataTypeConverterFactory {
         // use the static method to create the object
         this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(),
              new TimestamptzDataTypeConverter(), new DecimalDataTypeConverter(), new BigIntDataTypeConverter(),
-             new RealDataTypeConverter(), new DoubleDataTypeConverter(), new TextDataTypeConverter());
+             new RealDataTypeConverter(), new DoubleDataTypeConverter(), new TextDataTypeConverter(), new DateDataTypeConverter());
     }
 
     @VisibleForTesting
@@ -34,7 +35,8 @@ public class ColumnDataTypeConverterFactory {
                                    BigIntDataTypeConverter bigIntDataTypeConverter,
                                    RealDataTypeConverter realDataTypeConverter,
                                    DoubleDataTypeConverter doubleDataTypeConverter,
-                                   TextDataTypeConverter textDataTypeConverter) {
+                                   TextDataTypeConverter textDataTypeConverter,
+                                   DateDataTypeConverter dateDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
@@ -44,6 +46,7 @@ public class ColumnDataTypeConverterFactory {
         this.realDataTypeConverter = realDataTypeConverter;
         this.doubleDataTypeConverter = doubleDataTypeConverter;
         this.textDataTypeConverter = textDataTypeConverter;
+        this.dateDataTypeConverter = dateDataTypeConverter;
     }
 
     public static ColumnDataTypeConverterFactory getInstance() {
@@ -66,6 +69,8 @@ public class ColumnDataTypeConverterFactory {
                 return timestampDataTypeConverter;
             case TIMESTAMPTZ:
                 return timestamptzDataTypeConverter;
+            case DATE:
+                return dateDataTypeConverter;
             case DECIMAL:
                 return decimalDataTypeConverter;
             case BIGINT:

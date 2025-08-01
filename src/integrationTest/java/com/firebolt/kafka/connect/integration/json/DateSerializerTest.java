@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect.integration.json;
 
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.DateTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -20,7 +19,6 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -31,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class DateSerializerTest extends BaseIntegrationTest {
 
     private static final String TOPIC_NAME = "date-test-topic";
@@ -513,4 +510,5 @@ public class DateSerializerTest extends BaseIntegrationTest {
         assertEquals(expected, actualList,
             fieldName + " mismatch at index " + recordIndex);
     }
+
 }
