@@ -62,6 +62,23 @@ public class FireboltColumnDataTypeTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+        "numeric",
+        "decimal",
+        "NUMERIC",
+        "DECIMAL",
+        "Numeric",
+        "Decimal",
+        "NuMeRiC",
+        "DeCiMaL"
+    })
+    void testFromStringReturnsDecimalForValidDecimalTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.DECIMAL, result);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "text",
         "varchar", 
@@ -69,8 +86,6 @@ public class FireboltColumnDataTypeTest {
         "real",
         "boolean",
         "date",
-        "numeric",
-        "decimal",
         "unsupported_type",
         "int8",
         "int32",
@@ -107,10 +122,11 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(3, values.length);
+        assertEquals(4, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
+        assertEquals(FireboltColumnDataType.DECIMAL, values[3]);
     }
 
     @Test
@@ -118,6 +134,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.INTEGER, FireboltColumnDataType.valueOf("INTEGER"));
         assertEquals(FireboltColumnDataType.ARRAY, FireboltColumnDataType.valueOf("ARRAY"));
         assertEquals(FireboltColumnDataType.TIMESTAMP, FireboltColumnDataType.valueOf("TIMESTAMP"));
+        assertEquals(FireboltColumnDataType.DECIMAL, FireboltColumnDataType.valueOf("DECIMAL"));
     }
 
     @Test

@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class NumericSerializerTest extends BaseIntegrationTest {
     
     private static final String TABLE_NAME = "numeric_test_table";
@@ -303,46 +302,46 @@ public class NumericSerializerTest extends BaseIntegrationTest {
                 Array actualRequiredListWithNonNullArray = rs.getArray("requiredListWithNonNullElements");
                 Array actualOptionalListArray = rs.getArray("optionalList");
                 Array actualOptionalListWithNonNullElementsArray = rs.getArray("optionalListWithNonNullElements");
-                
+
                 // Basic field verification
-                assertEquals(expected.getRecordId(), actualRecordId, 
+                assertEquals(expected.getRecordId(), actualRecordId,
                     "RecordId mismatch at index " + recordIndex);
-                assertEquals(0, expected.getRequiredNumeric().compareTo(actualRequiredNumeric), 
-                    "RequiredNumeric mismatch at index " + recordIndex + 
+                assertEquals(0, expected.getRequiredNumeric().compareTo(actualRequiredNumeric),
+                    "RequiredNumeric mismatch at index " + recordIndex +
                     " (expected: " + expected.getRequiredNumeric() + ", actual: " + actualRequiredNumeric + ")");
-                
+
                 // Null handling verification for optional numeric
                 if (expected.getOptionalNumeric() == null) {
-                    assertNull(actualOptionalNumeric, 
+                    assertNull(actualOptionalNumeric,
                         "OptionalNumeric should be null at index " + recordIndex);
                 } else {
-                    assertEquals(0, expected.getOptionalNumeric().compareTo(actualOptionalNumeric), 
-                        "OptionalNumeric mismatch at index " + recordIndex + 
+                    assertEquals(0, expected.getOptionalNumeric().compareTo(actualOptionalNumeric),
+                        "OptionalNumeric mismatch at index " + recordIndex +
                         " (expected: " + expected.getOptionalNumeric() + ", actual: " + actualOptionalNumeric + ")");
                 }
-                
+
                 // Array verification using getArray()
-                verifyNumericArray("requiredListWithNullableElements", 
+                verifyNumericArray("requiredListWithNullableElements",
                     expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
-                    
-                verifyNumericArray("requiredListWithNonNullElements", 
+
+                verifyNumericArray("requiredListWithNonNullElements",
                     expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
-                
+
                 // Optional list verification
                 if (expected.getOptionalList() == null) {
-                    assertNull(actualOptionalListArray, 
+                    assertNull(actualOptionalListArray,
                         "OptionalList should be null at index " + recordIndex);
                 } else {
-                    verifyNumericArray("optionalList", 
+                    verifyNumericArray("optionalList",
                         expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
                 }
-                
+
                 // Optional list with non-null elements verification
                 if (expected.getOptionalListWithNonNullElements() == null) {
-                    assertNull(actualOptionalListWithNonNullElementsArray, 
+                    assertNull(actualOptionalListWithNonNullElementsArray,
                         "OptionalListWithNonNullElements should be null at index " + recordIndex);
                 } else {
-                    verifyNumericArray("optionalListWithNonNullElements", 
+                    verifyNumericArray("optionalListWithNonNullElements",
                         expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
                 }
                 

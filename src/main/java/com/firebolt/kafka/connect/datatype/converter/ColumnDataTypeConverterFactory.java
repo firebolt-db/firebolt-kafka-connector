@@ -11,17 +11,22 @@ public class ColumnDataTypeConverterFactory {
     private IntegerDataTypeConverter integerDataTypeConverter ;
     private ArrayDataTypeConverter arrayDataTypeConverter;
     private TimestampDataTypeConverter timestampDataTypeConverter;
+    private DecimalDataTypeConverter decimalDataTypeConverter;
 
     private ColumnDataTypeConverterFactory() {
         // use the static method to create the object
-        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter());
+        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(), new DecimalDataTypeConverter());
     }
 
     @VisibleForTesting
-    ColumnDataTypeConverterFactory(IntegerDataTypeConverter integerDataTypeConverter, ArrayDataTypeConverter arrayDataTypeConverter, TimestampDataTypeConverter timestampDataTypeConverter) {
+    ColumnDataTypeConverterFactory(IntegerDataTypeConverter integerDataTypeConverter,
+                                   ArrayDataTypeConverter arrayDataTypeConverter,
+                                   TimestampDataTypeConverter timestampDataTypeConverter,
+                                   DecimalDataTypeConverter decimalDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
+        this.decimalDataTypeConverter = decimalDataTypeConverter;
     }
 
     public static ColumnDataTypeConverterFactory getInstance() {
@@ -42,6 +47,8 @@ public class ColumnDataTypeConverterFactory {
                 return arrayDataTypeConverter;
             case TIMESTAMP:
                 return timestampDataTypeConverter;
+            case DECIMAL:
+                return decimalDataTypeConverter;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());
