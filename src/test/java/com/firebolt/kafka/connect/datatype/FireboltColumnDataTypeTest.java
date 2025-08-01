@@ -132,6 +132,35 @@ public class FireboltColumnDataTypeTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+        "double precision",
+        "double",
+        "float",
+        "float8",
+        "float(p)",
+        "DOUBLE PRECISION",
+        "DOUBLE",
+        "FLOAT",
+        "FLOAT8",
+        "FLOAT(P)",
+        "Double Precision",
+        "Double",
+        "Float",
+        "Float8",
+        "Float(P)",
+        "DoUbLe PrEcIsIoN",
+        "DoUbLe",
+        "FlOaT",
+        "FlOaT8",
+        "FlOaT(P)"
+    })
+    void testFromStringReturnsDoubleForValidDoubleTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.DOUBLE, result);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "text",
         "varchar", 
@@ -172,7 +201,7 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(7, values.length);
+        assertEquals(8, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
@@ -180,6 +209,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.DECIMAL, values[4]);
         assertEquals(FireboltColumnDataType.BIGINT, values[5]);
         assertEquals(FireboltColumnDataType.REAL, values[6]);
+        assertEquals(FireboltColumnDataType.DOUBLE, values[7]);
     }
 
     @Test
@@ -191,6 +221,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.DECIMAL, FireboltColumnDataType.valueOf("DECIMAL"));
         assertEquals(FireboltColumnDataType.BIGINT, FireboltColumnDataType.valueOf("BIGINT"));
         assertEquals(FireboltColumnDataType.REAL, FireboltColumnDataType.valueOf("REAL"));
+        assertEquals(FireboltColumnDataType.DOUBLE, FireboltColumnDataType.valueOf("DOUBLE"));
     }
 
     @Test

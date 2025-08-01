@@ -36,12 +36,15 @@ public class ColumnDataTypeConverterFactoryTest {
     @Mock
     private RealDataTypeConverter mockRealDataTypeConverter;
 
+    @Mock
+    private DoubleDataTypeConverter mockDoubleDataTypeConverter;
+
     private ColumnDataTypeConverterFactory factory;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter);
+        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -161,6 +164,32 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockRealDataTypeConverter, result);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "double precision",
+        "double",
+        "float",
+        "float8",
+        "float(p)",
+        "DOUBLE PRECISION",
+        "DOUBLE",
+        "FLOAT",
+        "FLOAT8",
+        "FLOAT(P)",
+        "Double Precision",
+        "Double",
+        "Float",
+        "Float8",
+        "Float(P)"
+    })
+    void testGetConverterForDoubleTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 8, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockDoubleDataTypeConverter, result);
+    }
+
     @Test
     void testGetConverterThrowsExceptionForUnsupportedType() {
         TableSchema.Column column = new TableSchema.Column("test_column", "unsupported_type", 12, true);
@@ -190,7 +219,7 @@ public class ColumnDataTypeConverterFactoryTest {
     @Test
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
-            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter);
+            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter);
         
         assertNotNull(testFactory);
         
@@ -198,10 +227,14 @@ public class ColumnDataTypeConverterFactoryTest {
         TableSchema.Column arrayColumn = new TableSchema.Column("array_col", "array(text)", 2003, true);
         TableSchema.Column timestampColumn = new TableSchema.Column("timestamp_col", "timestamp", 93, true);
         TableSchema.Column bigintColumn = new TableSchema.Column("bigint_col", "bigint", 8, true);
+        TableSchema.Column realColumn = new TableSchema.Column("real_col", "real", 7, true);
+        TableSchema.Column doubleColumn = new TableSchema.Column("double_col", "double", 8, true);
         
         assertSame(mockIntegerDataTypeConverter, testFactory.getConverter(intColumn));
         assertSame(mockArrayDataTypeConverter, testFactory.getConverter(arrayColumn));
         assertSame(mockTimestampDataTypeConverter, testFactory.getConverter(timestampColumn));
         assertSame(mockBigIntDataTypeConverter, testFactory.getConverter(bigintColumn));
+        assertSame(mockRealDataTypeConverter, testFactory.getConverter(realColumn));
+        assertSame(mockDoubleDataTypeConverter, testFactory.getConverter(doubleColumn));
     }
 } 

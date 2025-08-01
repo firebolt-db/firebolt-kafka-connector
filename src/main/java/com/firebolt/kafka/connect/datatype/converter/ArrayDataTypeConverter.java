@@ -52,6 +52,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.FLOAT32) {
                 return connection.createArrayOf(typeName, elements.stream().map(objectValue -> objectValue == null ? null : String.valueOf(objectValue)).toArray());
             }
+        } else if (typeName.equals("double")) {
+            return connection.createArrayOf(typeName, elements.toArray());
         }
 
         return connection.createArrayOf(typeName, elements.toArray());
@@ -70,6 +72,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return "bigint";
         } else if (fireboltColumn.getDataType().equals("array(real)")) {
             return "real";
+        } else if (fireboltColumn.getDataType().equals("array(double)")) {
+            return "double";
         }
 
         // add more data types
