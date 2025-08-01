@@ -175,6 +175,19 @@ public class FireboltColumnDataTypeTest {
 
     @ParameterizedTest
     @CsvSource({
+        "bytea",
+        "BYTEA",
+        "Bytea",
+        "ByTeA"
+    })
+    void testFromStringReturnsByteaForValidByteaTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.BYTEA, result);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
         "date",
         "DATE",
         "Date",
@@ -225,7 +238,7 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(10, values.length);
+        assertEquals(11, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
@@ -236,6 +249,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.REAL, values[7]);
         assertEquals(FireboltColumnDataType.DOUBLE, values[8]);
         assertEquals(FireboltColumnDataType.TEXT, values[9]);
+        assertEquals(FireboltColumnDataType.BYTEA, values[10]);
     }
 
     @Test
@@ -250,6 +264,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.REAL, FireboltColumnDataType.valueOf("REAL"));
         assertEquals(FireboltColumnDataType.DOUBLE, FireboltColumnDataType.valueOf("DOUBLE"));
         assertEquals(FireboltColumnDataType.TEXT, FireboltColumnDataType.valueOf("TEXT"));
+        assertEquals(FireboltColumnDataType.BYTEA, FireboltColumnDataType.valueOf("BYTEA"));
     }
 
     @Test

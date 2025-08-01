@@ -45,6 +45,9 @@ public class ColumnDataTypeConverterFactoryTest {
     @Mock
     private TextDataTypeConverter textDataTypeConverter;
 
+    @Mock
+    private ByteaDataTypeConverter byteaDataTypeConverter;
+
     private ColumnDataTypeConverterFactory factory;
 
     @BeforeEach
@@ -52,7 +55,7 @@ public class ColumnDataTypeConverterFactoryTest {
         MockitoAnnotations.openMocks(this);
         factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter,
                 mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter,
-                mockDoubleDataTypeConverter, textDataTypeConverter, mockDateDataTypeConverter);
+                mockDoubleDataTypeConverter, textDataTypeConverter, mockDateDataTypeConverter, byteaDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -77,11 +80,31 @@ public class ColumnDataTypeConverterFactoryTest {
         "array(text)",
         "array(integer)",
         "array(bigint)",
+        "array(real)",
+        "array(boolean)",
         "ARRAY(TEXT)",
         "ARRAY(INTEGER)",
-        "Array(Text)"
+        "Array(Text)",
+        "Array(BigInt)",
+        "array(array(text))",
+        "array("
     })
     void testGetConverterForArrayTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 2003, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockArrayDataTypeConverter, result);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "array(bytea)",
+        "ARRAY(BYTEA)",
+        "Array(Bytea)",
+        "Array(BYTEA)"
+    })
+    void testGetConverterForByteaArrayTypes(String dataType) {
         TableSchema.Column column = new TableSchema.Column("test_column", dataType, 2003, true);
         
         ColumnDataTypeConverter result = factory.getConverter(column);
@@ -228,6 +251,21 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockDateDataTypeConverter, result);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "bytea",
+        "BYTEA",
+        "Bytea",
+        "ByTeA"
+    })
+    void testGetConverterForByteaTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, -2, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(byteaDataTypeConverter, result);
+    }
+
     @Test
     void testGetConverterThrowsExceptionForUnsupportedType() {
         TableSchema.Column column = new TableSchema.Column("test_column", "unsupported_type", 12, true);
@@ -258,7 +296,7 @@ public class ColumnDataTypeConverterFactoryTest {
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
             mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter,
-                mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter, textDataTypeConverter, mockDateDataTypeConverter);
+                mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter, textDataTypeConverter, mockDateDataTypeConverter, byteaDataTypeConverter);
         
         assertNotNull(testFactory);
         
@@ -270,6 +308,7 @@ public class ColumnDataTypeConverterFactoryTest {
         TableSchema.Column realColumn = new TableSchema.Column("real_col", "real", 7, true);
         TableSchema.Column doubleColumn = new TableSchema.Column("double_col", "double", 8, true);
         TableSchema.Column textColumn = new TableSchema.Column("text_col", "text", 12, true);
+        TableSchema.Column byteaColumn = new TableSchema.Column("bytea_col", "bytea", -2, true);
         
         assertSame(mockIntegerDataTypeConverter, testFactory.getConverter(intColumn));
         assertSame(mockArrayDataTypeConverter, testFactory.getConverter(arrayColumn));
@@ -279,5 +318,6 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockRealDataTypeConverter, testFactory.getConverter(realColumn));
         assertSame(mockDoubleDataTypeConverter, testFactory.getConverter(doubleColumn));
         assertSame(textDataTypeConverter, testFactory.getConverter(textColumn));
+        assertSame(byteaDataTypeConverter, testFactory.getConverter(byteaColumn));
     }
 } 

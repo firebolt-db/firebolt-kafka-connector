@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class ByteaSerializerTest extends BaseIntegrationTest {
     
     private static final String TABLE_NAME = "bytea_test_table";
@@ -95,10 +94,10 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 .requiredBytea(new byte[]{0x01})
                 .optionalBytea(new byte[]{0x02})
                 .requiredListWithNullableElements(Arrays.asList(
-                    "item1".getBytes(StandardCharsets.UTF_8), 
+                    "item1".getBytes(StandardCharsets.UTF_8),
                     "item2".getBytes(StandardCharsets.UTF_8)))
                 .requiredListWithNonNullElements(Arrays.asList(
-                    "value1".getBytes(StandardCharsets.UTF_8), 
+                    "value1".getBytes(StandardCharsets.UTF_8),
                     "value2".getBytes(StandardCharsets.UTF_8)))
                 .optionalList(Arrays.asList(
                     "opt1".getBytes(StandardCharsets.UTF_8)))
@@ -149,6 +148,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
 
             // Record with mixed array content
             aValidTestRecord(10)
+                .optionalBytea(new byte[0])
                 .requiredListWithNullableElements(Arrays.asList(
                     "Test".getBytes(StandardCharsets.UTF_8),
                     null,
@@ -332,10 +332,10 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 
                 // Array verification using getArray()
                 verifyByteaArray("requiredListWithNullableElements", 
-                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
+                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
                     
                 verifyByteaArray("requiredListWithNonNullElements", 
-                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
+                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex);
                 
                 // Optional list verification
                 if (expected.getOptionalList() == null) {
@@ -343,7 +343,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                         "OptionalList should be null at index " + recordIndex);
                 } else {
                     verifyByteaArray("optionalList", 
-                        expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
+                        expected.getOptionalList(), actualOptionalListArray, recordIndex);
                 }
                 
                 // Optional list with non-null elements verification
@@ -352,7 +352,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                         "OptionalListWithNonNullElements should be null at index " + recordIndex);
                 } else {
                     verifyByteaArray("optionalListWithNonNullElements", 
-                        expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
+                        expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
                 }
                 
                 log.debug("Verified bytea record {}: recordId={}, requiredBytea length={}", 
@@ -370,7 +370,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
      * Verifies a bytea array field using Array object instead of string parsing.
      */
     private void verifyByteaArray(String fieldName, List<byte[]> expected, Array actualArray, 
-                                int recordIndex, boolean allowNullElements) throws SQLException {
+                                int recordIndex) throws SQLException {
         if (expected == null) {
             assertNull(actualArray, fieldName + " should be null at index " + recordIndex);
             return;
