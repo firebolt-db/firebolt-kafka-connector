@@ -17,7 +17,7 @@ ext {
     log4jVersion = '2.23.1'
     okhttpVersion = '5.1.0'
     kafkaVersion = '3.9.1'
-    testcontainersVersion = '1.18.3'
+    testcontainersVersion = '1.21.3'
     slf4jVersion = '2.0.7'
     fireboltJdbcVersion = '3.6.7'
     guavaVersion = '32.1.2-jre'
