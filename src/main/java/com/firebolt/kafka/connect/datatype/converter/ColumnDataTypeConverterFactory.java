@@ -16,12 +16,13 @@ public class ColumnDataTypeConverterFactory {
     private BigIntDataTypeConverter bigIntDataTypeConverter;
     private RealDataTypeConverter realDataTypeConverter;
     private DoubleDataTypeConverter doubleDataTypeConverter;
+    private TextDataTypeConverter textDataTypeConverter;
 
     private ColumnDataTypeConverterFactory() {
         // use the static method to create the object
         this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(),
              new TimestamptzDataTypeConverter(), new DecimalDataTypeConverter(), new BigIntDataTypeConverter(),
-             new RealDataTypeConverter(), new DoubleDataTypeConverter());
+             new RealDataTypeConverter(), new DoubleDataTypeConverter(), new TextDataTypeConverter());
     }
 
     @VisibleForTesting
@@ -32,7 +33,8 @@ public class ColumnDataTypeConverterFactory {
                                    DecimalDataTypeConverter decimalDataTypeConverter,
                                    BigIntDataTypeConverter bigIntDataTypeConverter,
                                    RealDataTypeConverter realDataTypeConverter,
-                                   DoubleDataTypeConverter doubleDataTypeConverter) {
+                                   DoubleDataTypeConverter doubleDataTypeConverter,
+                                   TextDataTypeConverter textDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
@@ -41,6 +43,7 @@ public class ColumnDataTypeConverterFactory {
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
         this.realDataTypeConverter = realDataTypeConverter;
         this.doubleDataTypeConverter = doubleDataTypeConverter;
+        this.textDataTypeConverter = textDataTypeConverter;
     }
 
     public static ColumnDataTypeConverterFactory getInstance() {
@@ -71,6 +74,8 @@ public class ColumnDataTypeConverterFactory {
                 return realDataTypeConverter;
             case DOUBLE:
                 return doubleDataTypeConverter;
+            case TEXT:
+                return textDataTypeConverter;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());
