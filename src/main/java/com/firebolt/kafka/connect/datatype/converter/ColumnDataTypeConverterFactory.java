@@ -11,21 +11,24 @@ public class ColumnDataTypeConverterFactory {
     private IntegerDataTypeConverter integerDataTypeConverter ;
     private ArrayDataTypeConverter arrayDataTypeConverter;
     private TimestampDataTypeConverter timestampDataTypeConverter;
+    private TimestamptzDataTypeConverter timestamptzDataTypeConverter;
     private DecimalDataTypeConverter decimalDataTypeConverter;
 
     private ColumnDataTypeConverterFactory() {
         // use the static method to create the object
-        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(), new DecimalDataTypeConverter());
+        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(), new TimestamptzDataTypeConverter(), new DecimalDataTypeConverter());
     }
 
     @VisibleForTesting
     ColumnDataTypeConverterFactory(IntegerDataTypeConverter integerDataTypeConverter,
                                    ArrayDataTypeConverter arrayDataTypeConverter,
                                    TimestampDataTypeConverter timestampDataTypeConverter,
+                                   TimestamptzDataTypeConverter timestamptzDataTypeConverter,
                                    DecimalDataTypeConverter decimalDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
+        this.timestamptzDataTypeConverter = timestamptzDataTypeConverter;
         this.decimalDataTypeConverter = decimalDataTypeConverter;
     }
 
@@ -47,6 +50,8 @@ public class ColumnDataTypeConverterFactory {
                 return arrayDataTypeConverter;
             case TIMESTAMP:
                 return timestampDataTypeConverter;
+            case TIMESTAMPTZ:
+                return timestamptzDataTypeConverter;
             case DECIMAL:
                 return decimalDataTypeConverter;
         }

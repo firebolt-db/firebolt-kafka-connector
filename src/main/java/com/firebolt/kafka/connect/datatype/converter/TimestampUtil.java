@@ -2,6 +2,8 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 public class TimestampUtil {
 
@@ -18,10 +20,37 @@ public class TimestampUtil {
         }
     }
 
+    public static OffsetDateTime asOffsetDateTime(Long value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value > 10_000_000_000_000L) {
+            // Assume microseconds
+            return asOffsetDateTimeFromMicros(value);
+        } else {
+            return asOffsetDateTimeFromMillis(value);
+        }
+    }
+
     private static Timestamp fromMicros(long micros) {
         long seconds = micros / 1_000_000;
         long microRemainder = micros % 1_000_000;
         Instant instant = Instant.ofEpochSecond(seconds, microRemainder * 1000);
         return Timestamp.from(instant);
     }
+
+    private static OffsetDateTime asOffsetDateTimeFromMicros(long micros) {
+        long seconds = micros / 1_000_000;
+        long microRemainder = micros % 1_000_000;
+        Instant instant = Instant.ofEpochSecond(seconds, microRemainder * 1000);
+        return instant.atOffset(ZoneOffset.ofHours(0)); // assume utc if it is in micros
+    }
+
+    private static OffsetDateTime asOffsetDateTimeFromMillis(long millis) {
+        Instant instant = Instant.ofEpochMilli(millis);
+        return instant.atOffset(ZoneOffset.ofHours(0)); // assume utc if it is in micros
+    }
+
+
 }

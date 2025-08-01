@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.data.Schema;
 
@@ -37,6 +38,12 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
                 return connection.createArrayOf("string", elements.toArray());
             }
+        } else if (typeName.equals("timestamptz")) {
+            if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
+                return connection.createArrayOf(typeName, elements.stream().map(objectValue -> TimestampUtil.asOffsetDateTime((Long) objectValue)).toArray());
+            } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
+                return connection.createArrayOf("string", elements.toArray());
+            }
         } else if (typeName.equals("numeric")) {
             if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING) {
                 return connection.createArrayOf("string", elements.toArray());
@@ -51,6 +58,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return "integer";
         } else if (fireboltColumn.getDataType().equals("array(timestamp)")) {
             return "timestamp";
+        } else if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
+            return "timestamptz";
         } else if (fireboltColumn.getDataType().equals("array(numeric)")) {
             return "numeric";
         }
