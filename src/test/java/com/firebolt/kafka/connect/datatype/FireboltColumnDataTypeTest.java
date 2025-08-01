@@ -188,6 +188,23 @@ public class FireboltColumnDataTypeTest {
 
     @ParameterizedTest
     @CsvSource({
+        "boolean",
+        "bool",
+        "BOOLEAN",
+        "BOOL",
+        "Boolean",
+        "Bool",
+        "BoOlEaN",
+        "BoOl"
+    })
+    void testFromStringReturnsBooleanForValidBooleanTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.BOOLEAN, result);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
         "date",
         "DATE",
         "Date",
@@ -202,7 +219,6 @@ public class FireboltColumnDataTypeTest {
     @ParameterizedTest
     @ValueSource(strings = {
         "varchar", 
-        "boolean",
         "unsupported_type",
         "int32",
         "array",
@@ -238,7 +254,7 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(11, values.length);
+        assertEquals(12, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
@@ -250,6 +266,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.DOUBLE, values[8]);
         assertEquals(FireboltColumnDataType.TEXT, values[9]);
         assertEquals(FireboltColumnDataType.BYTEA, values[10]);
+        assertEquals(FireboltColumnDataType.BOOLEAN, values[11]);
     }
 
     @Test
@@ -265,6 +282,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.DOUBLE, FireboltColumnDataType.valueOf("DOUBLE"));
         assertEquals(FireboltColumnDataType.TEXT, FireboltColumnDataType.valueOf("TEXT"));
         assertEquals(FireboltColumnDataType.BYTEA, FireboltColumnDataType.valueOf("BYTEA"));
+        assertEquals(FireboltColumnDataType.BOOLEAN, FireboltColumnDataType.valueOf("BOOLEAN"));
     }
 
     @Test

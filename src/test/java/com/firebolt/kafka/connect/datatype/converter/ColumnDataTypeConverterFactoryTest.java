@@ -43,10 +43,13 @@ public class ColumnDataTypeConverterFactoryTest {
     private DoubleDataTypeConverter mockDoubleDataTypeConverter;
 
     @Mock
-    private TextDataTypeConverter textDataTypeConverter;
+    private TextDataTypeConverter mockTextDataTypeConverter;
 
     @Mock
-    private ByteaDataTypeConverter byteaDataTypeConverter;
+    private ByteaDataTypeConverter mockByteaDataTypeConverter;
+
+    @Mock
+    private BooleanDataTypeConverter mockBooleanDataTypeConverter;
 
     private ColumnDataTypeConverterFactory factory;
 
@@ -55,7 +58,7 @@ public class ColumnDataTypeConverterFactoryTest {
         MockitoAnnotations.openMocks(this);
         factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter,
                 mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter,
-                mockDoubleDataTypeConverter, textDataTypeConverter, mockDateDataTypeConverter, byteaDataTypeConverter);
+                mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -105,6 +108,21 @@ public class ColumnDataTypeConverterFactoryTest {
         "Array(BYTEA)"
     })
     void testGetConverterForByteaArrayTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 2003, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockArrayDataTypeConverter, result);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "array(timestamptz)",
+        "ARRAY(TIMESTAMPTZ)",
+        "Array(Timestamptz)",
+        "Array(TIMESTAMPTZ)"
+    })
+    void testGetConverterForTimestamptzArrayTypes(String dataType) {
         TableSchema.Column column = new TableSchema.Column("test_column", dataType, 2003, true);
         
         ColumnDataTypeConverter result = factory.getConverter(column);
@@ -233,7 +251,7 @@ public class ColumnDataTypeConverterFactoryTest {
         
         ColumnDataTypeConverter result = factory.getConverter(column);
         
-        assertSame(textDataTypeConverter, result);
+        assertSame(mockTextDataTypeConverter, result);
     }
 
     @ParameterizedTest
@@ -263,7 +281,26 @@ public class ColumnDataTypeConverterFactoryTest {
         
         ColumnDataTypeConverter result = factory.getConverter(column);
         
-        assertSame(byteaDataTypeConverter, result);
+        assertSame(mockByteaDataTypeConverter, result);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "boolean",
+        "bool",
+        "BOOLEAN",
+        "BOOL",
+        "Boolean",
+        "Bool",
+        "BoOlEaN",
+        "BoOl"
+    })
+    void testGetConverterForBooleanTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 16, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockBooleanDataTypeConverter, result);
     }
 
     @Test
@@ -296,7 +333,7 @@ public class ColumnDataTypeConverterFactoryTest {
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
             mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter,
-                mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter, textDataTypeConverter, mockDateDataTypeConverter, byteaDataTypeConverter);
+                mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter);
         
         assertNotNull(testFactory);
         
@@ -309,6 +346,7 @@ public class ColumnDataTypeConverterFactoryTest {
         TableSchema.Column doubleColumn = new TableSchema.Column("double_col", "double", 8, true);
         TableSchema.Column textColumn = new TableSchema.Column("text_col", "text", 12, true);
         TableSchema.Column byteaColumn = new TableSchema.Column("bytea_col", "bytea", -2, true);
+        TableSchema.Column booleanColumn = new TableSchema.Column("boolean_col", "boolean", 16, true);
         
         assertSame(mockIntegerDataTypeConverter, testFactory.getConverter(intColumn));
         assertSame(mockArrayDataTypeConverter, testFactory.getConverter(arrayColumn));
@@ -317,7 +355,8 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockBigIntDataTypeConverter, testFactory.getConverter(bigintColumn));
         assertSame(mockRealDataTypeConverter, testFactory.getConverter(realColumn));
         assertSame(mockDoubleDataTypeConverter, testFactory.getConverter(doubleColumn));
-        assertSame(textDataTypeConverter, testFactory.getConverter(textColumn));
-        assertSame(byteaDataTypeConverter, testFactory.getConverter(byteaColumn));
+        assertSame(mockTextDataTypeConverter, testFactory.getConverter(textColumn));
+        assertSame(mockByteaDataTypeConverter, testFactory.getConverter(byteaColumn));
+        assertSame(mockBooleanDataTypeConverter, testFactory.getConverter(booleanColumn));
     }
 } 

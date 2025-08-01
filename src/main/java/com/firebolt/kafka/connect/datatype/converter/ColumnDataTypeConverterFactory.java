@@ -19,13 +19,14 @@ public class ColumnDataTypeConverterFactory {
     private DoubleDataTypeConverter doubleDataTypeConverter;
     private TextDataTypeConverter textDataTypeConverter;
     private ByteaDataTypeConverter byteaDataTypeConverter;
+    private BooleanDataTypeConverter booleanDataTypeConverter;
 
     private ColumnDataTypeConverterFactory() {
         // use the static method to create the object
         this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter(),
              new TimestamptzDataTypeConverter(), new DecimalDataTypeConverter(), new BigIntDataTypeConverter(),
              new RealDataTypeConverter(), new DoubleDataTypeConverter(), new TextDataTypeConverter(), new DateDataTypeConverter(),
-                new ByteaDataTypeConverter());
+                new ByteaDataTypeConverter(), new BooleanDataTypeConverter());
     }
 
     @VisibleForTesting
@@ -39,7 +40,8 @@ public class ColumnDataTypeConverterFactory {
                                    DoubleDataTypeConverter doubleDataTypeConverter,
                                    TextDataTypeConverter textDataTypeConverter,
                                    DateDataTypeConverter dateDataTypeConverter,
-                                   ByteaDataTypeConverter byteaDataTypeConverter) {
+                                   ByteaDataTypeConverter byteaDataTypeConverter,
+                                   BooleanDataTypeConverter booleanDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
@@ -51,6 +53,7 @@ public class ColumnDataTypeConverterFactory {
         this.textDataTypeConverter = textDataTypeConverter;
         this.dateDataTypeConverter = dateDataTypeConverter;
         this.byteaDataTypeConverter = byteaDataTypeConverter;
+        this.booleanDataTypeConverter = booleanDataTypeConverter;
     }
 
     public static ColumnDataTypeConverterFactory getInstance() {
@@ -87,6 +90,8 @@ public class ColumnDataTypeConverterFactory {
                 return textDataTypeConverter;
             case BYTEA:
                 return byteaDataTypeConverter;
+            case BOOLEAN:
+                return booleanDataTypeConverter;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());

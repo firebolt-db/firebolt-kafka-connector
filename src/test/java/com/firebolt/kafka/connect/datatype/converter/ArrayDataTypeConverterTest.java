@@ -205,6 +205,27 @@ public class ArrayDataTypeConverterTest {
     }
 
     @Test
+    void testConvertAndSetWithRealArrayTypeFloat32Schema() throws SQLException {
+        List<Float> realValues = Arrays.asList(1.5f, 2.7f, 3.14f, null, 0.0f);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(realValues)
+                .schemaSubType(Schema.Type.FLOAT32)
+                .build();
+
+        TableSchema.Column realArrayColumn = new TableSchema.Column("test_column", "array(real)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, realArrayColumn);
+
+        // For FLOAT32 schema, values should be converted to strings
+        Object[] expectedValues = realValues.stream()
+                .map(value -> value == null ? null : String.valueOf(value))
+                .toArray();
+
+        verify(mockConnection).createArrayOf(eq("real"), eq(expectedValues));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
     void testConvertAndSetWithDoubleArrayType() throws SQLException {
         List<Double> doubleValues = Arrays.asList(1.5, 2.7, 3.14159265359);
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
@@ -238,13 +259,24 @@ public class ArrayDataTypeConverterTest {
         verify(mockStatement).setArray(1, mockArray);
     }
 
-    @ParameterizedTest
-    @CsvSource({
-        "array(boolean)",
-        "unsupported_array_type"
-    })
-    void testConvertAndSetWithUnsupportedArrayTypesDefaultsToString(String dataType) throws SQLException {
-        TableSchema.Column unsupportedColumn = new TableSchema.Column("test_column", dataType, 2003, true);
+    @Test
+    void testConvertAndSetWithBooleanArrayType() throws SQLException {
+        List<Boolean> booleanValues = Arrays.asList(true, false, true, null, false);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(booleanValues)
+                .build();
+
+        TableSchema.Column booleanArrayColumn = new TableSchema.Column("test_column", "array(boolean)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, booleanArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("boolean"), eq(booleanValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithUnsupportedArrayTypeDefaultsToString() throws SQLException {
+        TableSchema.Column unsupportedColumn = new TableSchema.Column("test_column", "unsupported_array_type", 2003, true);
         List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(arrayValues)
@@ -351,6 +383,101 @@ public class ArrayDataTypeConverterTest {
                 .toArray(Timestamp[]::new);
 
         verify(mockConnection).createArrayOf(eq("timestamp"), eq(expectedTimestamps));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "0",                    // Epoch
+        "1000",                 // 1 second in millis
+        "1609459200000",        // 2021-01-01 00:00:00 UTC in millis
+        "10000000000000",       // Threshold value (treated as millis)
+        "10000000000001"        // Just above threshold (treated as micros)
+    })
+    void testConvertAndSetWithTimestamptzArrayInt64Schema(long timestampValue) throws SQLException {
+        List<Long> timestampValues = Arrays.asList(timestampValue, timestampValue + 1000);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        TableSchema.Column timestamptzArrayColumn = new TableSchema.Column("test_column", "array(timestamptz)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn);
+
+        // Verify that createArrayOf is called with timestamptz type and any array of objects
+        verify(mockConnection).createArrayOf(eq("timestamptz"), any(Object[].class));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTimestamptzArrayStringSchema() throws SQLException {
+        List<String> timestampStrings = Arrays.asList("2021-01-01 00:00:00", "2024-12-31 23:59:59");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampStrings)
+                .schemaSubType(Schema.Type.STRING)
+                .build();
+
+        TableSchema.Column timestamptzArrayColumn = new TableSchema.Column("test_column", "array(timestamptz)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(timestampStrings.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithEmptyTimestamptzArray() throws SQLException {
+        List<Long> emptyArray = new ArrayList<>();
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(emptyArray)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        TableSchema.Column timestamptzArrayColumn = new TableSchema.Column("test_column", "array(timestamptz)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("timestamptz"), eq(emptyArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTimestamptzArrayContainingNulls() throws SQLException {
+        List<Long> timestampValues = Arrays.asList(1609459200000L, null, 1609459260000L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        TableSchema.Column timestamptzArrayColumn = new TableSchema.Column("test_column", "array(timestamptz)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn);
+
+        // Verify that createArrayOf is called with timestamptz type and any array of objects
+        verify(mockConnection).createArrayOf(eq("timestamptz"), any(Object[].class));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithMixedTimestamptzValues() throws SQLException {
+        // Test with millisecond and microsecond values mixed
+        List<Long> timestampValues = Arrays.asList(
+                1000L,              // Milliseconds
+                10000000000001L,    // Microseconds (above threshold)
+                1609459200000L      // Milliseconds
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        TableSchema.Column timestamptzArrayColumn = new TableSchema.Column("test_column", "array(timestamptz)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn);
+
+        // Verify that createArrayOf is called with timestamptz type and any array of objects
+        verify(mockConnection).createArrayOf(eq("timestamptz"), any(Object[].class));
         verify(mockStatement).setArray(1, mockArray);
     }
 
@@ -674,4 +801,24 @@ public class ArrayDataTypeConverterTest {
             converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
         });
     }
+
+    @ParameterizedTest
+    @CsvSource({
+        "1, 'First parameter'",
+        "2, 'Second parameter'",
+        "10, 'Tenth parameter'",
+        "100, 'Hundredth parameter'"
+    })
+    void testConvertAndSetWithDifferentParameterIndices(int paramIndex, String description) throws SQLException {
+        List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .build();
+
+        converter.convertAndSet(mockStatement, paramIndex, kafkaValue, integerArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("integer"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(paramIndex, mockArray);
+    }
+
 } 

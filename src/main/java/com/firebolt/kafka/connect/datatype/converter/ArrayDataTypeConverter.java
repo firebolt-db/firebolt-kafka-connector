@@ -89,6 +89,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return "string";
         } else if (fireboltColumn.getDataType().equals("array(bytea)")) {
             return "bytea";
+        } else if (fireboltColumn.getDataType().equals("array(boolean)")) {
+            return "boolean";
         }
 
         // add more data types
