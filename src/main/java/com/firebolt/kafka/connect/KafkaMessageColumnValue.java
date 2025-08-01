@@ -15,5 +15,10 @@ public class KafkaMessageColumnValue {
 
     private Schema.Type schemaType;
 
+    /**
+     * In case of an array we will keep here the type of each element in the array
+     */
+    private Schema.Type schemaSubType;
+
     private Map<String, String> schemaTypeParams;
 }

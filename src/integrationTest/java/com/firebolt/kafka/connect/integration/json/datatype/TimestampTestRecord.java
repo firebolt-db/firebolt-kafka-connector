@@ -1,11 +1,11 @@
 package com.firebolt.kafka.connect.integration.json.datatype;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * Test record for comprehensive Timestamp serialization testing with JSON Schema and Kafka Connect.
@@ -71,11 +71,26 @@ public class TimestampTestRecord {
      * Maps to Firebolt TIMESTAMP NOT NULL.
      */
     private Long microsecondTimestamp;
-    
+
+    /**
+     * Array of microsecond precision timestamps as Longs (microseconds since epoch).
+     * This field preserves microsecond precision by bypassing Kafka Connect's Timestamp logical type.
+     * Maps to Firebolt ARRAY(TIMESTAMP NOT NULL) NOT NULL.
+     */
+    private List<Long> microsecondTimestampList;
+
+    /**
+     * Single timestamp string with microsecond precision.
+     * Uses ISO-8601 format with microseconds (e.g., "2024-01-15T14:30:45.123456").
+     * Maps to Firebolt TIMESTAMP NOT NULL.
+     */
+    private String timestampString;
+
     /**
      * Array of timestamp strings with microsecond precision.
      * Uses ISO-8601 format with microseconds (e.g., "2024-01-15T14:30:45.123456").
      * Maps to Firebolt ARRAY(TIMESTAMP NOT NULL) NOT NULL.
      */
     private List<String> timestampStringArray;
-} 
+
+}

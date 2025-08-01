@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.convert;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
+import java.sql.Types;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -88,11 +89,16 @@ public class SchemaBasedRecordConverter extends RecordConverter {
             return null;
         }
 
-        return KafkaMessageColumnValue.builder()
+        KafkaMessageColumnValue.KafkaMessageColumnValueBuilder builder = KafkaMessageColumnValue.builder()
                 .value(value)
                 .schemaType(schema.type())
-                .schemaTypeParams(schema.parameters())
-                .build();
+                .schemaTypeParams(schema.parameters());
+
+        if (schema.type() == Schema.Type.ARRAY) {
+            builder.schemaSubType(schema.valueSchema().type());
+        }
+
+        return builder.build();
     }
 
 } 

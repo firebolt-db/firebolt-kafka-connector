@@ -10,16 +10,18 @@ public class ColumnDataTypeConverterFactory {
 
     private IntegerDataTypeConverter integerDataTypeConverter ;
     private ArrayDataTypeConverter arrayDataTypeConverter;
+    private TimestampDataTypeConverter timestampDataTypeConverter;
 
     private ColumnDataTypeConverterFactory() {
         // use the static method to create the object
-        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter());
+        this(new IntegerDataTypeConverter(), new ArrayDataTypeConverter(), new TimestampDataTypeConverter());
     }
 
     @VisibleForTesting
-    ColumnDataTypeConverterFactory(IntegerDataTypeConverter integerDataTypeConverter, ArrayDataTypeConverter arrayDataTypeConverter) {
+    ColumnDataTypeConverterFactory(IntegerDataTypeConverter integerDataTypeConverter, ArrayDataTypeConverter arrayDataTypeConverter, TimestampDataTypeConverter timestampDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
+        this.timestampDataTypeConverter = timestampDataTypeConverter;
     }
 
     public static ColumnDataTypeConverterFactory getInstance() {
@@ -38,6 +40,8 @@ public class ColumnDataTypeConverterFactory {
                 return integerDataTypeConverter;
             case ARRAY:
                 return arrayDataTypeConverter;
+            case TIMESTAMP:
+                return timestampDataTypeConverter;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());

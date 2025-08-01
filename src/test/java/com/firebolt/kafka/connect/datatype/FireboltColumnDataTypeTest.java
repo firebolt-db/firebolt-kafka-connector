@@ -49,13 +49,25 @@ public class FireboltColumnDataTypeTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+        "timestamp",
+        "TIMESTAMP",
+        "Timestamp",
+        "TimEsTaMp"
+    })
+    void testFromStringReturnsTimestampForValidTimestampTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.TIMESTAMP, result);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "text",
         "varchar", 
         "bigint",
         "real",
         "boolean",
-        "timestamp",
         "date",
         "numeric",
         "decimal",
@@ -95,15 +107,17 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(2, values.length);
+        assertEquals(3, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
+        assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
     }
 
     @Test
     void testEnumValueOf() {
         assertEquals(FireboltColumnDataType.INTEGER, FireboltColumnDataType.valueOf("INTEGER"));
         assertEquals(FireboltColumnDataType.ARRAY, FireboltColumnDataType.valueOf("ARRAY"));
+        assertEquals(FireboltColumnDataType.TIMESTAMP, FireboltColumnDataType.valueOf("TIMESTAMP"));
     }
 
     @Test
