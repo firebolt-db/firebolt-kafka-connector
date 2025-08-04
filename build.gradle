@@ -11,7 +11,7 @@ plugins {
 // To update a library version, simply change the version number here
 // and it will be applied to all dependencies that use that library
 ext {
-    lombokVersion = '1.18.30'
+    lombokVersion = '1.18.38'
     jacksonVersion = '2.19.2'
     junitJupiterVersion = '5.9.3'
     log4jVersion = '2.25.1'
