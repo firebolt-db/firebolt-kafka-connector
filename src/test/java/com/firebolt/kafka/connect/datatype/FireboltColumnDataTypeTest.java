@@ -174,10 +174,22 @@ public class FireboltColumnDataTypeTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+        "date",
+        "DATE",
+        "Date",
+        "DaTe"
+    })
+    void testFromStringReturnsDateForValidDateTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.DATE, result);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "varchar", 
         "boolean",
-        "date",
         "unsupported_type",
         "int32",
         "array",
@@ -213,16 +225,17 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(9, values.length);
+        assertEquals(10, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
         assertEquals(FireboltColumnDataType.TIMESTAMPTZ, values[3]);
-        assertEquals(FireboltColumnDataType.DECIMAL, values[4]);
-        assertEquals(FireboltColumnDataType.BIGINT, values[5]);
-        assertEquals(FireboltColumnDataType.REAL, values[6]);
-        assertEquals(FireboltColumnDataType.DOUBLE, values[7]);
-        assertEquals(FireboltColumnDataType.TEXT, values[8]);
+        assertEquals(FireboltColumnDataType.DATE, values[4]);
+        assertEquals(FireboltColumnDataType.DECIMAL, values[5]);
+        assertEquals(FireboltColumnDataType.BIGINT, values[6]);
+        assertEquals(FireboltColumnDataType.REAL, values[7]);
+        assertEquals(FireboltColumnDataType.DOUBLE, values[8]);
+        assertEquals(FireboltColumnDataType.TEXT, values[9]);
     }
 
     @Test
@@ -231,6 +244,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.ARRAY, FireboltColumnDataType.valueOf("ARRAY"));
         assertEquals(FireboltColumnDataType.TIMESTAMP, FireboltColumnDataType.valueOf("TIMESTAMP"));
         assertEquals(FireboltColumnDataType.TIMESTAMPTZ, FireboltColumnDataType.valueOf("TIMESTAMPTZ"));
+        assertEquals(FireboltColumnDataType.DATE, FireboltColumnDataType.valueOf("DATE"));
         assertEquals(FireboltColumnDataType.DECIMAL, FireboltColumnDataType.valueOf("DECIMAL"));
         assertEquals(FireboltColumnDataType.BIGINT, FireboltColumnDataType.valueOf("BIGINT"));
         assertEquals(FireboltColumnDataType.REAL, FireboltColumnDataType.valueOf("REAL"));

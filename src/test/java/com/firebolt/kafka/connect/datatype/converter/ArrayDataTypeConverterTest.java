@@ -218,10 +218,28 @@ public class ArrayDataTypeConverterTest {
         verify(mockStatement).setArray(1, mockArray);
     }
 
+    @Test
+    void testConvertAndSetWithDateArrayType() throws SQLException {
+        // Convert timestamps to days since epoch for the new DateDataTypeConverter
+        // 1672531200000L -> 19358 days (2023-01-01)
+        // 1609459200000L -> 18628 days (2021-01-01) 
+        // 946684800000L -> 10957 days (2000-01-01)
+        List<Integer> dateValues = Arrays.asList(19358, 18628, 10957);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(dateValues)
+                .build();
+
+        TableSchema.Column dateArrayColumn = new TableSchema.Column("test_column", "array(date)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("date"), eq(dateValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
     @ParameterizedTest
     @CsvSource({
         "array(boolean)",
-        "array(date)",
         "unsupported_array_type"
     })
     void testConvertAndSetWithUnsupportedArrayTypesDefaultsToString(String dataType) throws SQLException {

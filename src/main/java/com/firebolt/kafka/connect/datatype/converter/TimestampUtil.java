@@ -1,7 +1,9 @@
 package com.firebolt.kafka.connect.datatype.converter;
 
+import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -31,6 +33,11 @@ public class TimestampUtil {
         } else {
             return asOffsetDateTimeFromMillis(value);
         }
+    }
+
+    public static Date fromDaysSinceEpoch(int numberOfDays) {
+        LocalDate localDate = LocalDate.ofEpochDay(numberOfDays);
+        return Date.valueOf(localDate);
     }
 
     private static Timestamp fromMicros(long micros) {
