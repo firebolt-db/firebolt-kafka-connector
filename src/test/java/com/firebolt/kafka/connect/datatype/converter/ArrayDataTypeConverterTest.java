@@ -181,6 +181,21 @@ public class ArrayDataTypeConverterTest {
         verify(mockStatement).setArray(1, mockArray);
     }
 
+    @Test
+    void testConvertAndSetWithDoubleArrayType() throws SQLException {
+        List<Double> doubleValues = Arrays.asList(1.5, 2.7, 3.14159265359);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(doubleValues)
+                .build();
+
+        TableSchema.Column doubleArrayColumn = new TableSchema.Column("test_column", "array(double)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, doubleArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("double"), eq(doubleValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
     @ParameterizedTest
     @CsvSource({
         "array(boolean)",

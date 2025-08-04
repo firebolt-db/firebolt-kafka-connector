@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.json;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.DoubleTestRecord;
 import com.firebolt.kafka.connect.utils.TestTag;
@@ -27,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class DoubleSerializerTest extends BaseIntegrationTest {
     
     private static final String TABLE_NAME = "double_test_table";
@@ -68,13 +69,13 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
     })
     void testDoubleSerialization(boolean includeNulls, String testDescription) throws Exception {
         producer = initializeJsonProducer(includeNulls);
-        
+
         List<DoubleTestRecord> testRecords = createTestRecords();
-        
+
         publishMessages(testRecords);
-        
+
         waitForDataInFirebolt(TABLE_NAME, testRecords.size());
-        
+
         verifyDoubleRecordsInFirebolt(testRecords);
     }
 
@@ -151,14 +152,66 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 .optionalDouble(-1.0E-10)
                 .build(),
 
-            // Record with large lists (5000 elements each)
+            // Record with Double edge cases (MIN_VALUE and MAX_VALUE)
             aValidTestRecord(11)
+                .requiredDouble(Double.MIN_VALUE)  // Smallest positive double value
+                .optionalDouble(Double.MAX_VALUE)   // Largest double value
+                .build(),
+
+            // Record with mathematical constants
+            aValidTestRecord(12)
+                .requiredDouble(Math.PI)           // 3.141592653589793
+                .optionalDouble(Math.E)            // 2.718281828459045
+                .build(),
+
+            // Record with edge case arrays containing extreme values (no infinity values)
+            aValidTestRecord(13)
+                .requiredListWithNullableElements(Arrays.asList(
+                    Double.MIN_VALUE,
+                    Double.MAX_VALUE,
+                    null,
+                    Double.MIN_NORMAL
+                ))
+                .requiredListWithNonNullElements(Arrays.asList(
+                    Math.PI,
+                    Math.E,
+                    -Math.PI,
+                    -Math.E
+                ))
+                .build(),
+
+            // Record with scientific notation edge cases
+            aValidTestRecord(14)
+                .requiredDouble(1.7976931348623157E+308)  // Close to MAX_VALUE
+                .optionalDouble(4.9E-324)                 // Close to MIN_VALUE
+                .build(),
+
+            // Record with precision boundary cases
+            aValidTestRecord(15)
+                .requiredDouble(9007199254740991.0)       // 2^53 - 1 (max safe integer in double)
+                .optionalDouble(-9007199254740991.0)      // -(2^53 - 1)
+                .build(),
+
+            // Record with very large lists containing edge values
+            aValidTestRecord(16)
                 .requiredDouble(999.999999999999)
                 .optionalDouble(-999.999999999999)
                 .requiredListWithNullableElements(createLargeListWithNulls(5000))
                 .requiredListWithNonNullElements(createLargeListWithoutNulls(5000))
                 .optionalList(createOptionalLargeList(5000))
                 .optionalListWithNonNullElements(createOptionalLargeList(3000))  // Different size for variety
+                .build(),
+
+            // Record with extreme precision test
+            aValidTestRecord(17)
+                .requiredDouble(1.2345678901234567890123456789)  // More precision than double can handle
+                .optionalDouble(-1.2345678901234567890123456789)
+                .build(),
+
+            // Record with subnormal numbers (very close to zero)
+            aValidTestRecord(18)
+                .requiredDouble(Double.MIN_NORMAL)      // Smallest normal positive double
+                .optionalDouble(-Double.MIN_NORMAL)     // Smallest normal negative double
                 .build()
         );
     }
@@ -292,7 +345,12 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 
                 // Verify each field
                 Integer actualRecordId = rs.getInt("recordId");
-                Double actualRequiredDouble = rs.getDouble("requiredDouble");
+                
+                // Handle requiredDouble with proper NaN detection
+                double requiredDoubleValue = rs.getDouble("requiredDouble");
+                Double actualRequiredDouble = rs.wasNull() ? null : requiredDoubleValue;
+                
+                // Handle optionalDouble
                 Double actualOptionalDouble = rs.getObject("optionalDouble") != null ? rs.getDouble("optionalDouble") : null;
                 
                 // Read arrays using getArray() instead of getString()
@@ -306,28 +364,22 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                     "RecordId mismatch at index " + recordIndex);
                 
                 // Use tolerance for double comparison to handle floating-point precision issues
-                if (expected.getRequiredDouble() != null && !expected.getRequiredDouble().isNaN()) {
+                if (expected.getRequiredDouble() != null) {
                     // Calculate appropriate tolerance based on the magnitude of the expected value
                     double tolerance = Math.max(1e-15, Math.abs(expected.getRequiredDouble()) * 1e-15);
                     assertEquals(expected.getRequiredDouble(), actualRequiredDouble, tolerance,
                         "RequiredDouble mismatch at index " + recordIndex + " ==> expected: <" + expected.getRequiredDouble() + "> but was: <" + actualRequiredDouble + ">");
-                } else if (expected.getRequiredDouble() != null && expected.getRequiredDouble().isNaN()) {
-                    assertTrue(actualRequiredDouble.isNaN(), 
-                        "RequiredDouble should be NaN at index " + recordIndex);
                 }
-                
+
                 // Null handling verification for optional double
                 if (expected.getOptionalDouble() == null) {
                     assertNull(actualOptionalDouble, 
                         "OptionalDouble should be null at index " + recordIndex);
-                } else if (!expected.getOptionalDouble().isNaN()) {
+                } else {
                     // Calculate appropriate tolerance based on the magnitude of the expected value
                     double tolerance = Math.max(1e-15, Math.abs(expected.getOptionalDouble()) * 1e-15);
                     assertEquals(expected.getOptionalDouble(), actualOptionalDouble, tolerance,
                         "OptionalDouble mismatch at index " + recordIndex + " ==> expected: <" + expected.getOptionalDouble() + "> but was: <" + actualOptionalDouble + ">");
-                } else {
-                    assertTrue(actualOptionalDouble.isNaN(), 
-                        "OptionalDouble should be NaN at index " + recordIndex);
                 }
                 
                 // Array verification using getArray()
@@ -387,25 +439,17 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 if (expectedElement == null) {
                     assertNull(actualElement, 
                         fieldName + " element " + i + " should be null at index " + recordIndex);
-                } else if (!expectedElement.isNaN()) {
+                } else {
                     // Calculate appropriate tolerance based on the magnitude of the expected value
                     double tolerance = Math.max(1e-15, Math.abs(expectedElement) * 1e-15);
                     assertEquals(expectedElement, actualElement, tolerance,
                         fieldName + " element " + i + " mismatch at index " + recordIndex + " ==> expected: <" + expectedElement + "> but was: <" + actualElement + ">");
-                } else {
-                    assertTrue(actualElement.isNaN(),
-                        fieldName + " element " + i + " should be NaN at index " + recordIndex);
                 }
             } else {
-                if (!expectedElement.isNaN()) {
-                    // Calculate appropriate tolerance based on the magnitude of the expected value
-                    double tolerance = Math.max(1e-15, Math.abs(expectedElement) * 1e-15);
-                    assertEquals(expectedElement, actualElement, tolerance,
-                        fieldName + " element " + i + " mismatch at index " + recordIndex + " ==> expected: <" + expectedElement + "> but was: <" + actualElement + ">");
-                } else {
-                    assertTrue(actualElement.isNaN(),
-                        fieldName + " element " + i + " should be NaN at index " + recordIndex);
-                }
+                // Calculate appropriate tolerance based on the magnitude of the expected value
+                double tolerance = Math.max(1e-15, Math.abs(expectedElement) * 1e-15);
+                assertEquals(expectedElement, actualElement, tolerance,
+                    fieldName + " element " + i + " mismatch at index " + recordIndex + " ==> expected: <" + expectedElement + "> but was: <" + actualElement + ">");
             }
         }
     }
@@ -416,7 +460,21 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
     private List<Double> createLargeListWithNulls(int size) {
         List<Double> result = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            result.add(i % 5 == 0 ? null : i * 1.5);  // Every 5th element is null
+            if (i % 10 == 0) {
+                result.add(null);
+            } else if (i % 100 == 1) {
+                result.add(Double.MIN_VALUE);  // Include edge cases occasionally
+            } else if (i % 100 == 2) {
+                result.add(Double.MAX_VALUE);
+            } else if (i % 1000 == 3) {
+                result.add(Math.PI);
+            } else if (i % 1000 == 4) {
+                result.add(Math.E);
+            } else if (i % 500 == 5) {
+                result.add(Double.MIN_NORMAL);
+            } else {
+                result.add(i * 1.5);
+            }
         }
         return result;
     }
@@ -427,7 +485,21 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
     private List<Double> createLargeListWithoutNulls(int size) {
         List<Double> result = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            result.add(i * 10.5);
+            if (i % 100 == 1) {
+                result.add(Double.MIN_VALUE);
+            } else if (i % 100 == 2) {
+                result.add(Double.MAX_VALUE);
+            } else if (i % 500 == 3) {
+                result.add(Math.PI);
+            } else if (i % 500 == 4) {
+                result.add(Math.E);
+            } else if (i % 250 == 5) {
+                result.add(Double.MIN_NORMAL);
+            } else if (i % 750 == 6) {
+                result.add(-Double.MIN_NORMAL);
+            } else {
+                result.add(i * 10.5);
+            }
         }
         return result;
     }
@@ -438,12 +510,24 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
     private List<Double> createOptionalLargeList(int size) {
         List<Double> result = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            result.add(i * -1.5);
+            if (i % 200 == 1) {
+                result.add(-Double.MIN_VALUE);
+            } else if (i % 200 == 2) {
+                result.add(-Double.MAX_VALUE);
+            } else if (i % 800 == 3) {
+                result.add(-Math.PI);
+            } else if (i % 800 == 4) {
+                result.add(-Math.E);
+            } else if (i % 400 == 5) {
+                result.add(-Double.MIN_NORMAL);
+            } else {
+                result.add(i * -1.5);
+            }
         }
         return result;
     }
 
-    private DoubleTestRecord.DoubleTestRecordBuilder aValidTestRecord(int recordId) {
+    private static DoubleTestRecord.DoubleTestRecordBuilder aValidTestRecord(int recordId) {
         return DoubleTestRecord.builder()
                 .recordId(recordId)
                 .requiredDouble(42.5)
@@ -454,4 +538,4 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 .optionalListWithNonNullElements(Arrays.asList(111.1, 222.2, 333.3));
     }
 
-} 
+}
