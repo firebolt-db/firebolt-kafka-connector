@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class TextSerializerTest extends BaseIntegrationTest {
     
     private static final String TABLE_NAME = "text_test_table";

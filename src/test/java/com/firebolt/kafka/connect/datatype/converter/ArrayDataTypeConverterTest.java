@@ -140,14 +140,36 @@ public class ArrayDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithTextArrayType() throws SQLException {
-        List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
+        List<String> textValues = Arrays.asList("hello", "world", "text array test");
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
-                .value(arrayValues)
+                .value(textValues)
                 .build();
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, textArrayColumn);
 
-        verify(mockConnection).createArrayOf(eq("string"), eq(arrayValues.toArray()));
+        verify(mockConnection).createArrayOf(eq("string"), eq(textValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTextArrayTypeVariousStrings() throws SQLException {
+        List<String> textValues = Arrays.asList(
+            "simple text", 
+            "text with spaces", 
+            "123 numeric string", 
+            "special!@#$%chars",
+            "unicode: café naïve",
+            "", // empty string
+            "text\nwith\nnewlines",
+            "very long text that might be used to test performance and edge cases with larger string content"
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(textValues)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, textArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("string"), eq(textValues.toArray()));
         verify(mockStatement).setArray(1, mockArray);
     }
 
