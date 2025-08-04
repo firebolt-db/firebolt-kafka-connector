@@ -30,12 +30,15 @@ public class ColumnDataTypeConverterFactoryTest {
     @Mock
     private DecimalDataTypeConverter mockDecimalDataTypeConverter;
 
+    @Mock
+    private BigIntDataTypeConverter mockBigIntDataTypeConverter;
+
     private ColumnDataTypeConverterFactory factory;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter);
+        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -118,6 +121,26 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockDecimalDataTypeConverter, result);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "bigint",
+        "int8",
+        "long",
+        "BIGINT",
+        "INT8",
+        "LONG",
+        "BigInt",
+        "Int8",
+        "Long"
+    })
+    void testGetConverterForBigintTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 8, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockBigIntDataTypeConverter, result);
+    }
+
     @Test
     void testGetConverterThrowsExceptionForUnsupportedType() {
         TableSchema.Column column = new TableSchema.Column("test_column", "unsupported_type", 12, true);
@@ -147,16 +170,18 @@ public class ColumnDataTypeConverterFactoryTest {
     @Test
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
-            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter);
+            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter);
         
         assertNotNull(testFactory);
         
         TableSchema.Column intColumn = new TableSchema.Column("int_col", "integer", 4, true);
         TableSchema.Column arrayColumn = new TableSchema.Column("array_col", "array(text)", 2003, true);
         TableSchema.Column timestampColumn = new TableSchema.Column("timestamp_col", "timestamp", 93, true);
+        TableSchema.Column bigintColumn = new TableSchema.Column("bigint_col", "bigint", 8, true);
         
         assertSame(mockIntegerDataTypeConverter, testFactory.getConverter(intColumn));
         assertSame(mockArrayDataTypeConverter, testFactory.getConverter(arrayColumn));
         assertSame(mockTimestampDataTypeConverter, testFactory.getConverter(timestampColumn));
+        assertSame(mockBigIntDataTypeConverter, testFactory.getConverter(bigintColumn));
     }
 } 

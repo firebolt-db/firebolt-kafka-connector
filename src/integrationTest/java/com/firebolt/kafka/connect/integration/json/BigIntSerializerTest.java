@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class BigIntSerializerTest extends BaseIntegrationTest {
     
     private static final String TABLE_NAME = "bigint_test_table";
@@ -164,7 +163,7 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 .requiredListWithNullableElements(createLargeListWithNulls(5000))
                 .requiredListWithNonNullElements(createLargeListWithoutNulls(5000))
                 .optionalList(createOptionalLargeList(5000))
-                .optionalListWithNonNullElements(createOptionalLargeList(3000))  // Different size for variety
+                .optionalListWithNonNullElements(createLargeListWithoutNulls(3000))  // Different size for variety
                 .build()
         );
     }
@@ -310,16 +309,16 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 
                 // Array verification using getArray()
                 verifyBigIntArray("requiredListWithNullableElements", 
-                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
+                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
                     
                 verifyBigIntArray("requiredListWithNonNullElements", 
-                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
+                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex);
                 
                 verifyBigIntArray("optionalList", 
-                    expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
+                    expected.getOptionalList(), actualOptionalListArray, recordIndex);
                 
                 verifyBigIntArray("optionalListWithNonNullElements", 
-                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
+                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
                 
                 recordIndex++;
             }
@@ -330,7 +329,7 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
     }
     
     private void verifyBigIntArray(String fieldName, List<Long> expected, Array actualArray, 
-                                 int recordIndex, boolean allowNullElements) throws SQLException {
+                                 int recordIndex) throws SQLException {
         if (expected == null) {
             assertNull(actualArray, fieldName + " should be null at index " + recordIndex);
             return;

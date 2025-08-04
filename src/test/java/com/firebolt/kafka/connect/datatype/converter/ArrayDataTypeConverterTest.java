@@ -151,9 +151,23 @@ public class ArrayDataTypeConverterTest {
         verify(mockStatement).setArray(1, mockArray);
     }
 
+    @Test
+    void testConvertAndSetWithBigIntArrayType() throws SQLException {
+        List<Long> bigIntValues = Arrays.asList(1L, 2L, 3L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(bigIntValues)
+                .build();
+
+        TableSchema.Column bigIntArrayColumn = new TableSchema.Column("test_column", "array(bigint)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, bigIntArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("bigint"), eq(bigIntValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
     @ParameterizedTest
     @CsvSource({
-        "array(bigint)",
         "array(real)",
         "array(boolean)",
         "array(date)",
