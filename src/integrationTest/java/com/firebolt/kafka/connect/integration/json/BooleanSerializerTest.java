@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(TestTag.NOT_IMPLEMENTED)
 public class BooleanSerializerTest extends BaseIntegrationTest {
     
     private static final String TABLE_NAME = "boolean_test_table";
@@ -324,18 +323,18 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
                 
                 // Array verification using getArray()
                 verifyBooleanArray("requiredListWithNullableElements", 
-                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
+                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
                     
                 verifyBooleanArray("requiredListWithNonNullElements", 
-                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
+                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex);
                 
                 // Optional list verification
                 verifyBooleanArray("optionalList", 
-                    expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
+                    expected.getOptionalList(), actualOptionalListArray, recordIndex);
                 
                 // Optional list with non-null elements verification
                 verifyBooleanArray("optionalListWithNonNullElements", 
-                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
+                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
                 
                 recordIndex++;
             }
@@ -349,7 +348,7 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
      * Verifies a boolean array field using Array object instead of string parsing.
      */
     private void verifyBooleanArray(String fieldName, List<Boolean> expected, Array actualArray, 
-                                  int recordIndex, boolean allowNullElements) throws SQLException {
+                                  int recordIndex) throws SQLException {
         if (expected == null) {
             assertNull(actualArray, fieldName + " should be null at index " + recordIndex);
             return;
