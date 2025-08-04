@@ -45,7 +45,7 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
                 return connection.createArrayOf("string", elements.toArray());
             }
-        } else if (typeName.contains("date")) {
+        } else if (typeName.equals("date")) {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT32) {
                 return connection.createArrayOf(typeName, elements.stream().map(objectValue -> objectValue == null ? null : TimestampUtil.fromDaysSinceEpoch((Integer) objectValue)).toArray());
             } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
