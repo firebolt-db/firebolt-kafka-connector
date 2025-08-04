@@ -281,17 +281,10 @@ public class FireboltClient implements AutoCloseable {
             "\"colArrayIntSyntax2\" INTEGER[], " +
             "\"colArrayDate\" ARRAY(DATE), " +
             "\"colArrayReal\" ARRAY(REAL), " +
-            "\"colArrayNested\" ARRAY(ARRAY(INTEGER)), " +
             "\"colArrayNumeric\" ARRAY(NUMERIC), " +
             "\"colArrayDoublePrecision\" ARRAY(DOUBLE PRECISION), " +
             "\"colArrayTimestamptz\" ARRAY(TIMESTAMPTZ), " +
-            "\"colArrayTimestamp\" ARRAY(TIMESTAMP), " +
-            
-            // STRUCT type stored as JSON text (JDBC driver doesn't support STRUCT type)
-            "\"colStruct\" TEXT" +
-            
-            // GEOGRAPHY type  
-            "";
+            "\"colArrayTimestamp\" ARRAY(TIMESTAMP) " + "";
         
         createTable(tableName, schema);
     }

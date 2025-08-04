@@ -606,14 +606,7 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
                 
                 // Verify each field
                 Integer actualRecordId = rs.getInt("recordId");
-                
-                // Debug logging for precision verification
-                if (recordIndex == 12 || recordIndex == 13) { // Records with microsecond/nanosecond precision
-                    java.sql.Timestamp sqlTimestamp = rs.getTimestamp("requiredTimestamp");
-                    log.info("DEBUG precision test - Record {}: SQL Timestamp = {}, Nanos = {}", 
-                        recordIndex, sqlTimestamp, sqlTimestamp != null ? sqlTimestamp.getNanos() : "null");
-                }
-                
+
                 LocalDateTime actualRequiredTimestamp = rs.getTimestamp("requiredTimestamp") != null ? 
                     rs.getTimestamp("requiredTimestamp").toLocalDateTime() : null;
                 LocalDateTime actualOptionalTimestamp = rs.getTimestamp("optionalTimestamp") != null ? 
