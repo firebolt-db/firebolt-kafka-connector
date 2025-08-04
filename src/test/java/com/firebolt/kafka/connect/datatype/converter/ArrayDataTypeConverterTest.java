@@ -18,6 +18,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -478,6 +479,162 @@ public class ArrayDataTypeConverterTest {
         converter.convertAndSet(mockStatement, 1, kafkaValue, numericArrayColumn);
 
         verify(mockConnection).createArrayOf(eq("numeric"), eq(numericValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithByteaArrayType() throws SQLException {
+        List<String> byteaValues = Arrays.asList(
+            Base64.getEncoder().encodeToString("Hello World".getBytes()),
+            Base64.getEncoder().encodeToString("Test string".getBytes()),
+            Base64.getEncoder().encodeToString("123456789".getBytes())
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(byteaValues)
+                .build();
+
+        TableSchema.Column byteaArrayColumn = new TableSchema.Column("test_column", "array(bytea)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
+
+        byte[][] expectedBytes = byteaValues.stream()
+                .map(base64 -> Base64.getDecoder().decode(base64))
+                .toArray(byte[][]::new);
+
+        verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedBytes));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithByteaArrayTypeEmptyString() throws SQLException {
+        List<String> byteaValues = Arrays.asList("", Base64.getEncoder().encodeToString("Test".getBytes()), "");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(byteaValues)
+                .build();
+
+        TableSchema.Column byteaArrayColumn = new TableSchema.Column("test_column", "array(bytea)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
+
+        Object[] expectedValues = new Object[]{
+            "\\x".getBytes(),
+            Base64.getDecoder().decode(Base64.getEncoder().encodeToString("Test".getBytes())),
+            "\\x".getBytes()
+        };
+
+        verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithByteaArrayTypeContainingNulls() throws SQLException {
+        List<String> byteaValues = Arrays.asList(
+            Base64.getEncoder().encodeToString("Hello".getBytes()),
+            null,
+            Base64.getEncoder().encodeToString("World".getBytes())
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(byteaValues)
+                .build();
+
+        TableSchema.Column byteaArrayColumn = new TableSchema.Column("test_column", "array(bytea)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
+
+        Object[] expectedValues = new Object[]{
+            Base64.getDecoder().decode(Base64.getEncoder().encodeToString("Hello".getBytes())),
+            null,
+            Base64.getDecoder().decode(Base64.getEncoder().encodeToString("World".getBytes()))
+        };
+
+        verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithEmptyByteaArray() throws SQLException {
+        List<String> emptyArray = new ArrayList<>();
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(emptyArray)
+                .build();
+
+        TableSchema.Column byteaArrayColumn = new TableSchema.Column("test_column", "array(bytea)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("bytea"), eq(emptyArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithLargeByteaArray() throws SQLException {
+        List<String> largeArray = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            String testData = "Test data " + i;
+            largeArray.add(Base64.getEncoder().encodeToString(testData.getBytes()));
+        }
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(largeArray)
+                .build();
+
+        TableSchema.Column byteaArrayColumn = new TableSchema.Column("test_column", "array(bytea)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
+
+        Object[] expectedValues = largeArray.stream()
+                .map(base64 -> Base64.getDecoder().decode(base64))
+                .toArray();
+
+        verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithByteaArrayTypeBinaryData() throws SQLException {
+        byte[] binaryData1 = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+        byte[] binaryData2 = {(byte) 0xFF, (byte) 0xFE, (byte) 0xFD, (byte) 0xFC};
+        
+        List<String> byteaValues = Arrays.asList(
+            Base64.getEncoder().encodeToString(binaryData1),
+            Base64.getEncoder().encodeToString(binaryData2)
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(byteaValues)
+                .build();
+
+        TableSchema.Column byteaArrayColumn = new TableSchema.Column("test_column", "array(bytea)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
+
+        Object[] expectedValues = new Object[]{binaryData1, binaryData2};
+
+        verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithByteaArrayTypeSpecialCharacters() throws SQLException {
+        String specialChars = "!@#$%^&*()_+-=[]{}|;':\",./<>?";
+        String unicodeText = "Unicode: café, naïve, résumé, Москва";
+        
+        List<String> byteaValues = Arrays.asList(
+            Base64.getEncoder().encodeToString(specialChars.getBytes()),
+            Base64.getEncoder().encodeToString(unicodeText.getBytes())
+        );
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(byteaValues)
+                .build();
+
+        TableSchema.Column byteaArrayColumn = new TableSchema.Column("test_column", "array(bytea)", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
+
+        Object[] expectedValues = new Object[]{
+            specialChars.getBytes(),
+            unicodeText.getBytes()
+        };
+
+        verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
         verify(mockStatement).setArray(1, mockArray);
     }
 

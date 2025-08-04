@@ -8,6 +8,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
@@ -59,6 +60,9 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.FLOAT32) {
                 return connection.createArrayOf(typeName, elements.stream().map(objectValue -> objectValue == null ? null : String.valueOf(objectValue)).toArray());
             }
+        } else if (typeName.equals("bytea")) {
+            // empty byte array will be serialized as empty string in kafka connect. In firebolt and empty byte is represented by \x
+            return connection.createArrayOf(typeName, elements.stream().map(objectValue -> objectValue == null ? null : "".equals(objectValue) ? "\\x".getBytes() : Base64.getDecoder().decode(String.valueOf(objectValue))).toArray());
         }
 
         return connection.createArrayOf(typeName, elements.toArray());
@@ -83,6 +87,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return "double";
         } else if (fireboltColumn.getDataType().equals("array(text)")) {
             return "string";
+        } else if (fireboltColumn.getDataType().equals("array(bytea)")) {
+            return "bytea";
         }
 
         // add more data types

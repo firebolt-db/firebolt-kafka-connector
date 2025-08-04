@@ -19,7 +19,8 @@ public enum FireboltColumnDataType {
     BIGINT(value -> Set.of("bigint", "int8", "long").contains(value.toLowerCase())),
     REAL(value -> Set.of("real", "float4").contains(value.toLowerCase())),
     DOUBLE(value -> Set.of("double precision", "double", "float", "float8", "float(p)").contains(value.toLowerCase())),
-    TEXT(value -> Set.of("text").contains(value.toLowerCase()));
+    TEXT(value -> Set.of("text").contains(value.toLowerCase())),
+    BYTEA(value -> Set.of("bytea").contains(value.toLowerCase()));
 
     private Predicate<String> equalityPredicate;
 
