@@ -115,10 +115,26 @@ public class FireboltColumnDataTypeTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+        "real",
+        "float4",
+        "REAL",
+        "FLOAT4",
+        "Real",
+        "Float4",
+        "ReAl",
+        "FlOaT4"
+    })
+    void testFromStringReturnsRealForValidRealTypes(String columnTypeName) {
+        FireboltColumnDataType result = FireboltColumnDataType.fromString(columnTypeName);
+        
+        assertEquals(FireboltColumnDataType.REAL, result);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "text",
         "varchar", 
-        "real",
         "boolean",
         "date",
         "unsupported_type",
@@ -156,13 +172,14 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(6, values.length);
+        assertEquals(7, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
         assertEquals(FireboltColumnDataType.TIMESTAMPTZ, values[3]);
         assertEquals(FireboltColumnDataType.DECIMAL, values[4]);
         assertEquals(FireboltColumnDataType.BIGINT, values[5]);
+        assertEquals(FireboltColumnDataType.REAL, values[6]);
     }
 
     @Test
@@ -173,6 +190,7 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.TIMESTAMPTZ, FireboltColumnDataType.valueOf("TIMESTAMPTZ"));
         assertEquals(FireboltColumnDataType.DECIMAL, FireboltColumnDataType.valueOf("DECIMAL"));
         assertEquals(FireboltColumnDataType.BIGINT, FireboltColumnDataType.valueOf("BIGINT"));
+        assertEquals(FireboltColumnDataType.REAL, FireboltColumnDataType.valueOf("REAL"));
     }
 
     @Test

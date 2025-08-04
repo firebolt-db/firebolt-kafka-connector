@@ -33,12 +33,15 @@ public class ColumnDataTypeConverterFactoryTest {
     @Mock
     private BigIntDataTypeConverter mockBigIntDataTypeConverter;
 
+    @Mock
+    private RealDataTypeConverter mockRealDataTypeConverter;
+
     private ColumnDataTypeConverterFactory factory;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter);
+        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -141,6 +144,23 @@ public class ColumnDataTypeConverterFactoryTest {
         assertSame(mockBigIntDataTypeConverter, result);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "real",
+        "float4",
+        "REAL",
+        "FLOAT4",
+        "Real",
+        "Float4"
+    })
+    void testGetConverterForRealTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 7, true);
+        
+        ColumnDataTypeConverter result = factory.getConverter(column);
+        
+        assertSame(mockRealDataTypeConverter, result);
+    }
+
     @Test
     void testGetConverterThrowsExceptionForUnsupportedType() {
         TableSchema.Column column = new TableSchema.Column("test_column", "unsupported_type", 12, true);
@@ -170,7 +190,7 @@ public class ColumnDataTypeConverterFactoryTest {
     @Test
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
-            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter);
+            mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter);
         
         assertNotNull(testFactory);
         
