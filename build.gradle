@@ -18,7 +18,7 @@ ext {
     okhttpVersion = '5.1.0'
     kafkaVersion = '3.9.1'
     testcontainersVersion = '1.21.3'
-    slf4jVersion = '2.0.7'
+    slf4jVersion = '2.0.17'
     fireboltJdbcVersion = '3.6.7'
     guavaVersion = '33.4.8-jre'
     confluentVersion = '7.4.0'
