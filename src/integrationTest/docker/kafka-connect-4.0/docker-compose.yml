@@ -1,6 +1,6 @@
 services:
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    image: confluentinc/cp-kafka:8.0.0
     hostname: kafka
     container_name: kafka-40
     ports:
@@ -39,7 +39,7 @@ services:
       start_period: 60s
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.4.0
+    image: confluentinc/cp-schema-registry:8.0.0
     hostname: schema-registry
     container_name: schema-registry-40
     depends_on:
@@ -80,7 +80,7 @@ services:
       - ./firebolt-core:/firebolt-core/data
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.4.0
+    image: confluentinc/cp-kafka-connect:8.0.0
     hostname: kafka-connect
     container_name: kafka-connect-40
     depends_on:
@@ -107,14 +107,11 @@ services:
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
       CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: false
       CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components,/etc/kafka-connect/jars"
       CONNECT_LOG4J_APPENDER_STDOUT_LAYOUT_CONVERSIONPATTERN: '[%d] %p %X{connector.context}%m (%c:%L)%n'
       CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR"
-      # Configure to use Kafka Connect 4.0 runtime
-      KAFKA_VERSION: "4.0"
       # Enable JVM debugging
       KAFKA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     volumes:

@@ -1,6 +1,6 @@
 services:
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    image: confluentinc/cp-kafka:8.0.0
     hostname: kafka
     container_name: kafka-cloud
     ports:
@@ -39,7 +39,7 @@ services:
       start_period: 60s
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.4.0
+    image: confluentinc/cp-schema-registry:8.0.0
     hostname: schema-registry
     container_name: schema-registry-cloud
     depends_on:
@@ -55,7 +55,7 @@ services:
       - kafka-network
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.4.0
+    image: confluentinc/cp-kafka-connect:8.0.0
     hostname: kafka-connect
     container_name: kafka-connect-cloud
     depends_on:
@@ -89,8 +89,6 @@ services:
       # Configure FileConfigProvider for secrets resolution
       CONNECT_CONFIG_PROVIDERS: 'file'
       CONNECT_CONFIG_PROVIDERS_FILE_CLASS: 'org.apache.kafka.common.config.provider.FileConfigProvider'
-      # Configure to use latest Kafka Connect runtime
-      KAFKA_VERSION: "7.4.0"
       # Enable JVM debugging
       KAFKA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     volumes:

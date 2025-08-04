@@ -1,6 +1,6 @@
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
+    image: confluentinc/cp-zookeeper:7.9.1
     hostname: zookeeper
     container_name: zookeeper-391
     ports:
@@ -12,7 +12,7 @@ services:
       - kafka-network
 
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    image: confluentinc/cp-kafka:7.9.1
     hostname: kafka
     container_name: kafka-391
     depends_on:
@@ -36,7 +36,7 @@ services:
       - kafka-network
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.4.0
+    image: confluentinc/cp-schema-registry:7.9.1
     hostname: schema-registry
     container_name: schema-registry-391
     depends_on:
@@ -76,7 +76,7 @@ services:
       - ./firebolt-core:/firebolt-core/data
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.4.0
+    image: confluentinc/cp-kafka-connect:7.9.1
     hostname: kafka-connect
     container_name: kafka-connect-391
     depends_on:
@@ -99,15 +99,13 @@ services:
       CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status-391
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
-      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components,/etc/kafka-connect/jars"
       CONNECT_LOG4J_APPENDER_STDOUT_LAYOUT_CONVERSIONPATTERN: '[%d] %p %X{connector.context}%m (%c:%L)%n'
       CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR"
-      # Configure to use Kafka Connect 3.9.1 runtime
-      KAFKA_VERSION: "3.9.1"
       # Enable JVM debugging
       KAFKA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     volumes:
