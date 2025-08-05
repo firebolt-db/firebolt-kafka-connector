@@ -1,6 +1,5 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.JdbcConfig;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
@@ -21,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;

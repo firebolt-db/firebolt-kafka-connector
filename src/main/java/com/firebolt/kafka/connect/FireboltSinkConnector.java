@@ -62,11 +62,8 @@ public class FireboltSinkConnector extends SinkConnector {
 
     @Override
     public void start(Map<String, String> props) {
-        log.info("Starting Firebolt Sink Connector");
+        log.info("Starting Firebolt Sink Connector with version {}", version());
         this.configProperties = new HashMap<>(props);
-        
-        // Validate the configuration using the config definition
-        ConnectorConfigDefinition.CONFIG_DEF.validate(props);
     }
 
     @Override
