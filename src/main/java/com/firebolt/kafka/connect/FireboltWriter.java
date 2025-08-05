@@ -238,17 +238,12 @@ public class FireboltWriter {
     private void setStatementParameters(PreparedStatement stmt, FireboltRecord record, TableSchema schema, Set<String> validColumnNames) throws SQLException {
         Map<String, KafkaMessageColumnValue> columnValues = record.getColumnValues();
 
-        // DEBUG: Log parameter setting start
-        log.info("DEBUG: Setting statement parameters for record with column values: {}", columnValues);
-        log.error("DEBUG: setStatementParameters called with {} columns", schema.getColumns().size());
-        log.error("DEBUG: setStatementParameters - processing {} valid columns", validColumnNames.size());
-
         int parameterIndex = 1;
         for (TableSchema.Column column : schema.getColumns()) {
             if (validColumnNames.contains(column.getName())) {
                 String columnName = column.getName();
                 KafkaMessageColumnValue value = columnValues.get(columnName);
-                log.error("DEBUG: Processing column '{}' with dataType '{}' and value: {}", columnName, column.getDataType(), value != null ? value.getValue() : "null");
+                log.error("Processing column '{}' with dataType '{}' and value: {}", columnName, column.getDataType(), value != null ? value.getValue() : "null");
 
                 if (value == null || value.getValue() == null) {
                     stmt.setNull(parameterIndex, column.getSqlType());
@@ -260,8 +255,6 @@ public class FireboltWriter {
                 parameterIndex++;
             }
         }
-
-        log.info("DEBUG: Set {} parameters for statement", parameterIndex - 1);
     }
 
     /**
@@ -299,12 +292,12 @@ public class FireboltWriter {
         }
 
         // Debug log all available schema columns
-        log.info("DEBUG: Table '{}' schema has {} columns: {}", tableSchema.getTableName(),
+        log.info("Table '{}' schema has {} columns: {}", tableSchema.getTableName(),
                 tableSchema.getColumns().size(), tableSchema.getColumns().stream()
                         .map(TableSchema.Column::getName).collect(java.util.stream.Collectors.toList()));
 
         // Debug log all record columns
-        log.info("DEBUG: Record has {} columns: {}", recordColumnNames.size(), recordColumnNames);
+        log.info("Record has {} columns: {}", recordColumnNames.size(), recordColumnNames);
 
         // Only keep column names that exist in both the records and the schema (case-insensitive)
         for (String columnName : recordColumnNames) {

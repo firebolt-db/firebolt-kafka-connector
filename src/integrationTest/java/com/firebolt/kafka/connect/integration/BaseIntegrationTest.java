@@ -8,6 +8,7 @@ import com.firebolt.kafka.connect.utils.ServiceHealthExtension;
 import com.firebolt.kafka.connect.utils.TestSetupExtension;
 import com.firebolt.kafka.connect.utils.TopicOptions;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -38,6 +39,8 @@ import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 @ExtendWith({ServiceHealthExtension.class, TestSetupExtension.class})
 public abstract class BaseIntegrationTest {
@@ -257,7 +260,7 @@ public abstract class BaseIntegrationTest {
     /**
      * Initializes a Kafka producer for JSON Schema serialization with configurable null handling.
      * This method creates a producer configured for JSON Schema with proper schema registry integration.
-     * 
+     *
      * @param <T> the type of the record values to be produced
      * @param includeNulls true to include null values in JSON serialization, false to omit them
      * @return a new KafkaProducer configured for JSON Schema serialization
@@ -283,14 +286,14 @@ public abstract class BaseIntegrationTest {
         if (!includeNulls) {
             // Omit null fields entirely from JSON output
             props.put("json.default.property.inclusion", "NON_NULL");
-            // When omitting nulls, we typically want to write dates in ISO format and not indent
-            props.put("json.write.dates.iso8601", true);
-            props.put("json.indent.output", false);
         } else {
             // Include null fields in JSON output as "field": null
             props.put("json.default.property.inclusion", "ALWAYS");
         }
-        
+
+        props.put("json.write.dates.iso8601", true);
+        props.put("json.indent.output", false);
+
         Producer<String, T> producer = new KafkaProducer<>(props);
         log.info("Kafka JSON Schema producer initialized successfully with null handling: includeNulls={}", includeNulls);
         return producer;
@@ -562,6 +565,19 @@ public abstract class BaseIntegrationTest {
     protected static String getDatabaseName() {
         // Use a URL with the same structure as the default but with a non-existing database
         return JdbcConnectionParser.getDatabase(getJdbcConnectionUrl());
+
+    }
+
+    protected void assertEqualsBigDecimal(BigDecimal expected, BigDecimal actual, int recordIndex) {
+        // Null handling verification for optional numeric
+        if (expected == null) {
+            assertNull(actual,
+                    "OptionalNumeric should be null at index " + recordIndex);
+        } else {
+            assertEquals(0, expected.compareTo(actual),
+                    "OptionalNumeric mismatch at index " + recordIndex +
+                            " (expected: " + expected + ", actual: " + actual + ")");
+        }
 
     }
 

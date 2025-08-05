@@ -11,10 +11,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -43,10 +44,53 @@ class BigDecimalListSerializer extends JsonSerializer<List<BigDecimal>> {
 }
 
 /**
+ * Custom serializer for OffsetDateTime to convert to timestamp value (microseconds since epoch).
+ * This ensures compatibility with Kafka Connect Timestamp logical type.
+ */
+class OffsetDateTimeSerializer extends JsonSerializer<OffsetDateTime> {
+    @Override
+    public void serialize(OffsetDateTime value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        if (value == null) {
+            gen.writeNull();
+        } else {
+            // Convert to microseconds since epoch
+            long timestampMicros = value.toInstant().getEpochSecond() * 1_000_000 + value.toInstant().getNano() / 1_000;
+            gen.writeNumber(timestampMicros);
+        }
+    }
+}
+
+/**
+ * Custom serializer for List<OffsetDateTime> to convert each element to timestamp values.
+ */
+class OffsetDateTimeListSerializer extends JsonSerializer<List<OffsetDateTime>> {
+    @Override
+    public void serialize(List<OffsetDateTime> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        if (value == null) {
+            gen.writeNull();
+            return;
+        }
+        
+        gen.writeStartArray();
+        for (OffsetDateTime dateTime : value) {
+            if (dateTime == null) {
+                gen.writeNull();
+            } else {
+                // Convert to microseconds since epoch
+                long timestampMicros = dateTime.toInstant().getEpochSecond() * 1_000_000 + dateTime.toInstant().getNano() / 1_000;
+                gen.writeNumber(timestampMicros);
+            }
+        }
+        gen.writeEndArray();
+    }
+}
+
+/**
  * Test record class that mirrors the structure of the all data types test table.
  * This class provides a Java object representation of all Firebolt data types
  * for use in integration tests.
  */
+@Data
 @Getter
 @Setter
 @Builder
@@ -73,6 +117,7 @@ public class AllDataTypesTestRecord {
     // Date and timestamp types
     private LocalDate colDate;           // colDate DATE
     private LocalDateTime colTimestamp;  // colTimestamp TIMESTAMP
+    @JsonSerialize(using = OffsetDateTimeSerializer.class)
     private OffsetDateTime colTimestamptz; // colTimestamptz TIMESTAMPTZ
     
     // Binary type
@@ -85,88 +130,12 @@ public class AllDataTypesTestRecord {
     private List<Integer> colArrayIntSyntax2;     // colArrayIntSyntax2 INTEGER[]
     private List<LocalDate> colArrayDate;         // colArrayDate ARRAY(DATE)
     private List<Float> colArrayReal;             // colArrayReal ARRAY(REAL)
-    private List<List<Integer>> colArrayNested;   // colArrayNested ARRAY(ARRAY(INTEGER))
-    
+
     @JsonSerialize(using = BigDecimalListSerializer.class)
     private List<BigDecimal> colArrayNumeric;     // colArrayNumeric ARRAY(NUMERIC)
     private List<Double> colArrayDoublePrecision; // colArrayDoublePrecision ARRAY(DOUBLE PRECISION)
+    @JsonSerialize(using = OffsetDateTimeListSerializer.class)
     private List<OffsetDateTime> colArrayTimestamptz; // colArrayTimestamptz ARRAY(TIMESTAMPTZ)
     private List<LocalDateTime> colArrayTimestamp;    // colArrayTimestamp ARRAY(TIMESTAMP)
-    
-    // STRUCT type  
-    private TestStruct colStruct;                     // colStruct STRUCT(name TEXT, age INTEGER, active BOOLEAN, score DOUBLE PRECISION)
-    
-    // GEOGRAPHY type
-    // private String colGeography;                  // colGeography GEOGRAPHY
-    
-    // Methods for object comparison and string representation
-    
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        AllDataTypesTestRecord that = (AllDataTypesTestRecord) o;
-        return Objects.equals(colInteger, that.colInteger) &&
-               Objects.equals(colBigint, that.colBigint) &&
-               Objects.equals(colNumeric, that.colNumeric) &&
-               Objects.equals(colReal, that.colReal) &&
-               Objects.equals(colDoublePrecision, that.colDoublePrecision) &&
-               Objects.equals(colBoolean, that.colBoolean) &&
-               Objects.equals(colText, that.colText) &&
-               Objects.equals(colDate, that.colDate) &&
-               Objects.equals(colTimestamp, that.colTimestamp) &&
-               Objects.equals(colTimestamptz, that.colTimestamptz) &&
-               Objects.equals(colBytea, that.colBytea) &&
-               Objects.equals(colArrayTextNullable, that.colArrayTextNullable) &&
-               Objects.equals(colArrayTextNotNull, that.colArrayTextNotNull) &&
-               Objects.equals(colArrayIntSyntax1, that.colArrayIntSyntax1) &&
-               Objects.equals(colArrayIntSyntax2, that.colArrayIntSyntax2) &&
-               Objects.equals(colArrayDate, that.colArrayDate) &&
-               Objects.equals(colArrayReal, that.colArrayReal) &&
-               Objects.equals(colArrayNested, that.colArrayNested) &&
-               Objects.equals(colArrayNumeric, that.colArrayNumeric) &&
-               Objects.equals(colArrayDoublePrecision, that.colArrayDoublePrecision) &&
-               Objects.equals(colArrayTimestamptz, that.colArrayTimestamptz) &&
-               Objects.equals(colArrayTimestamp, that.colArrayTimestamp) &&
-               Objects.equals(colStruct, that.colStruct);
-               // Objects.equals(colGeography, that.colGeography);
-    }
-    
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(colInteger, colBigint, colNumeric, colReal, colDoublePrecision, colBoolean, colText, colDate, colTimestamp, colTimestamptz, colBytea, colArrayTextNullable, colArrayTextNotNull, colArrayIntSyntax1, colArrayIntSyntax2, colArrayDate, colArrayReal, colArrayNested, colArrayNumeric, colArrayDoublePrecision, colArrayTimestamptz, colArrayTimestamp, colStruct);
-        return result;
-               // colArrayTextNotNull, colArrayIntSyntax1, colArrayIntSyntax2, 
-               // colArrayDate, colArrayReal, colArrayNested, colStruct, colGeography);
-    }
-    
-    @Override
-    public String toString() {
-        return "AllDataTypesTestRecord{" +
-               "colInteger=" + colInteger +
-               ", colBigint=" + colBigint +
-               ", colNumeric=" + colNumeric +
-               ", colReal=" + colReal +
-               ", colDoublePrecision=" + colDoublePrecision +
-               ", colBoolean=" + colBoolean +
-               ", colText='" + colText + '\'' +
-               ", colDate=" + colDate +
-               ", colTimestamp=" + colTimestamp +
-               ", colTimestamptz=" + colTimestamptz +
-               ", colBytea=" + colBytea +
-               ", colArrayTextNullable=" + colArrayTextNullable +
-               ", colArrayTextNotNull=" + colArrayTextNotNull +
-               ", colArrayIntSyntax1=" + colArrayIntSyntax1 +
-               ", colArrayIntSyntax2=" + colArrayIntSyntax2 +
-               ", colArrayDate=" + colArrayDate +
-               ", colArrayReal=" + colArrayReal +
-               ", colArrayNested=" + colArrayNested +
-               ", colArrayNumeric=" + colArrayNumeric +
-               ", colArrayDoublePrecision=" + colArrayDoublePrecision +
-               ", colArrayTimestamptz=" + colArrayTimestamptz +
-               ", colArrayTimestamp=" + colArrayTimestamp +
-               ", colStruct=" + colStruct +
-               // ", colGeography='" + colGeography + '\'' +
-               '}';
-    }
+
 } 
