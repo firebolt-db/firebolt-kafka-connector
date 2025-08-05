@@ -451,8 +451,8 @@ sonar {
         property "sonar.projectKey", "firebolt-db_kafka-connect"
         property "sonar.organization", "firebolt-db"
         property "sonar.host.url", "https://sonarcloud.io"
-        property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
-        property "sonar.junit.reportPaths", "build/test-results/test"
+        property "sonar.coverage.jacoco.xmlReportPaths", layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.absolutePath
+        property "sonar.junit.reportPaths", layout.buildDirectory.dir("test-results/test").get().asFile.absolutePath
     }
 }
 
@@ -460,7 +460,7 @@ sonar {
 test.finalizedBy jacocoTestReport
 
 // Integration test jacoco report
-task jacocoIntegrationTestReport(type: JacocoReport) {
+tasks.register('jacocoIntegrationTestReport', JacocoReport) {
     dependsOn integrationTest
     executionData integrationTest
     sourceSets sourceSets.main
@@ -472,7 +472,7 @@ task jacocoIntegrationTestReport(type: JacocoReport) {
 }
 
 // Combined jacoco report for both unit and integration tests
-task jacocoMergedReport(type: JacocoReport) {
+tasks.register('jacocoMergedReport', JacocoReport) {
     dependsOn test, integrationTest
     executionData fileTree(dir: layout.buildDirectory.dir('jacoco'), include: '**/*.exec')
     sourceSets sourceSets.main
@@ -480,5 +480,108 @@ task jacocoMergedReport(type: JacocoReport) {
         xml.required = true
         html.required = true
         csv.required = false
+    }
+}
+
+// ============================================================================
+// CONFLUENT HUB ARCHIVE TASKS
+// ============================================================================
+
+// ShadowJar for Confluent Hub
+tasks.withType(Jar) {
+    manifest {
+        attributes([
+            "Implementation-Title": "Firebolt-Kafka-Connect",
+            "Implementation-Version": project.version.toString()
+        ])
+    }
+}
+
+// Create a fat JAR with all dependencies for Confluent Hub
+tasks.register('confluentJar', Jar) {
+    archiveClassifier.set("confluent")
+
+    from sourceSets.main.output
+
+    // Include all runtime dependencies
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    // Exclude files that might cause conflicts
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+    exclude 'META-INF/MANIFEST.MF'
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes([
+                "Implementation-Title"  : "Firebolt-Kafka-Connect",
+                "Implementation-Version": project.version.toString(),
+                "Implementation-Vendor" : "Firebolt",
+                "Built-By"              : System.getProperty('user.name'),
+                "Built-Date"            : new Date().toString(),
+                "Built-JDK"             : System.getProperty('java.version')
+        ])
+    }
+}
+
+// Confluent Archive preparation
+def releaseDate = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE.format(java.time.LocalDateTime.now())
+def archiveFilename = "firebolt-kafka-connect"
+
+tasks.register('prepareConfluentArchive', Copy) {
+    group = "Confluent"
+    description = "Prepares the Confluent Archive ready for the hub"
+    dependsOn "confluentJar"
+
+    def baseDir = "${archiveFilename}-${project.version}"
+    
+    from("config/archive/manifest.json") {
+        expand([
+            version: project.version,
+            releaseDate: releaseDate
+        ])
+        destinationDir = file(layout.buildDirectory.dir("confluentArchive/${baseDir}"))
+    }
+
+    from("config/archive/assets") {
+        into("assets")
+    }
+
+    from(layout.buildDirectory.dir("libs")) {
+        include("${project.name}-${project.version}-confluent.jar")
+        into("lib")
+    }
+
+    from(".") {
+        include("README.md", "LICENSE")
+        into("doc")
+    }
+}
+
+tasks.register('createConfluentArchive', Zip) {
+    group = "Confluent"
+    description = "Creates the Confluent Archive zipfile to be uploaded to the Confluent Hub"
+    dependsOn "prepareConfluentArchive"
+    
+    from files(layout.buildDirectory.dir("confluentArchive"))
+    archiveBaseName.set("")
+    archiveAppendix.set(archiveFilename)
+    archiveVersion.set(project.version.toString())
+    destinationDirectory.set(layout.buildDirectory.dir("confluent"))
+}
+
+// Task to build the complete Confluent Hub archive
+tasks.register('buildConfluentHubArchive') {
+    group = "Confluent"
+    description = "Builds the complete Confluent Hub archive with all dependencies"
+    dependsOn "createConfluentArchive"
+    
+    doLast {
+        def archiveFile = file(layout.buildDirectory.file("confluent/${archiveFilename}-${project.version}.zip"))
+        println "✅ Confluent Hub archive created: ${archiveFile.absolutePath}"
+        println "📦 Archive size: ${archiveFile.length()} bytes"
+        println "🚀 Ready for upload to Confluent Hub!"
     }
 }
