@@ -79,7 +79,7 @@ public class FireboltSinkConnector extends SinkConnector {
         for (int i = 0; i < maxTasks; i++) {
             Map<String, String> taskConfig = new HashMap<>(configProperties);
             // Add task-specific configuration if needed
-            taskConfig.put("task.id", String.valueOf(i));
+            taskConfig.put(FireboltSinkTask.TASK_ID_ATTRIBUTE, String.valueOf(i));
             configs.add(taskConfig);
         }
         

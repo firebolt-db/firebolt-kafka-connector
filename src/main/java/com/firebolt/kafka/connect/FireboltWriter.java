@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect;
 
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
-import com.firebolt.kafka.connect.service.FireboltDbService;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -27,7 +26,6 @@ public class FireboltWriter {
     private final List<FireboltRecord> recordBatch;
     private final Map<String, PreparedStatement> insertStatements;
     private final Map<String, TableSchema> tableSchemas;
-    private final FireboltDbService fireboltDbService;
     private long lastFlushTime;
 
     public FireboltWriter(SinkConfig config, Connection connection) {
@@ -36,7 +34,6 @@ public class FireboltWriter {
         this.recordBatch = new ArrayList<>();
         this.insertStatements = new ConcurrentHashMap<>();
         this.tableSchemas = new ConcurrentHashMap<>();
-        this.fireboltDbService = new FireboltDbService();
         this.lastFlushTime = System.currentTimeMillis();
     }
 
