@@ -26,6 +26,8 @@ import org.apache.kafka.connect.sink.SinkTask;
 @Slf4j
 public class FireboltSinkTask extends SinkTask {
 
+    public static final String TASK_ID_ATTRIBUTE = "task.id";
+
     private FireboltSinkService fireboltSinkService;
     private SinkConfig sinkConfig;
     private Set<String> assignedTopics;
@@ -51,7 +53,7 @@ public class FireboltSinkTask extends SinkTask {
 
     @Override
     public void start(Map<String, String> props) {
-        log.info("Starting Firebolt Sink Task");
+        log.info("Starting Firebolt Sink Task: {}", props.get(TASK_ID_ATTRIBUTE));
 
         try {
             this.sinkConfig = new SinkConfig(props);
@@ -132,6 +134,16 @@ public class FireboltSinkTask extends SinkTask {
     @Override
     public void stop() {
         log.info("Stopping Firebolt Sink Task");
+
+        if (fireboltSinkService != null) {
+            log.debug("Stopping the sink service");
+            try {
+                fireboltSinkService.close();
+            } catch (Exception e) {
+                log.error("Error closing Firebolt Sink Service", e);
+                // Don't re-throw the exception to ensure graceful shutdown
+            }
+        }
     }
 
     /**
@@ -162,6 +174,7 @@ public class FireboltSinkTask extends SinkTask {
                 topicToTableMapping.put(topic, tableName);
                 log.info("Mapped topic '{}' to table '{}'", topic, tableName);
             } else {
+                topicToTableMapping.put(topic, topic);
                 log.info("No table mapping found for topic '{}', so mapping it to table '{}'", topic, topic);
             }
         }

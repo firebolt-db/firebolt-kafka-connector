@@ -18,4 +18,9 @@ public interface FireboltSinkService {
      */
     void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas);
 
+    /**
+     * Closes the resources associated with the firebolt
+     */
+    void close();
+
 }
