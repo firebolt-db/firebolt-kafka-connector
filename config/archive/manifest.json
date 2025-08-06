@@ -1,0 +1,49 @@
+{
+  "component_types": ["sink"],
+  "description": "The Firebolt Kafka Connect Sink Connector enables you to move data from Apache Kafka® topics to Firebolt database tables. This connector provides high-performance, scalable data ingestion into Firebolt's cloud-native data warehouse.\n\nKey features include:\n- **High Performance**: Leverages Firebolt's columnar storage and vectorized query engine for fast data ingestion\n- **Schema Support**: Full support for JSON Schema\n- **Data Type Mapping**: Comprehensive mapping between Kafka Connect data types and Firebolt column types\n- **Topic-to-Table Mapping**: Flexible configuration to route data from specific Kafka topics to specific Firebolt tables\n- **Security**: Support for Firebolt's authentication and authorization mechanisms\n\nThe connector supports all major Firebolt data types including INTEGER, BIGINT, FLOAT, DOUBLE, TEXT, TIMESTAMP, TIMESTAMPTZ, ARRAY, and more.",
+  "documentation_url": "https://github.com/firebolt-db/firebolt-kafka-connector",
+  "features": {
+    "delivery_guarantee": ["at_least_once"],
+    "kafka_connect_api": true,
+    "single_message_transforms": true,
+    "supported_encodings": ["any"]
+  },
+  "license": [
+    {
+      "name": "Apache License, Version 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0",
+      "logo": "assets/apache_logo.png"
+    }
+  ],
+  "logo": "assets/firebolt_logo.png",
+  "name": "firebolt-kafka-connect",
+  "owner": {
+    "logo": "assets/firebolt_logo.png",
+    "name": "Firebolt",
+    "type": "organization",
+    "url": "https://firebolt.io/",
+    "username": "firebolt-db"
+  },
+  "release_date": "${releaseDate}",
+  "requirements": [
+    "Firebolt database account and credentials",
+    "Kafka Connect 3.9.1 or later",
+    "Java 11 or later"
+  ],
+  "support": {
+    "logo": "assets/firebolt_logo.png",
+    "provider_name": "Firebolt",
+    "summary": "We provide full support for this connector. For issues, questions, or feature requests, please visit our GitHub repository or contact our support team.",
+    "email": "support@firebolt.io"
+  },
+  "tags": [
+    "firebolt",
+    "data-warehouse",
+    "analytics",
+    "sink",
+    "database",
+    "cloud-native"
+  ],
+  "title": "Firebolt Kafka Connect Sink Connector",
+  "version": "${version}"
+} 
