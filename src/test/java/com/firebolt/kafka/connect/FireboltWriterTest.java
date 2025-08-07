@@ -338,4 +338,154 @@ public class FireboltWriterTest {
             }
         });
     }
+
+    @Test
+    void shouldHandleCaseInsensitiveColumnNameMatching() {
+        executeWithMockedConverter(() -> {
+            try {
+                // Create table schema with mixed case column names
+                TableSchema caseTestSchema = new TableSchema("case_test_table");
+                caseTestSchema.addColumn("ID", "INTEGER", 4, false); // uppercase
+                caseTestSchema.addColumn("userName", "TEXT", 12, true); // camelCase
+                caseTestSchema.addColumn("FULL_NAME", "TEXT", 12, true); // uppercase with underscore
+                caseTestSchema.addColumn("CreatedDate", "TEXT", 12, true); // PascalCase
+                
+                // Create record with different case column names that should match
+                Map<String, KafkaMessageColumnValue> columnValues = new HashMap<>();
+                columnValues.put("id", KafkaMessageColumnValue.builder().value(123L).build()); // lowercase vs "ID"
+                columnValues.put("USERNAME", KafkaMessageColumnValue.builder().value("john_doe").build()); // uppercase vs "userName"
+                columnValues.put("full_name", KafkaMessageColumnValue.builder().value("John Doe").build()); // lowercase vs "FULL_NAME"
+                columnValues.put("createddate", KafkaMessageColumnValue.builder().value("2024-01-01").build()); // lowercase vs "CreatedDate"
+                
+                FireboltRecord caseTestRecord = new FireboltRecord(
+                    "case_test_table",
+                    columnValues,
+                    "test_topic",
+                    0,
+                    100L,
+                    System.currentTimeMillis()
+                );
+                
+                fireboltWriter.write(caseTestRecord, caseTestSchema);
+                fireboltWriter.flush();
+                
+                // Verify SQL includes all columns with correct schema case (quoted)
+                verify(mockConnection).prepareStatement(argThat(sql -> 
+                    sql.contains("\"ID\"") &&           // Schema case preserved
+                    sql.contains("\"userName\"") &&     // Schema case preserved
+                    sql.contains("\"FULL_NAME\"") &&    // Schema case preserved
+                    sql.contains("\"CreatedDate\"") &&    // Schema case preserved
+                    !sql.contains("\"id\"") &&           // Not record case
+                    !sql.contains("\"USERNAME\"") &&    // Not record case
+                    !sql.contains("\"full_name\"") &&    // Not record case
+                    !sql.contains("\"createddate\"")     // Not record case
+                ));
+                
+                // Verify all 4 parameters are set via converter (case-insensitive matching worked)
+                verify(mockConverter, times(4)).convertAndSet(eq(mockPreparedStatement), anyInt(), any(), any());
+                
+            } catch (SQLException e) {
+                fail("Unexpected SQLException: " + e.getMessage());
+            }
+        });
+    }
+
+    @Test
+    void shouldHandleCaseMismatchWithSomeUnmatchedColumns() {
+        executeWithMockedConverter(() -> {
+            try {
+                // Create table schema
+                TableSchema schema = new TableSchema("test_table");
+                schema.addColumn("UserId", "INTEGER", 4, false);
+                schema.addColumn("EMAIL", "TEXT", 12, true);
+                
+                // Create record with mixed case and extra columns
+                Map<String, KafkaMessageColumnValue> columnValues = new HashMap<>();
+                columnValues.put("userid", KafkaMessageColumnValue.builder().value(456L).build()); // should match "UserId"
+                columnValues.put("email", KafkaMessageColumnValue.builder().value("test@example.com").build()); // should match "EMAIL"
+                columnValues.put("phone", KafkaMessageColumnValue.builder().value("123-456-7890").build()); // should be filtered out
+                columnValues.put("address", KafkaMessageColumnValue.builder().value("123 Main St").build()); // should be filtered out
+                
+                FireboltRecord record = new FireboltRecord(
+                    "test_table",
+                    columnValues,
+                    "test_topic",
+                    0,
+                    100L,
+                    System.currentTimeMillis()
+                );
+                
+                fireboltWriter.write(record, schema);
+                fireboltWriter.flush();
+                
+                // Verify SQL includes only the matched columns with schema case
+                verify(mockConnection).prepareStatement(argThat(sql -> 
+                    sql.contains("\"UserId\"") &&
+                    sql.contains("\"EMAIL\"") &&
+                    !sql.contains("phone") &&
+                    !sql.contains("address")
+                ));
+                
+                // Verify only 2 parameters are set via converter (2 matched columns)
+                verify(mockConverter, times(2)).convertAndSet(eq(mockPreparedStatement), anyInt(), any(), any());
+                
+            } catch (SQLException e) {
+                fail("Unexpected SQLException: " + e.getMessage());
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "ID, id, true",           // uppercase to lowercase
+        "userName, USERNAME, true", // camelCase to uppercase  
+        "full_name, FULL_NAME, true", // lowercase to uppercase
+        "CreatedAt, createdat, true", // PascalCase to lowercase
+        "Email, email, true",     // PascalCase to lowercase
+        "userId, UserId, true",   // camelCase to PascalCase
+        "nonexistent, missing, false" // no match
+    })
+    void shouldMatchColumnNamesCaseInsensitively(String schemaColumn, String recordColumn, boolean shouldMatch) {
+        executeWithMockedConverter(() -> {
+            try {
+                // Create table schema with the schema column
+                TableSchema schema = new TableSchema("test_table");
+                schema.addColumn(schemaColumn, "TEXT", 12, true);
+                
+                // Create record with the record column
+                Map<String, KafkaMessageColumnValue> columnValues = new HashMap<>();
+                columnValues.put(recordColumn, KafkaMessageColumnValue.builder().value("test_value").build());
+                
+                FireboltRecord record = new FireboltRecord(
+                    "test_table",
+                    columnValues,
+                    "test_topic",
+                    0,
+                    100L,
+                    System.currentTimeMillis()
+                );
+                
+                fireboltWriter.write(record, schema);
+                fireboltWriter.flush();
+                
+                if (shouldMatch) {
+                    // Verify SQL includes the schema column name (quoted)
+                    verify(mockConnection).prepareStatement(argThat(sql -> 
+                        sql.contains("\"" + schemaColumn + "\"")
+                    ));
+                    
+                    // Verify parameter is set via converter
+                    verify(mockConverter, atLeastOnce()).convertAndSet(eq(mockPreparedStatement), anyInt(), any(), any());
+                } else {
+                    // For non-matching case, verify no columns in SQL
+                    verify(mockConnection).prepareStatement(argThat(sql -> 
+                        sql.matches("INSERT INTO test_table \\(\\) VALUES \\(\\)")
+                    ));
+                }
+                
+            } catch (SQLException e) {
+                fail("Unexpected SQLException: " + e.getMessage());
+            }
+        });
+    }
 } 
