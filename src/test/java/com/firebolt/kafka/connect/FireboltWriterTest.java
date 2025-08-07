@@ -374,7 +374,11 @@ public class FireboltWriterTest {
                     sql.contains("\"ID\"") &&           // Schema case preserved
                     sql.contains("\"userName\"") &&     // Schema case preserved
                     sql.contains("\"FULL_NAME\"") &&    // Schema case preserved
-                    sql.contains("\"CreatedDate\"")     // Schema case preserved
+                    sql.contains("\"CreatedDate\"") &&    // Schema case preserved
+                    !sql.contains("\"id\"") &&           // Not record case
+                    !sql.contains("\"USERNAME\"") &&    // Not record case
+                    !sql.contains("\"full_name\"") &&    // Not record case
+                    !sql.contains("\"createddate\"")     // Not record case
                 ));
                 
                 // Verify all 4 parameters are set via converter (case-insensitive matching worked)
@@ -478,54 +482,6 @@ public class FireboltWriterTest {
                         sql.matches("INSERT INTO test_table \\(\\) VALUES \\(\\)")
                     ));
                 }
-                
-            } catch (SQLException e) {
-                fail("Unexpected SQLException: " + e.getMessage());
-            }
-        });
-    }
-
-    @Test
-    void shouldPreserveSchemaColumnCaseInGeneratedSQL() {
-        executeWithMockedConverter(() -> {
-            try {
-                // Create table schema with very specific casing
-                TableSchema schema = new TableSchema("CaSeTeStTaBlE");
-                schema.addColumn("ID", "INTEGER", 4, false);
-                schema.addColumn("firstName", "TEXT", 12, true);
-                schema.addColumn("LAST_NAME", "TEXT", 12, true);
-                schema.addColumn("eMaIl", "TEXT", 12, true);
-                
-                // Create record with completely different casing
-                Map<String, KafkaMessageColumnValue> columnValues = new HashMap<>();
-                columnValues.put("id", KafkaMessageColumnValue.builder().value(789L).build());
-                columnValues.put("FIRSTNAME", KafkaMessageColumnValue.builder().value("Jane").build());
-                columnValues.put("last_name", KafkaMessageColumnValue.builder().value("Smith").build());
-                columnValues.put("EMAIL", KafkaMessageColumnValue.builder().value("jane@example.com").build());
-                
-                FireboltRecord record = new FireboltRecord(
-                    "CaSeTeStTaBlE",
-                    columnValues,
-                    "test_topic",
-                    0,
-                    100L,
-                    System.currentTimeMillis()
-                );
-                
-                fireboltWriter.write(record, schema);
-                fireboltWriter.flush();
-                
-                // Verify SQL preserves exact schema column names (quoted)
-                verify(mockConnection).prepareStatement(argThat(sql -> 
-                    sql.contains("\"ID\"") &&          // Exact schema case
-                    sql.contains("\"firstName\"") &&   // Exact schema case
-                    sql.contains("\"LAST_NAME\"") &&   // Exact schema case
-                    sql.contains("\"eMaIl\"") &&       // Exact schema case
-                    !sql.contains("\"id\"") &&         // Not record case
-                    !sql.contains("\"FIRSTNAME\"") &&  // Not record case
-                    !sql.contains("\"last_name\"") &&  // Not record case
-                    !sql.contains("\"EMAIL\"")         // Not record case
-                ));
                 
             } catch (SQLException e) {
                 fail("Unexpected SQLException: " + e.getMessage());
