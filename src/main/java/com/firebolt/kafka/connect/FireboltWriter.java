@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -233,14 +235,18 @@ public class FireboltWriter {
     }
 
     private void setStatementParameters(PreparedStatement stmt, FireboltRecord record, TableSchema schema, Set<String> validColumnNames) throws SQLException {
-        Map<String, KafkaMessageColumnValue> columnValues = record.getColumnValues();
+        // lower case all the column names keys from the map since we will do case-insensitive column mapping
+        Map<String, KafkaMessageColumnValue> columnValues = record.getColumnValues().entrySet()
+                .stream()
+                .filter(entry -> entry.getValue() != null) // map collectors cannot have null values
+                .collect(Collectors.toMap(key -> key.getKey().toLowerCase(), entry -> entry.getValue()));
 
         int parameterIndex = 1;
         for (TableSchema.Column column : schema.getColumns()) {
             if (validColumnNames.contains(column.getName())) {
                 String columnName = column.getName();
-                KafkaMessageColumnValue value = columnValues.get(columnName);
-                log.error("Processing column '{}' with dataType '{}' and value: {}", columnName, column.getDataType(), value != null ? value.getValue() : "null");
+                KafkaMessageColumnValue value = columnValues.get(columnName.toLowerCase());
+                log.info("Processing column '{}' with dataType '{}' and value: {}", columnName, column.getDataType(), value != null ? value.getValue() : "null");
 
                 if (value == null || value.getValue() == null) {
                     stmt.setNull(parameterIndex, column.getSqlType());
@@ -300,17 +306,17 @@ public class FireboltWriter {
         for (String columnName : recordColumnNames) {
             String lowerCaseColumnName = columnName.toLowerCase();
             if (schemaColumnNamesLowerCase.containsKey(lowerCaseColumnName)) {
-                validColumns.add(columnName); // Keep the original case from the record
+                validColumns.add(schemaColumnNamesLowerCase.get(lowerCaseColumnName)); // Keep the original case from the record
                 log.debug("Column '{}' matched schema column '{}' (case-insensitive)",
                         columnName, schemaColumnNamesLowerCase.get(lowerCaseColumnName));
             } else {
-                log.info("DEBUG: FILTERING OUT column '{}' as it doesn't exist in table schema for table '{}'",
+                log.warn("DEBUG: FILTERING OUT column '{}' as it doesn't exist in table schema for table '{}'",
                         columnName, tableSchema.getTableName());
             }
         }
 
-        log.debug("Filtered {} record columns to {} valid columns for table '{}'",
-                recordColumnNames.size(), validColumns.size(), tableSchema.getTableName());
+        log.info("Filtered {} record columns to {} valid columns for table '{}'. These are the valid column names {}",
+                recordColumnNames.size(), validColumns.size(), tableSchema.getTableName(), validColumns);
 
         return validColumns;
     }
