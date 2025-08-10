@@ -63,7 +63,7 @@ public class InsertPreparedStatement {
 
     private String buildInsertSQL(TableSchema tableSchema, Set<String> validColumnNames) {
         StringBuilder sql = new StringBuilder();
-        sql.append("INSERT INTO ").append(tableSchema.getTableName()).append(" (");
+        sql.append("INSERT INTO \"").append(tableSchema.getTableName()).append("\" (");
 
         List<String> columnNames = new ArrayList<>();
         List<String> placeholders = new ArrayList<>();
