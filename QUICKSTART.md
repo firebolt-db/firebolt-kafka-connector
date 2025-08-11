@@ -28,7 +28,7 @@ Create or pick the Kafka topics you will sink to Firebolt, for example:
 - Topic: `orders`
 - Target Firebolt table: `orders_raw`
 
-Optional CLI example: `ccloud kafka topic create orders`.
+Optional CLI example: `confluent kafka topic create orders`.
 
 ## 4) Create a connector instance
 In Confluent Cloud > Connectors, choose your custom Firebolt connector and configure:
@@ -50,13 +50,14 @@ Example JSON (Advanced config editor)
   "tasks.max": "1",
   "topics": "orders",
   "jdbc.connection.url": "jdbc:firebolt:my_db?engine=my_engine&account=my_account",
-  "firebolt.clientId": "${secrets:FIREBOLT_CLIENT_ID}",
-  "firebolt.clientSecret": "${secrets:FIREBOLT_CLIENT_SECRET}",
+  "firebolt.clientId": "<client_id>",
+  "firebolt.clientSecret": "<client_secret>",
   "topic.to.table.mapping": "orders:orders_raw"
 }
 ```
 Notes
 - Store credentials as Confluent Cloud Secrets and reference them as shown.
+- Secure you credentials by encrypting them in Confluent Cloud, see [Confluent Cloud guide](https://docs.confluent.io/platform/current/security/compliance/secrets/overview.html).
 - You may map multiple topics: `topicA:table_a,topicB:table_b`.
 
 ## 5) Verify the pipeline
