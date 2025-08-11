@@ -36,7 +36,6 @@ In Confluent Cloud > Connectors, choose your custom Firebolt connector and confi
 Required settings
 - `name`: e.g., `firebolt-orders-sink`
 - `topics`: `orders`
-- `tasks.max`: `1` (start small; scale based on throughput)
 - `jdbc.connection.url`: `jdbc:firebolt:<database>?engine=<engine>&account=<account>`
 - `firebolt.clientId` (Secret)
 - `firebolt.clientSecret` (Secret)
