@@ -42,7 +42,7 @@ Required settings
 - `firebolt.clientSecret` (Secret)
 - `topic.to.table.mapping`: `orders:orders_raw`
 
-Example JSON (Advanced config editor)
+Or in JSON
 ```json
 {
   "name": "firebolt-orders-sink",
