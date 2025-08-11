@@ -54,8 +54,6 @@ Or in JSON
 }
 ```
 Notes
-- Store credentials as Confluent Cloud Secrets and reference them as shown.
-- Secure you credentials by encrypting them in Confluent Cloud, see [Confluent Cloud guide](https://docs.confluent.io/platform/current/security/compliance/secrets/overview.html).
 - You may map multiple topics: `topicA:table_a,topicB:table_b`.
 
 ## 5) Verify the pipeline
