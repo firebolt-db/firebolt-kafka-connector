@@ -91,7 +91,6 @@ public class InsertPreparedStatement {
             if (validColumnNames.containsKey(column.getName())) {
                 String attributeName = validColumnNames.get(column.getName());
                 KafkaMessageColumnValue value = record.getColumnValues().get(attributeName);
-                log.info("Processing column '{}' with dataType '{}' and value: {}", column.getName(), column.getDataType(), value != null ? value.getValue() : "null");
 
                 if (value == null || value.getValue() == null) {
                     stmt.setNull(parameterIndex, column.getSqlType());

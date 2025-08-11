@@ -105,7 +105,7 @@ public class FireboltSinkTask extends SinkTask {
             return;
         }
 
-        log.debug("Processing {} records", records.size());
+        log.info("Received {} records for processing", records.size());
         try {
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
