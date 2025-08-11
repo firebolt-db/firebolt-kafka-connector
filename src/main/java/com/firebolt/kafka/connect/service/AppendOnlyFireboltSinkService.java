@@ -1,22 +1,20 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.FireboltRecord;
-import com.firebolt.kafka.connect.FireboltWriter;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.convert.RecordConverter;
+import com.firebolt.kafka.connect.TableWriter;
 import com.firebolt.kafka.connect.convert.RecordConverterFactory;
-import com.firebolt.kafka.connect.convert.SchemaBasedRecordConverter;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
-import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
 import com.google.common.annotations.VisibleForTesting;
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -29,16 +27,22 @@ import org.apache.kafka.connect.sink.SinkRecord;
 public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
     private SinkConfig config;
-    private Connection fireboltConnection;
-    private FireboltWriter fireboltWriter;
     private RecordConverterFactory recordConverterFactory;
     private FireboltDbService fireboltDbService;
 
-    /**
-     * Default constructor for service provider instantiation.
-     */
+    // a map between a table name and the writer for that map
+    private Map<String, TableWriter> tableWriterMap;
+
     AppendOnlyFireboltSinkService(SinkConfig sinkConfig) {
-        initialize(sinkConfig);
+        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>());
+    }
+
+    @VisibleForTesting
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap) {
+        this.config = sinkConfig;
+        this.fireboltDbService = fireboltDbService;
+        this.recordConverterFactory = recordConverterFactory;
+        this.tableWriterMap = tableWriterMap;
     }
 
     @Override
@@ -50,61 +54,32 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         try {
             // Group records by topic/partition combination
-            Map<TopicPartitionKey, List<SinkRecord>> recordsByTopicPartition = groupRecordsByTopicPartition(records);
+            Map<String, List<SinkRecord>> recordsByTopic = groupRecordsByTopic(records);
 
-            log.debug("Grouped {} records into {} topic/partition combinations",
-                    records.size(), recordsByTopicPartition.size());
+            log.debug("Grouped {} records into {} topic combinations", records.size(), recordsByTopic.size());
 
             // Process each topic/partition group separately
-            for (Map.Entry<TopicPartitionKey, List<SinkRecord>> entry : recordsByTopicPartition.entrySet()) {
-                TopicPartitionKey topicPartition = entry.getKey();
+            for (Map.Entry<String, List<SinkRecord>> entry : recordsByTopic.entrySet()) {
+                String topic = entry.getKey();
                 List<SinkRecord> groupedRecords = entry.getValue();
 
-                log.debug("Processing {} records for topic/partition: {}",
-                        groupedRecords.size(), topicPartition);
-
-                String tableName = config.getTableNameForTopic(topicPartition.getTopic());
+                String tableName = config.getTableNameForTopic(topic);
                 TableSchema tableSchema = tableSchemas.get(tableName);
                 if (tableSchema == null) {
-                    log.warn("Did not find table schema for topic {}. Ignoring the record", topicPartition.getTopic());
+                    log.warn("Did not find table schema for topic {}. Ignoring the record", topic);
                     continue;
                 }
 
-                processRecordsForTopicPartition(topicPartition, groupedRecords, tableSchema);
-            }
+                TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig())));
 
-            // Flush any remaining batched records that haven't reached the batch size threshold
-            fireboltWriter.flush();
+                List<FireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
+                tableWriter.insertRecords(fireboltRecords);
+
+            }
 
         } catch (Exception e) {
             log.error("Error processing records in AppendOnlyFireboltSinkService", e);
             throw new RuntimeException("Error processing records", e);
-        }
-    }
-
-    /**
-     * Initializes the service with configuration properties.
-     * This method is called when the service is first used.
-     *
-     * @param sinkConfig the configuration properties
-     */
-    private void initialize(SinkConfig sinkConfig) {
-        log.info("Initializing AppendOnlyFireboltSinkService");
-
-        try {
-            this.config = sinkConfig;
-
-            // Initialize components
-            this.fireboltDbService = new FireboltDbService();
-            initializeFireboltConnection();
-            this.fireboltWriter = new FireboltWriter(config, fireboltConnection);
-            this.recordConverterFactory = new RecordConverterFactory(config);
-
-            log.info("AppendOnlyFireboltSinkService initialized successfully");
-
-        } catch (Exception e) {
-            log.error("Failed to initialize AppendOnlyFireboltSinkService", e);
-            throw new RuntimeException("Failed to initialize AppendOnlyFireboltSinkService", e);
         }
     }
 
@@ -114,109 +89,58 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     public void close() {
         log.info("Closing AppendOnlyFireboltSinkService");
 
-        try {
-            // Close resources
-            if (fireboltWriter != null) {
-                fireboltWriter.close();
-            }
-
-            // Close connection
-            if (fireboltConnection != null && !fireboltConnection.isClosed()) {
-                fireboltConnection.close();
-                log.info("Firebolt connection closed");
-            }
-
-        } catch (Exception e) {
-            log.error("Error closing AppendOnlyFireboltSinkService", e);
-        }
+        // close all the table writers
+        tableWriterMap.entrySet().forEach(entry -> entry.getValue().close());
 
         log.info("AppendOnlyFireboltSinkService closed");
     }
 
-    private void processIndividualRecord(SinkRecord record, TableSchema tableSchema) {
+    private Optional<FireboltRecord> processIndividualRecord(SinkRecord record) {
         try {
             // Convert the record to a format suitable for Firebolt
-            FireboltRecord fireboltRecord = recordConverterFactory.convert(record);
-            // Write to Firebolt
-            fireboltWriter.write(fireboltRecord, tableSchema);
-
+            return Optional.of(recordConverterFactory.convert(record));
         } catch (RecordConversionException e) {
             log.error("Error converting record: topic={}, partition={}, offset={}",
                     record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
-            throw new RuntimeException("Error converting record", e);
-        } catch (Exception e) {
-            log.error("Error processing record: topic={}, partition={}, offset={}",
-                    record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
-
-            // For now, always throw on error since error tolerance was removed
-            throw new RuntimeException("Error processing record", e);
-        }
-    }
-
-    private void initializeFireboltConnection() throws ConnectionFailedException {
-        log.info("Initializing Firebolt connection");
-
-        try {
-            // Create connection using FireboltDbService
-            fireboltConnection = fireboltDbService.createConnection(config.getJdbcConfig());
-            log.info("Successfully connected to Firebolt");
-
-        } catch (ConnectionFailedException e) {
-            log.error("Failed to connect to Firebolt", e);
-            throw e;
+            // this should be moved to the dead letter queue or retried. For now ignore it
+            return Optional.empty();
         }
     }
 
     /**
-     * Groups records by topic/partition combination for efficient processing.
+     * Groups records by topic since the records for all topics will be processed by the same writer
      *
-     * @param records the collection of records to group
-     * @return a map where keys are TopicPartitionKey objects and values are lists of records
      */
-    private Map<TopicPartitionKey, List<SinkRecord>> groupRecordsByTopicPartition(Collection<SinkRecord> records) {
-        Map<TopicPartitionKey, List<SinkRecord>> groupedRecords = new HashMap<>();
+    private Map<String, List<SinkRecord>> groupRecordsByTopic(Collection<SinkRecord> records) {
+        Map<String, List<SinkRecord>> groupedRecords = new HashMap<>();
 
         for (SinkRecord record : records) {
-            TopicPartitionKey topicPartitionKey = createTopicPartitionKey(record.topic(), record.kafkaPartition());
-
-            groupedRecords.computeIfAbsent(topicPartitionKey, k -> new ArrayList<>()).add(record);
+            String topic = record.originalTopic();
+            groupedRecords.computeIfAbsent(topic, k -> new ArrayList<>()).add(record);
         }
 
         return groupedRecords;
     }
 
     /**
-     * Processes records for a specific topic/partition combination.
+     * Processes records for a specific topic combination.
      *
-     * @param topicPartition the topic/partition identifier
+     * @param topic the topic identifier
      * @param records the list of records for this topic/partition
      */
-    private void processRecordsForTopicPartition(TopicPartitionKey topicPartition, List<SinkRecord> records, TableSchema tableSchema) {
-        log.debug("Processing {} records for topic/partition: {}", records.size(), topicPartition);
+    private List<FireboltRecord> processRecordsForTopic(String topic, List<SinkRecord> records, Map<Integer, Long> topicProcessedOffsets) {
+        log.debug("Processing {} records for topic: {}", records.size(), topic);
 
-        try {
-            for (SinkRecord record : records) {
-                processIndividualRecord(record, tableSchema);
-            }
-
-            log.debug("Successfully processed {} records for topic/partition: {}",
-                    records.size(), topicPartition);
-
-        } catch (Exception e) {
-            log.error("Error processing records for topic/partition: {}", topicPartition, e);
-            throw new RuntimeException("Error processing records for topic/partition: " + topicPartition, e);
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
         }
-    }
 
-    /**
-     * Creates a consistent key for topic/partition combination.
-     *
-     * @param topic the topic name
-     * @param partition the partition number (can be null)
-     * @return a TopicPartitionKey representing the topic/partition combination
-     */
-    private TopicPartitionKey createTopicPartitionKey(String topic, Integer partition) {
-        return new TopicPartitionKey(topic, partition);
+        return records.stream()
+                .filter(sinkRecord -> !topicProcessedOffsets.containsKey(sinkRecord.originalKafkaPartition()) || sinkRecord.originalKafkaOffset() > topicProcessedOffsets.get(sinkRecord.originalKafkaPartition())) // do not process records that have already been processed
+                .map(this::processIndividualRecord)
+                .filter(Optional::isPresent)  // when the sink record cannot be processed it will be retuned as empty, so only keep the ones that were successfully processed
+                .map(Optional::get)
+                .collect(Collectors.toList());
     }
 
 }
