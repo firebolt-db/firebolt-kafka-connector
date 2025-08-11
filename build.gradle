@@ -24,7 +24,7 @@ ext {
     confluentVersion = '7.4.0'
     avroVersion = '1.11.2'
     mockitoVersion = '5.18.0'
-    awaitilityVersion = '4.2.0'
+    awaitilityVersion = '4.3.0'
 }
 
 java {
