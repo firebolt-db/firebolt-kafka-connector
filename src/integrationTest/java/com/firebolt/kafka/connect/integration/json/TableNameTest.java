@@ -14,6 +14,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,22 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Slf4j
 public class TableNameTest extends BaseIntegrationTest {
 
-    private static final String TABLE_NAME = "name-with-dashes-table";
-    private static final String TOPIC_NAME = "the-topic";
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
-
     private Producer<String, SimpleRecord> producer;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
         super.setUp(testInfo);
-
-        // Generate unique connector name for this test run
-        generateUniqueConnectorName("table-name-with-dashes");
-
-        // Setup test resources using centralized method
-        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                simpleRecordTableSchema(), jsonSimpleRecordSchema());
     }
 
     @AfterEach
@@ -46,25 +37,40 @@ public class TableNameTest extends BaseIntegrationTest {
             producer.close();
         }
 
-        // Clean up test resources
-        cleanupTestResources(TABLE_NAME, TOPIC_NAME, SCHEMA_SUBJECT);
-
         super.tearDown();
     }
 
-    @Test
-    void testTableNameWithDashes() throws Exception {
-        producer = initializeJsonProducer();
+    @ParameterizedTest
+    @CsvSource({
+            "table-name-with-dashes,name-with-dashes-table,topic1",
+            "table-name-with-upperchars,UPPER_CHARS_TABLE_NAME,topic2"
+    })
+    void testTableNameWithDashes(String connectorName, String tableName, String topicName) throws Exception {
+        String schemaSubject = topicName + "-value";
+        try {
+           // Generate unique connector name for this test run
+           generateUniqueConnectorName(connectorName);
 
-        List<SimpleRecord> testRecords = createTestRecords();
+           // Setup test resources using centralized method
 
-        // publish the messages to kafka topic
-        publishMessages(testRecords);
+           setupTestResources(topicName, tableName, schemaSubject,
+                   simpleRecordTableSchema(), jsonSimpleRecordSchema());
 
-        waitForDataInFirebolt(TABLE_NAME, testRecords.size());
+           producer = initializeJsonProducer();
 
-        // check that all the records have the expected value
-        verifyRecords(testRecords);
+           List<SimpleRecord> testRecords = createTestRecords();
+
+           // publish the messages to kafka topic
+           publishMessages(topicName, testRecords);
+
+           waitForDataInFirebolt(tableName, testRecords.size());
+
+           // check that all the records have the expected value
+           verifyRecords(tableName, testRecords);
+       } finally {
+           // Clean up test resources
+           cleanupTestResources(tableName, topicName, schemaSubject);
+       }
     }
 
     /**
@@ -104,11 +110,11 @@ public class TableNameTest extends BaseIntegrationTest {
                 "}";
     }
 
-    private void publishMessages(List<SimpleRecord> records) throws Exception {
+    private void publishMessages(String topicName, List<SimpleRecord> records) throws Exception {
         for (SimpleRecord record : records) {
             String key = "column-name-casing-test-key-" + record.getId();
             ProducerRecord<String, SimpleRecord> producerRecord =
-                    new ProducerRecord<>(TOPIC_NAME, key, record);
+                    new ProducerRecord<>(topicName, key, record);
 
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
@@ -123,16 +129,16 @@ public class TableNameTest extends BaseIntegrationTest {
         producer.flush();
     }
 
-    private void verifyRecords(List<SimpleRecord> expectedRecords) throws SQLException {
+    private void verifyRecords(String tableName, List<SimpleRecord> expectedRecords) throws SQLException {
         // Count total records
-        int actualCount = fireboltDefaultDbClient.countRows(TABLE_NAME);
+        int actualCount = fireboltDefaultDbClient.countRows(tableName);
         assertEquals(expectedRecords.size(), actualCount,
                 "Expected " + expectedRecords.size() + " records but found " + actualCount);
 
         // Verify specific records by recordId
         String selectQuery = String.format(
                 "SELECT \"id\", \"value\" " +
-                        "FROM \"%s\" ORDER BY \"id\"", TABLE_NAME);
+                        "FROM \"%s\" ORDER BY \"id\"", tableName);
 
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
             int recordIndex = 0;
