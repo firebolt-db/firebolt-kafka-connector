@@ -34,7 +34,6 @@ Optional CLI example: `confluent kafka topic create orders`.
 In Confluent Cloud > Connectors, choose your custom Firebolt connector and configure:
 
 Required settings
-- `name`: e.g., `firebolt-orders-sink`
 - `topics`: `orders`
 - `jdbc.connection.url`: `jdbc:firebolt:<database>?engine=<engine>&account=<account>`
 - `firebolt.clientId` (Secret)
