@@ -77,7 +77,7 @@ public class InsertPreparedStatementTest {
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
-        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO test_table (\"id\", \"NAME\") VALUES (?, ?)")));
+        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO \"test_table\" (\"id\", \"NAME\") VALUES (?, ?)")));
 
         verify(mockPreparedStatement).setInt(1, 123);
         verify(mockPreparedStatement).setString(2, "Alice");
@@ -104,7 +104,7 @@ public class InsertPreparedStatementTest {
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
-        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO test_table (\"id\", \"NAME\") VALUES (?, ?)")));
+        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO \"test_table\" (\"id\", \"NAME\") VALUES (?, ?)")));
         verify(mockPreparedStatement).setInt(1, 1);
         verify(mockPreparedStatement).setString(2, "Carol");
 
@@ -129,7 +129,7 @@ public class InsertPreparedStatementTest {
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
-        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO test_table (\"id\", \"NAME\") VALUES (?, ?)")));
+        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO \"test_table\" (\"id\", \"NAME\") VALUES (?, ?)")));
         verify(mockPreparedStatement).setInt(1, 100);
         verify(mockPreparedStatement).setString(2, "widget");
         verify(mockPreparedStatement).addBatch();
@@ -145,7 +145,7 @@ public class InsertPreparedStatementTest {
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
-        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO test_table (\"id\") VALUES (?)")));
+        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO \"test_table\" (\"id\") VALUES (?)")));
         verify(mockPreparedStatement).setInt(1, 100);
         verify(mockPreparedStatement).addBatch();
         verify(mockPreparedStatement).executeBatch();
