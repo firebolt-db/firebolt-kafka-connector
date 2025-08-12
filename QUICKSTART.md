@@ -39,6 +39,8 @@ Required settings
 - `firebolt.clientId` (Secret)
 - `firebolt.clientSecret` (Secret)
 - `topic.to.table.mapping`: `orders:orders_raw`
+- `key.converter`: `org.apache.kafka.connect.storage.StringConverter`
+- `value.converter`: `io.confluent.connect.json.JsonSchemaConverter`
 
 Or in JSON
 ```json
@@ -50,7 +52,10 @@ Or in JSON
   "jdbc.connection.url": "jdbc:firebolt:my_db?engine=my_engine&account=my_account",
   "firebolt.clientId": "<client_id>",
   "firebolt.clientSecret": "<client_secret>",
-  "topic.to.table.mapping": "orders:orders_raw"
+  "topic.to.table.mapping": "orders:orders_raw",
+  "value.converter.basic.auth.credentials.source": "USER_INFO",
+  "value.converter.schema.registry.url": "<your schema registry url>",
+  "value.converter.schema.registry.basic.auth.user.info": "<schema_registry_key>:<schema_registry_secret>"
 }
 ```
 Notes
