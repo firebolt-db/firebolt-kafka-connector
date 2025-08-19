@@ -585,3 +585,35 @@ tasks.register('buildConfluentHubArchive') {
         println "🚀 Ready for upload to Confluent Hub!"
     }
 }
+
+// Task to run the LoadTest with system properties
+tasks.register('runLoadTest', JavaExec) {
+    group = "Load Testing"
+    description = "Runs the LoadTest with configurable system properties"
+    
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    mainClass = 'com.firebolt.kafka.connect.load.LoadTest'
+    
+    // Pass all system properties to the JVM
+    systemProperties System.properties
+    
+    // Set JVM arguments for better performance and logging
+    jvmArgs = [
+        '-Xmx4g',
+        '-Xms1g',
+        '-XX:+UseG1GC',
+        '-XX:MaxGCPauseMillis=200'
+    ]
+    
+    doFirst {
+        println "🚀 Starting LoadTest with the following configuration:"
+        println "   Firebolt JDBC URL: ${System.getProperty('firebolt.jdbc.url', '[using default]')}"
+        println "   Firebolt Client ID: ${System.getProperty('firebolt.client.id', '[using default]')}"
+        println "   Confluent Environment: ${System.getProperty('confluent.environment.id', '[using default]')}"
+        println "   Confluent Cluster: ${System.getProperty('confluent.cluster.id', '[using default]')}"
+        println "   Message Sizes: ${System.getProperty('loadtest.message.sizes', '[using default]')}"
+        println "   Message Count: ${System.getProperty('loadtest.message.count', '[using default]')}"
+        println "   Table Schema: ${System.getProperty('loadtest.table.schema', '[using default]')}"
+    }
+}
+

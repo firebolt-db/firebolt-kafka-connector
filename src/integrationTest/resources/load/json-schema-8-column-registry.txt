@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "All Data Types Test Record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "colInteger": {
+      "type": "integer",
+      "description": "Integer field (NOT NULL)"
+    },
+    "colBigint": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field"
+    },
+    "colNumeric": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colReal": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field"
+    },
+    "colDoublePrecision": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field"
+    },
+    "colBoolean": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field"
+    },
+    "colText": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field"
+    },
+    "colTimestamp": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field"
+    }
+  },
+  "required": ["colInteger"]
+}
+
+

@@ -1,0 +1,89 @@
+name: Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      firebolt_jdbc_url:
+        description: 'Firebolt JDBC URL (e.g., jdbc:firebolt:db?account=acc&engine=eng&env=staging)'
+        required: true
+        default: 'jdbc:firebolt:sink-connector-load-test?account=goprean-us-east&engine=sink_connector_load_test&env=staging'
+      connector_plugin_id:
+        description: 'Confluent Firebolt Connector Plugin ID (leave empty to use repository default)'
+        required: false
+      confluent_environment_id:
+        description: 'Confluent Environment ID (leave empty to use repository default)'
+        required: false
+      confluent_cluster_id:
+        description: 'Confluent Cluster ID (leave empty to use repository default)'
+        required: false
+      message_sizes:
+        description: 'Message sizes to test (comma separated: 100,500,1000)'
+        required: false
+        default: '100,500,1000,5000,10000'
+      message_count:
+        description: 'Number of messages to produce and consume (default: 1,000,000)'
+        required: false
+        default: '1000000'
+      table_schema:
+        description: 'Table schema to test (8-column, 80-column, 8-column-with-default-timestamp)'
+        required: false
+        default: '8-column'
+        type: choice
+        options:
+          - '8-column'
+          - '8-column-with-default-timestamp'
+          - '80-column'
+
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # 3 hours max
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          
+      - name: Run Load Test
+        run: |
+          ./gradlew runLoadTest \
+            -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url || 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging' }}" \
+            -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
+            -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
+            -Dconfluent.environment.id="${{ github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}" \
+            -Dconfluent.cluster.id="${{ github.event.inputs.confluent_cluster_id || vars.CONFLUENT_CLUSTER_ID }}" \
+            -Dconfluent.firebolt.connector.plugin.id="${{ github.event.inputs.connector_plugin_id || vars.CONFLUENT_CONNECTOR_PLUGIN_ID }}" \
+            -Dconfluent.kafka.api.key="${{ secrets.CONFLUENT_KAFKA_API_KEY }}" \
+            -Dconfluent.kafka.api.secret="${{ secrets.CONFLUENT_KAFKA_API_SECRET }}" \
+            -Dconfluent.schema.registry.api.key="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_KEY }}" \
+            -Dconfluent.schema.registry.api.secret="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}" \
+            -Dconfluent.cloud.resource.api.key="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}" \
+            -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
+            -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '100,500' }}" \
+            -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
+            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}"
+        env:
+          # Additional environment variables if needed
+          GRADLE_OPTS: "-Xmx2g"
+          
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results-${{ github.run_number }}
+          path: |
+            build/reports/
+            build/test-results/
+            *.log
+          retention-days: 30
