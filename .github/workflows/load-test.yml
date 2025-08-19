@@ -33,16 +33,31 @@ on:
           - '8-column'
           - '8-column-with-default-timestamp'
           - '80-column'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop]
 
 
 jobs:
   load-test:
     runs-on: ubuntu-latest
     timeout-minutes: 180  # 3 hours max
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.draft == true)
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        
+      - name: Show Trigger Info
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "🚀 Load Test triggered by Draft Pull Request #${{ github.event.pull_request.number }}"
+            echo "📝 PR Title: ${{ github.event.pull_request.title }}"
+            echo "👤 Author: ${{ github.event.pull_request.user.login }}"
+            echo "🔀 Branch: ${{ github.event.pull_request.head.ref }} -> ${{ github.event.pull_request.base.ref }}"
+          else
+            echo "🚀 Load Test triggered manually via workflow_dispatch"
+          fi
         
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -70,7 +85,7 @@ jobs:
             -Dconfluent.schema.registry.api.secret="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}" \
             -Dconfluent.cloud.resource.api.key="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}" \
             -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
-            -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '100,500' }}" \
+            -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '500' }}" \
             -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
             -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}"
         env:
