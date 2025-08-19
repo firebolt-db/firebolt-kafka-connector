@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.clients;
 
+import com.firebolt.jdbc.connection.FireboltConnection;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import com.firebolt.shadow.org.apache.commons.lang3.StringUtils;
 import java.sql.Connection;
@@ -45,7 +46,6 @@ public class FireboltClient implements AutoCloseable {
 
     private FireboltClient(String jdbcUrl, String clientId, String clientSecret) throws SQLException {
         this.jdbcUrl = jdbcUrl;
-
         Properties props = new Properties();
         props.put("client_id", clientId);
         props.put("client_secret", clientSecret);
@@ -242,69 +242,11 @@ public class FireboltClient implements AutoCloseable {
         
         createTable(tableName, schema);
     }
-    
-    /**
-     * Creates a comprehensive test table with all Firebolt data types.
-     * This includes all numeric, boolean, composite, date/timestamp, string, binary, and spatial types.
-     * Useful for testing data type compatibility and conversion.
-     * 
-     * @param tableName the name of the table to create
-     * @throws SQLException if table creation fails
-     */
-    public void createAllDataTypesTestTable(String tableName) throws SQLException {
-        String schema = 
-            // Numeric types
-            "\"colInteger\" INTEGER NOT NULL, " +
-            "\"colBigint\" BIGINT, " +
-            "\"colNumeric\" NUMERIC(38,9), " +
-            "\"colReal\" REAL, " +
-            "\"colDoublePrecision\" DOUBLE PRECISION, " +
 
-            // Boolean type
-            "\"colBoolean\" BOOLEAN, " +
-
-            // String type
-            "\"colText\" TEXT, " +
-            
-            // Date and timestamp types
-            "\"colDate\" DATE, " +
-            "\"colTimestamp\" TIMESTAMP, " +
-            "\"colTimestamptz\" TIMESTAMPTZ, " +
-            
-            // Binary type
-            "\"colBytea\" BYTEA, " +
-            
-            // Array types (various syntaxes and element types)
-            "\"colArrayTextNullable\" ARRAY(TEXT NULL), " +
-            "\"colArrayTextNotNull\" ARRAY(TEXT NOT NULL), " +
-            "\"colArrayIntSyntax1\" ARRAY(INTEGER), " +
-            "\"colArrayIntSyntax2\" INTEGER[], " +
-            "\"colArrayDate\" ARRAY(DATE), " +
-            "\"colArrayReal\" ARRAY(REAL), " +
-            "\"colArrayNumeric\" ARRAY(NUMERIC), " +
-            "\"colArrayDoublePrecision\" ARRAY(DOUBLE PRECISION), " +
-            "\"colArrayTimestamptz\" ARRAY(TIMESTAMPTZ), " +
-            "\"colArrayTimestamp\" ARRAY(TIMESTAMP) " + "";
-        
-        createTable(tableName, schema);
-    }
-    
-    /**
-     * Creates a simple test table with 5 basic columns.
-     * This is useful for basic integration testing with common data types.
-     * 
-     * @param tableName the name of the table to create
-     * @throws SQLException if table creation fails
-     */
-    public void createSimpleTestTable(String tableName) throws SQLException {
-        String schema = 
-            "id BIGINT NOT NULL, " +
-            "\"createdAt\" TIMESTAMPTZ, " + // use quotes to preserve case
-            "\"recordTimestamp\" BIGINT, " +
-            "title TEXT, " +
-            "description TEXT";
-        
-        createTable(tableName, schema);
+    public String getEngineUrl() {
+        // parse the jdbc url to get the account name
+        FireboltConnection fireboltConnection = (FireboltConnection) connection;
+        return fireboltConnection.getSessionProperties().getHost();
     }
     
 }
