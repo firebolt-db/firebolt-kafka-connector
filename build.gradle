@@ -23,7 +23,7 @@ ext {
     guavaVersion = '33.4.8-jre'
     confluentVersion = '7.4.0'
     avroVersion = '1.12.0'
-    mockitoVersion = '5.18.0'
+    mockitoVersion = '5.19.0'
     awaitilityVersion = '4.3.0'
 }
 
