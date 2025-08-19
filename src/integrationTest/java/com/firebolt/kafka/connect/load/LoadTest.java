@@ -136,12 +136,6 @@ public class LoadTest {
             }
         }
         log.info("=== END ACTIVE THREADS DEBUG ===");
-        
-        // Add a shutdown hook to force cleanup if needed
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("Shutdown hook triggered - forcing cleanup");
-            System.exit(0);
-        }));
     }
 
     private static ConfluentCloudSettings confluentCloudSettings() {

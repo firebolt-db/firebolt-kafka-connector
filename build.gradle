@@ -617,3 +617,55 @@ tasks.register('runLoadTest', JavaExec) {
     }
 }
 
+// Task to build a standalone fat JAR for LoadTest
+tasks.register('buildLoadTestJar', Jar) {
+    group = "Load Testing"
+    description = "Builds a standalone fat JAR for LoadTest that can be run with java -jar"
+    
+    archiveBaseName = 'firebolt-kafka-load-test'
+    archiveVersion = project.version
+    archiveClassifier = 'standalone'
+    
+    manifest {
+        attributes(
+            'Main-Class': 'com.firebolt.kafka.connect.load.LoadTest',
+            'Implementation-Title': 'Firebolt Kafka Load Test',
+            'Implementation-Version': project.version,
+            'Built-By': System.getProperty('user.name'),
+            'Built-Date': new Date(),
+            'Built-JDK': System.getProperty('java.version')
+        )
+    }
+    
+    // Include all integration test classes
+    from sourceSets.integrationTest.output
+    
+    // Include all runtime dependencies (JAR files only)
+    from {
+        sourceSets.integrationTest.runtimeClasspath.findAll { it.name.endsWith('.jar') }.collect { zipTree(it) }
+    }
+    
+    // Exclude signature files to avoid conflicts
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    doLast {
+        def jarFile = archiveFile.get().asFile
+        println "✅ LoadTest standalone JAR created: ${jarFile.absolutePath}"
+        println "📦 JAR size: ${jarFile.length()} bytes"
+        println "🚀 Run with: java [JVM_OPTIONS] -jar ${jarFile.name} [SYSTEM_PROPERTIES]"
+        println ""
+        println "Example usage:"
+        println "java -Xmx4g -jar ${jarFile.name} \\"
+        println "  -Dfirebolt.jdbc.url='jdbc:firebolt:...' \\"
+        println "  -Dfirebolt.client.id='...' \\"
+        println "  -Dfirebolt.client.secret='...' \\"
+        println "  -Dconfluent.environment.id='...' \\"
+        println "  -Dloadtest.message.sizes='500' \\"
+        println "  -Dloadtest.message.count='10000'"
+    }
+}
+

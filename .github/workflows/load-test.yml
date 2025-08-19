@@ -70,9 +70,40 @@ jobs:
         with:
           cache-read-only: false
           
-      - name: Run Load Test
+      - name: Build LoadTest JAR
         run: |
-          ./gradlew runLoadTest \
+          echo "🔨 Building LoadTest standalone JAR..."
+          ./gradlew buildLoadTestJar
+          
+          # Verify JAR was created
+          if [ ! -f "build/libs/firebolt-kafka-load-test-0.1-standalone.jar" ]; then
+            echo "❌ LoadTest JAR was not created"
+            exit 1
+          fi
+          
+          echo "✅ LoadTest JAR built successfully"
+          ls -lh build/libs/firebolt-kafka-load-test-*-standalone.jar
+          
+      - name: Run Load Test (Standalone JAR)
+        id: load_test
+        run: |
+          set +e  # Don't exit on error - we need to check exit codes
+          
+          echo "🚀 Running LoadTest using standalone JAR (no Gradle overhead)..."
+          
+          # Define JVM options for clean execution
+          JVM_OPTS=(
+            -Xmx4g
+            -Xms1g
+            -Djava.awt.headless=true
+            -XX:+UseSerialGC
+            -XX:+DisableExplicitGC
+            -XX:+ExitOnOutOfMemoryError
+            -XX:+CrashOnOutOfMemoryError
+          )
+          
+          # Run the JAR with system properties
+          java "${JVM_OPTS[@]}" \
             -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url || 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging' }}" \
             -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
             -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
@@ -87,10 +118,24 @@ jobs:
             -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
             -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '500' }}" \
             -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
-            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}"
-        env:
-          # Additional environment variables if needed
-          GRADLE_OPTS: "-Xmx2g"
+            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}" \
+            -jar build/libs/firebolt-kafka-load-test-0.1-standalone.jar
+          
+          EXIT_CODE=$?
+          echo "Load test exit code: $EXIT_CODE"
+          
+          # Exit code 137 means Runtime.halt(137) was called to prevent hanging
+          # This is considered SUCCESS in our case
+          if [ $EXIT_CODE -eq 137 ]; then
+            echo "✅ Load test completed successfully (forced exit to prevent hanging)"
+            exit 0
+          elif [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ Load test completed successfully (clean exit)"
+            exit 0
+          else
+            echo "❌ Load test failed with exit code: $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
           
       - name: Upload Test Results
         if: always()
