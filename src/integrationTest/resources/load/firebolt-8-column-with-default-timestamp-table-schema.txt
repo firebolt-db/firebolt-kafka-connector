@@ -1,0 +1,9 @@
+"colInteger" INTEGER NOT NULL,
+"colBigint" BIGINT,
+"colNumeric" NUMERIC(38,9),
+"colReal" REAL,
+"colDoublePrecision" DOUBLE PRECISION,
+"colBoolean" BOOLEAN,
+"colText" TEXT,
+"colTimestamp" TIMESTAMP,
+"insertedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP

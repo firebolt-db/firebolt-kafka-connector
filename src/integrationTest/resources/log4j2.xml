@@ -18,7 +18,7 @@
         </Logger>
         
         <!-- Firebolt connector loggers -->
-        <Logger name="com.firebolt.kafka.connect" level="DEBUG" additivity="false">
+        <Logger name="com.firebolt.kafka.connect" level="INFO" additivity="false">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="IntegrationTestLog"/>
         </Logger>
@@ -42,7 +42,7 @@
         </Logger>
         
         <!-- Root logger -->
-        <Root level="DEBUG">
+        <Root level="INFO">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="IntegrationTestLog"/>
         </Root>

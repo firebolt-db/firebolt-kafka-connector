@@ -1,0 +1,626 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "80 Column Test Record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "colInteger": {
+      "type": "integer",
+      "description": "Integer field (NOT NULL)"
+    },
+    "colInteger2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 2"
+    },
+    "colInteger3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 3"
+    },
+    "colInteger4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 4"
+    },
+    "colInteger5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 5"
+    },
+    "colInteger6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 6"
+    },
+    "colInteger7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 7"
+    },
+    "colInteger8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 8"
+    },
+    "colInteger9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 9"
+    },
+    "colInteger10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Integer field 10"
+    },
+    "colBigint": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field"
+    },
+    "colBigint2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 2"
+    },
+    "colBigint3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 3"
+    },
+    "colBigint4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 4"
+    },
+    "colBigint5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 5"
+    },
+    "colBigint6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 6"
+    },
+    "colBigint7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 7"
+    },
+    "colBigint8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 8"
+    },
+    "colBigint9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 9"
+    },
+    "colBigint10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "integer"}
+      ],
+      "description": "Bigint field 10"
+    },
+    "colNumeric": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colNumeric10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {
+          "type": "string",
+          "connect.type": "org.apache.kafka.connect.data.Decimal",
+          "connect.parameters": {
+            "scale": "9"
+          },
+          "description": "High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision"
+        }
+      ]
+    },
+    "colReal": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field"
+    },
+    "colReal2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 2"
+    },
+    "colReal3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 3"
+    },
+    "colReal4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 4"
+    },
+    "colReal5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 5"
+    },
+    "colReal6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 6"
+    },
+    "colReal7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 7"
+    },
+    "colReal8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 8"
+    },
+    "colReal9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 9"
+    },
+    "colReal10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Real field 10"
+    },
+    "colDoublePrecision": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field"
+    },
+    "colDoublePrecision2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 2"
+    },
+    "colDoublePrecision3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 3"
+    },
+    "colDoublePrecision4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 4"
+    },
+    "colDoublePrecision5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 5"
+    },
+    "colDoublePrecision6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 6"
+    },
+    "colDoublePrecision7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 7"
+    },
+    "colDoublePrecision8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 8"
+    },
+    "colDoublePrecision9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 9"
+    },
+    "colDoublePrecision10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "number"}
+      ],
+      "description": "Double precision field 10"
+    },
+    "colBoolean": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field"
+    },
+    "colBoolean2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 2"
+    },
+    "colBoolean3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 3"
+    },
+    "colBoolean4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 4"
+    },
+    "colBoolean5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 5"
+    },
+    "colBoolean6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 6"
+    },
+    "colBoolean7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 7"
+    },
+    "colBoolean8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 8"
+    },
+    "colBoolean9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 9"
+    },
+    "colBoolean10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "boolean"}
+      ],
+      "description": "Boolean field 10"
+    },
+    "colText": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field"
+    },
+    "colText2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 2"
+    },
+    "colText3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 3"
+    },
+    "colText4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 4"
+    },
+    "colText5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 5"
+    },
+    "colText6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 6"
+    },
+    "colText7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 7"
+    },
+    "colText8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 8"
+    },
+    "colText9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 9"
+    },
+    "colText10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string"}
+      ],
+      "description": "Text field 10"
+    },
+    "colTimestamp": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field"
+    },
+    "colTimestamp2": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 2"
+    },
+    "colTimestamp3": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 3"
+    },
+    "colTimestamp4": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 4"
+    },
+    "colTimestamp5": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 5"
+    },
+    "colTimestamp6": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 6"
+    },
+    "colTimestamp7": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 7"
+    },
+    "colTimestamp8": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 8"
+    },
+    "colTimestamp9": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 9"
+    },
+    "colTimestamp10": {
+      "oneOf": [
+        {"type": "null", "title": "Not included"},
+        {"type": "string", "format": "date-time"}
+      ],
+      "description": "Timestamp field 10"
+    }
+  },
+  "required": ["colInteger"]
+}
