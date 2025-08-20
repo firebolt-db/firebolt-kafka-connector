@@ -58,7 +58,7 @@ jobs:
       - name: Run Load Test
         run: |
           ./gradlew runLoadTest \
-            -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url || 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging' }}" \
+            -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url }}" \
             -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
             -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
             -Dconfluent.environment.id="${{ github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}" \

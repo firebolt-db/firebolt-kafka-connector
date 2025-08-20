@@ -114,17 +114,17 @@ public class LoadTest {
         while ((parentGroup = rootGroup.getParent()) != null) {
             rootGroup = rootGroup.getParent();
         }
-        
+
         Thread[] threads = new Thread[rootGroup.activeCount() * 2];
         int count = rootGroup.enumerate(threads, true);
-        
+
         log.info("Total active threads: {}", count);
         for (int i = 0; i < count; i++) {
             Thread thread = threads[i];
             if (thread != null) {
-                log.info("Thread[{}]: name='{}', state={}, daemon={}, alive={}", 
-                    i, thread.getName(), thread.getState(), thread.isDaemon(), thread.isAlive());
-                
+                log.info("Thread[{}]: name='{}', state={}, daemon={}, alive={}",
+                        i, thread.getName(), thread.getState(), thread.isDaemon(), thread.isAlive());
+
                 // Print stack trace for non-daemon threads that might be preventing shutdown
                 if (!thread.isDaemon() && thread.isAlive() && !thread.getName().equals("main")) {
                     log.warn("Non-daemon thread '{}' may be preventing JVM shutdown:", thread.getName());
@@ -136,12 +136,6 @@ public class LoadTest {
             }
         }
         log.info("=== END ACTIVE THREADS DEBUG ===");
-        
-        // Add a shutdown hook to force cleanup if needed
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("Shutdown hook triggered - forcing cleanup");
-            System.exit(0);
-        }));
     }
 
     private static ConfluentCloudSettings confluentCloudSettings() {
