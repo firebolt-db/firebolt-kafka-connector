@@ -219,7 +219,7 @@ public class LoadTestRunner {
         connectorConfig.put("consumer.override.max.partition.fetch.bytes", "10485760");
         connectorConfig.put("consumer.override.fetch.max.bytes", "20971520");
         connectorConfig.put("connector.class", "com.firebolt.kafka.connect.FireboltSinkConnector");
-        connectorConfig.put("tasks.max", "1");
+        connectorConfig.put("tasks.max", "3");
         connectorConfig.put("kafka.api.key", kafkaApiKey);
         connectorConfig.put("kafka.api.secret", kafkaApiSecret);
         connectorConfig.put("firebolt.clientId", fireboltClientId);
@@ -460,7 +460,7 @@ public class LoadTestRunner {
 
         // create the topic
         log.debug("Creating the topic: {}", topicName);
-        client.createTopic(topicName, 1, (short) 3, /*retentionMs*/ 604800000L, /*retentionBytes*/ null);
+        client.createTopic(topicName, 3, (short) 3, /*retentionMs*/ 604800000L, /*retentionBytes*/ null);
 
         log.info("Topic {} created", topicName);
     }
