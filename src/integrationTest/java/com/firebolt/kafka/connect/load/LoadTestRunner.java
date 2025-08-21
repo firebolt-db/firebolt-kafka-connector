@@ -6,7 +6,7 @@ import com.firebolt.kafka.connect.clients.ConfluentResourceClient;
 import com.firebolt.kafka.connect.clients.ConfluentSchemaRegistryClient;
 import com.firebolt.kafka.connect.clients.FireboltClient;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
-import com.firebolt.shadow.org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;

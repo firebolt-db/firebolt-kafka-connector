@@ -3,7 +3,7 @@ package com.firebolt.kafka.connect.service;
 import com.firebolt.kafka.connect.JdbcConfig;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
-import com.firebolt.shadow.org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import com.google.common.collect.Sets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
