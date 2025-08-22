@@ -57,13 +57,24 @@ jobs:
       run: |
         KAFKA_CONNECT_VERSION="${{ inputs.kafka_connect_version }}"
         if [ "$KAFKA_CONNECT_VERSION" = "4.0" ]; then
-          COMPOSE_FILE="src/integrationTest/docker/kafka-connect-4.0/docker-compose.yml"
+          COMPOSE_FILE_DIR="src/integrationTest/docker/kafka-connect-4.0"
         else
-          COMPOSE_FILE="src/integrationTest/docker/kafka-connect-3.9.1/docker-compose.yml"
+          COMPOSE_FILE_DIR="src/integrationTest/docker/kafka-connect-3.9.1"
         fi
+        COMPOSE_FILE="$COMPOSE_FILE_DIR/docker-compose.yml"
+        echo "COMPOSE_FILE_DIR=$COMPOSE_FILE_DIR" >> $GITHUB_ENV
         echo "COMPOSE_FILE=$COMPOSE_FILE" >> $GITHUB_ENV
         echo "Using docker-compose file: $COMPOSE_FILE"
-        
+
+    - name: Setup firebolt core permissions
+      run: |
+        WHO="$(docker run --rm --entrypoint whoami ghcr.io/firebolt-db/firebolt-core:preview-rc)"
+        # Ensure the host directory that is mounted to /firebolt-core/data exists
+        if [ "$WHO" = "firebolt-core" ]; then
+          mkdir -p "$COMPOSE_FILE_DIR/firebolt-core"
+          sudo chown 1111:1111 "$COMPOSE_FILE_DIR/firebolt-core"
+        fi
+
     - name: Start Docker services
       run: |
         echo "Starting Docker services with $COMPOSE_FILE"
