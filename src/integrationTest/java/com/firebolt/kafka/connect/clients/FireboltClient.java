@@ -2,7 +2,7 @@ package com.firebolt.kafka.connect.clients;
 
 import com.firebolt.jdbc.connection.FireboltConnection;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
-import com.firebolt.shadow.org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;

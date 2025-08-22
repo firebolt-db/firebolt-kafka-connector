@@ -1,6 +1,5 @@
 package com.firebolt.kafka.connect.config;
 
-import com.firebolt.shadow.org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 
