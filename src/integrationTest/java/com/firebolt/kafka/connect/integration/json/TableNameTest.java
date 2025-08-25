@@ -101,37 +101,7 @@ public class TableNameTest extends BaseIntegrationTest {
         producer.flush();
     }
 
-    private void verifyRecords(String tableName, List<SimpleRecord> expectedRecords) throws SQLException {
-        // Count total records
-        int actualCount = fireboltDefaultDbClient.countRows(tableName);
-        assertEquals(expectedRecords.size(), actualCount,
-                "Expected " + expectedRecords.size() + " records but found " + actualCount);
-
-        // Verify specific records by recordId
-        String selectQuery = String.format(
-                "SELECT \"id\", \"value\" " +
-                        "FROM \"%s\" ORDER BY \"id\"", tableName);
-
-        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
-            int recordIndex = 0;
-
-            while (rs.next()) {
-                assertTrue(recordIndex < expectedRecords.size(),
-                        "More records found in database than expected");
-
-                SimpleRecord expected = expectedRecords.get(recordIndex);
-
-                // Verify each field
-                assertEquals(expected.getId(), rs.getInt("id"));
-                assertEquals(expected.getValue(), rs.getString("value"));
-
-                recordIndex++;
-            }
-
-            assertEquals(expectedRecords.size(), recordIndex,
-                    "Expected to verify " + expectedRecords.size() + " records, but only found " + recordIndex);
-        }
-    }
+    // Use BaseIntegrationTest.verifyRecords(String, List<SimpleRecord>)
 
     private SimpleRecord aValidTestRecord(int recordId) {
         return SimpleRecord.builder()
