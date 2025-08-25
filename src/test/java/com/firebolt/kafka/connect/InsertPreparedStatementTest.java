@@ -14,9 +14,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,6 +63,70 @@ public class InsertPreparedStatementTest {
         when(mockTableSchema.getColumns()).thenReturn(List.of(mockColumn1, mockColumn2));
 
         insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema);
+    }
+
+    @Test
+    void shouldSplitBatchOnHttp413AndInsertHalves() throws Exception {
+        // 4 records so we expect first executeBatch to fail with 413, then two successful halves
+        List<FireboltRecord> records = new ArrayList<>();
+        records.add(buildRecord(TABLE_NAME, 0, 1L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
+        )));
+        records.add(buildRecord(TABLE_NAME, 0, 2L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(2L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("b").schemaType(Schema.Type.STRING).build()
+        )));
+        records.add(buildRecord(TABLE_NAME, 0, 3L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(3L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("c").schemaType(Schema.Type.STRING).build()
+        )));
+        records.add(buildRecord(TABLE_NAME, 0, 4L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(4L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("d").schemaType(Schema.Type.STRING).build()
+        )));
+
+        // Prepare three statements: first fails with 413, next two succeed
+        PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
+        PreparedStatement psLeft = Mockito.mock(PreparedStatement.class);
+        PreparedStatement psRight = Mockito.mock(PreparedStatement.class);
+
+        // FireboltException simulating HTTP 413 (payload too large)
+        com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
+        when(http413.getErrorMessageFromServer()).thenReturn("Request body is larger than configured limit of 40MB");
+
+        when(psFail.executeBatch()).thenThrow(http413);
+        when(psLeft.executeBatch()).thenReturn(new int[] {1, 1});
+        when(psRight.executeBatch()).thenReturn(new int[] {1, 1});
+
+        // Return statements in sequence for three createPreparedStatement() calls
+        when(mockConnection.prepareStatement(anyString())).thenReturn(psFail, psLeft, psRight);
+
+        assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
+
+        // Verify executeBatch called once on each PS (1 fail + 2 successes)
+        verify(psFail, times(1)).executeBatch();
+        verify(psLeft, times(1)).executeBatch();
+        verify(psRight, times(1)).executeBatch();
+    }
+
+    @Test
+    void shouldNotThrowWhenSingleRecordTooLargeHttp413() throws Exception {
+        List<FireboltRecord> records = new ArrayList<>();
+        records.add(buildRecord(TABLE_NAME, 0, 99L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(123L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("big").schemaType(Schema.Type.STRING).build()
+        )));
+
+        PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
+        com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
+        when(http413.getErrorMessageFromServer()).thenReturn("Request body is larger than configured limit of 40MB");
+        when(psFail.executeBatch()).thenThrow(http413);
+        when(mockConnection.prepareStatement(anyString())).thenReturn(psFail);
+
+        assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
+
+        verify(psFail, times(1)).executeBatch();
     }
 
     @Test

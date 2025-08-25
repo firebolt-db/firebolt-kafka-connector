@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.jdbc.exception.FireboltException;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
 import java.sql.Connection;
@@ -36,6 +37,11 @@ public class InsertPreparedStatement {
         // map of firebolt column names to record attribute name
         Map<String, String> validColumnNames = filterValidColumns(columnNamesFromRecords, tableSchema);
 
+        // create the prepared statement and add the records
+        addRecordsInternal(fireboltRecords, validColumnNames);
+    }
+
+    private void addRecordsInternal(List<FireboltRecord> fireboltRecords, Map<String, String> validColumnNames) throws SQLException {
         try (PreparedStatement preparedStatement = createPreparedStatement(tableSchema, validColumnNames.keySet())) {
 
             // Execute batch insert
@@ -44,14 +50,45 @@ public class InsertPreparedStatement {
                 preparedStatement.addBatch();
             }
 
-            int[] results = preparedStatement.executeBatch();
-            log.debug("Batch insert results: {} rows affected", results.length);
+            try {
+                int[] results = preparedStatement.executeBatch();
+                log.info("Batch insert results: {} rows affected", results.length);
+            } catch (SQLException e) {
+                if (!isHttpEntityTooLargeException(e)) {
+                    throw e; // rethrow it as we only handle the entity too large here
+                }
 
-            // Clear batch
-            preparedStatement.clearBatch();
-            // once clear batch on firebolt prepared statements are implemented properly then we can remove this and only keep clearBatch()
-            preparedStatement.clearParameters();
+                // split the records in half and try to process the records
+                if (fireboltRecords.size() == 1) {
+                    FireboltRecord fireboltRecord = fireboltRecords.get(0);
+                    log.warn("Cannot process the firebolt record from partition {} at offset {}, as it is too large and exceeds the Firebolt request entity size", fireboltRecord.getPartition(), fireboltRecord.getOffset());
+
+                    // TODO should add this to the dead letter queue
+                } else {
+                    // simple strategy for now. Split the rows in two and try each half again
+                    int leftSide = fireboltRecords.size() / 2;
+                    log.warn("Batch size was too big so will split the records in smaller batches {} & {}", leftSide, fireboltRecords.size()-leftSide);
+                    addRecordsInternal(fireboltRecords.subList(0,leftSide), validColumnNames);
+                    addRecordsInternal(fireboltRecords.subList(leftSide,fireboltRecords.size()), validColumnNames);
+                }
+            } finally {
+                // Clear batch
+                preparedStatement.clearBatch();
+                // once clear batch on firebolt prepared statements are implemented properly then we can remove this and only keep clearBatch()
+                preparedStatement.clearParameters();
+            }
+
         }
+    }
+
+    /**
+     * For the HTTP Entity too large exception we have an exception type of 413.
+     * @param e
+     * @return
+     */
+    private boolean isHttpEntityTooLargeException(SQLException e) {
+        // TODO: once the latest driver is released use the exception type
+        return (e instanceof FireboltException) && (((FireboltException) e).getErrorMessageFromServer().startsWith("Request body is larger than configured limit of"));
     }
 
     private PreparedStatement createPreparedStatement(TableSchema tableSchema, Set<String> validColumnNames) throws SQLException {

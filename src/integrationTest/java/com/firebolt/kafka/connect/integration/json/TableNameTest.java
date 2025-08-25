@@ -6,13 +6,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -82,32 +80,6 @@ public class TableNameTest extends BaseIntegrationTest {
                 aValidTestRecord(2),
                 aValidTestRecord(3)
         );
-    }
-
-    private Supplier<String> simpleRecordTableSchema() {
-        return () -> "CREATE TABLE \"%s\" (" +
-                "\"id\" INTEGER NOT NULL, " +
-                "\"value\" TEXT NOT NULL " +
-                ")";
-    }
-
-    private Supplier<String> jsonSimpleRecordSchema() {
-        return () -> "{\n" +
-                "  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n" +
-                "  \"title\": \"Column Name Casing Test Record\",\n" +
-                "  \"type\": \"object\",\n" +
-                "  \"additionalProperties\": false,\n" +
-                "  \"properties\": {\n" +
-                "    \"id\": {\n" +
-                "      \"type\": \"integer\",\n" +
-                "      \"description\": \"Record identification number\"\n" +
-                "    },\n" +
-                "    \"value\": {\n" +
-                "      \"type\": \"string\"\n" +
-                "    }" +
-                "  },\n" +
-                "  \"required\": [\"ID\", \"Text\", \"localdate\", \"bigInt\"]\n" +
-                "}";
     }
 
     private void publishMessages(String topicName, List<SimpleRecord> records) throws Exception {

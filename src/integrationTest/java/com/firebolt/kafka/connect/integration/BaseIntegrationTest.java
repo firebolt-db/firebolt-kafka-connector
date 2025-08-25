@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -18,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -121,7 +123,8 @@ public abstract class BaseIntegrationTest {
         adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 60000);
         
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
-            NewTopic newTopic = new NewTopic(topicName, options.getPartitions(), options.getReplicationFactor());
+            NewTopic newTopic = new NewTopic(topicName, options.getPartitions(), options.getReplicationFactor())
+                    .configs(Map.of("max.message.bytes", String.valueOf(50 * 1024 * 1024))); // allow 50 MB messages
             CreateTopicsResult result = adminClient.createTopics(java.util.Collections.singletonList(newTopic));
             
             // Wait for the topic creation to complete
@@ -193,7 +196,10 @@ public abstract class BaseIntegrationTest {
             log.debug("Table {} did not exist or couldn't be dropped: {}", tableName, e.getMessage());
         }
     }
-    
+
+    protected void registerJsonConnector(String connectorName, String topics, String topicToTableMappings) throws Exception {
+        registerJsonConnector(connectorName, topics, topicToTableMappings, Collections.emptyMap());
+    }
     /**
      * Registers a Kafka Connect connector for JSON Schema processing with Firebolt.
      * This method creates a standard JSON Schema connector configuration suitable for most tests.
@@ -203,7 +209,7 @@ public abstract class BaseIntegrationTest {
      * @param topicToTableMappings the topic-to-table mappings (e.g., "topic1:table1,topic2:table2")
      * @throws Exception if connector registration fails
      */
-    protected void registerJsonConnector(String connectorName, String topics, String topicToTableMappings) throws Exception {
+    protected void registerJsonConnector(String connectorName, String topics, String topicToTableMappings, Map<String, String> connectorDefinitionOverride) throws Exception {
         Map<String, Object> connectorConfig = new HashMap<>();
         
         // Kafka Connect core properties
@@ -237,7 +243,13 @@ public abstract class BaseIntegrationTest {
         if (clientSecret != null) {
             connectorConfig.put("firebolt.clientSecret", "${file:/etc/kafka-connect/secrets/secrets.properties:clientSecret}");
         }
-        
+
+        // before creating the configuration apply definition override
+        if (connectorDefinitionOverride != null && !connectorDefinitionOverride.isEmpty()) {
+            log.info("Applying the connector definition override");
+            connectorConfig.putAll(connectorDefinitionOverride);
+        }
+
         // Create the connector
         createConnector(connectorName, connectorConfig);
         waitForConnectorRunning(connectorName);
@@ -273,13 +285,17 @@ public abstract class BaseIntegrationTest {
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        
+
+        // configuration for large messages
+        props.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, 48000000);
+        props.put("buffer.memory", "48000000");
+
         // Schema Registry configuration
         props.put("schema.registry.url", SCHEMA_REGISTRY_URL);
         props.put("auto.register.schemas", "false");
         props.put("use.latest.version", "true");
         props.put("latest.compatibility.strict", "false");
-        
+
         // Configure null handling behavior
         props.put("json.oneof.for.nullables", includeNulls);
         
@@ -429,10 +445,14 @@ public abstract class BaseIntegrationTest {
     }
     
     protected void waitForDataInFirebolt(String tableName, int expectedRowCount) throws SQLException {
-        log.info("Waiting for {} rows in Firebolt table '{}'...", expectedRowCount, tableName);
-        
+        waitForDataInFirebolt(tableName, expectedRowCount, DEFAULT_TIMEOUT);
+    }
+
+    protected void waitForDataInFirebolt(String tableName, int expectedRowCount, Duration maxWaitDuration) throws SQLException {
+        log.info("Waiting for {} rows in Firebolt table '{}'... Will wait for :{}", expectedRowCount, tableName, maxWaitDuration);
+
         await()
-            .atMost(DEFAULT_TIMEOUT)
+            .atMost(maxWaitDuration)
             .pollInterval(Duration.ofSeconds(5))
             .until(() -> {
                 try {
@@ -444,10 +464,10 @@ public abstract class BaseIntegrationTest {
                     return false;
                 }
             });
-        
+
         log.info("Found expected data in Firebolt table '{}'", tableName);
     }
-    
+
     /**
      * Generates a unique connector name for test runs.
      * @param connectorType The type/name of the connector (e.g., "integer-serializer-test")
@@ -496,17 +516,37 @@ public abstract class BaseIntegrationTest {
             String schemaSubject,
             java.util.function.Supplier<String> tableSchemaSupplier,
             java.util.function.Supplier<String> jsonSchemaSupplier) {
-        
+       setupTestResources(topicName, tableName, schemaSubject, tableSchemaSupplier, jsonSchemaSupplier, Collections.emptyMap());
+    }
+
+    /**
+     * Centralized setup method for test resources.
+     * This method handles setup of Firebolt table, Kafka topic, schema registry, and Kafka Connect connector.
+     *
+     * @param topicName The name of the Kafka topic to create
+     * @param tableName The name of the Firebolt table to create
+     * @param schemaSubject The name of the schema registry subject to register
+     * @param tableSchemaSupplier Supplier that provides the Firebolt table schema definition
+     * @param jsonSchemaSupplier Supplier that provides the JSON schema definition for schema registry
+     */
+    protected void setupTestResources(
+            String topicName,
+            String tableName,
+            String schemaSubject,
+            java.util.function.Supplier<String> tableSchemaSupplier,
+            java.util.function.Supplier<String> jsonSchemaSupplier,
+            Map<String, String> connectorDefinitionOverride) {
+
         try {
             // Clean up any existing resources from previous test runs
             cleanupTestResources(tableName, topicName, schemaSubject);
-            
+
             // Create the test table with the provided schema
             log.info("Creating Firebolt test table: {}", tableName);
             String createTableSql = String.format(tableSchemaSupplier.get(), tableName);
             fireboltDefaultDbClient.executeUpdate(createTableSql);
             log.info("Created Firebolt test table with schema");
-            
+
             // Create Kafka topic
             log.info("Creating Kafka topic: {}", topicName);
             createKafkaTopic(topicName);
@@ -516,11 +556,11 @@ public abstract class BaseIntegrationTest {
             String jsonSchema = jsonSchemaSupplier.get();
             int schemaId = getSchemaRegistryClient().registerSchema(schemaSubject, jsonSchema, "JSON");
             log.info("Successfully registered JSON schema with ID: {}", schemaId);
-            
+
             // Register the Kafka Connect connector
             log.info("Registering Kafka Connect connector: {}", testConnectorName);
-            registerJsonConnector(testConnectorName, topicName, topicName + ":" + tableName);
-            
+            registerJsonConnector(testConnectorName, topicName, topicName + ":" + tableName, connectorDefinitionOverride);
+
         } catch (Exception e) {
             log.error("Failed to set up test resources: {}", e.getMessage());
             throw new RuntimeException("Test resources setup failed", e);
@@ -581,4 +621,29 @@ public abstract class BaseIntegrationTest {
 
     }
 
+    protected Supplier<String> simpleRecordTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"value\" TEXT NOT NULL " +
+                ")";
+    }
+
+    protected Supplier<String> jsonSimpleRecordSchema() {
+        return () -> "{\n" +
+                "  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n" +
+                "  \"title\": \"Column Name Casing Test Record\",\n" +
+                "  \"type\": \"object\",\n" +
+                "  \"additionalProperties\": false,\n" +
+                "  \"properties\": {\n" +
+                "    \"id\": {\n" +
+                "      \"type\": \"integer\",\n" +
+                "      \"description\": \"Record identification number\"\n" +
+                "    },\n" +
+                "    \"value\": {\n" +
+                "      \"type\": \"string\"\n" +
+                "    }" +
+                "  },\n" +
+                "  \"required\": [\"ID\", \"Text\", \"localdate\", \"bigInt\"]\n" +
+                "}";
+    }
 }
