@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
@@ -83,12 +84,9 @@ public class InsertPreparedStatement {
 
     /**
      * For the HTTP Entity too large exception we have an exception type of 413.
-     * @param e
-     * @return
      */
     private boolean isHttpEntityTooLargeException(SQLException e) {
-        // TODO: once the latest driver is released use the exception type
-        return (e instanceof FireboltException) && (((FireboltException) e).getErrorMessageFromServer().startsWith("Request body is larger than configured limit of"));
+        return (e instanceof FireboltException) && ((FireboltException) e).getType() == ExceptionType.REQUEST_BODY_TOO_LARGE;
     }
 
     private PreparedStatement createPreparedStatement(TableSchema tableSchema, Set<String> validColumnNames) throws SQLException {
