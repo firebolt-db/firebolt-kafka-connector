@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.jdbc.exception.ExceptionType;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -93,7 +94,7 @@ public class InsertPreparedStatementTest {
 
         // FireboltException simulating HTTP 413 (payload too large)
         com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
-        when(http413.getErrorMessageFromServer()).thenReturn("Request body is larger than configured limit of 40MB");
+        when(http413.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
 
         when(psFail.executeBatch()).thenThrow(http413);
         when(psLeft.executeBatch()).thenReturn(new int[] {1, 1});
@@ -120,7 +121,7 @@ public class InsertPreparedStatementTest {
 
         PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
         com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
-        when(http413.getErrorMessageFromServer()).thenReturn("Request body is larger than configured limit of 40MB");
+        when(http413.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
         when(psFail.executeBatch()).thenThrow(http413);
         when(mockConnection.prepareStatement(anyString())).thenReturn(psFail);
 
