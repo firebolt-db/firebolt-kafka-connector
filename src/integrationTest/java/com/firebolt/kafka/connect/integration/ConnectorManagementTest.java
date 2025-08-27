@@ -88,13 +88,6 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
 
     @Test
     void canPauseChangeDefinitionAndResumeConnectorWithNewDefinition() throws Exception {
-        // Generate unique connector name for this test run
-        generateUniqueConnectorName("change-topic-to-new-one-test");
-
-        // Setup test resources using centralized method
-        setupTestResources(topic1Name, table1Name, schema1Subject,
-                simpleRecordTableSchema(), jsonSimpleRecordSchema());
-
         List<SimpleRecord> topic1TestRecords = List.of(
                 aValidTestRecord(1, "one"),
                 aValidTestRecord(2, "two"),
