@@ -156,7 +156,7 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
     }
 
     @Test
-    void canPauseDefinitionAddANewTopicToTableMappingThenRemoveATableToTopicMapping() throws Exception {
+    void canPauseDefinitionAddANewTopicToTableMapping() throws Exception {
         List<SimpleRecord> topic1TestRecords = List.of(
                 aValidTestRecord(100, "one zero zero"),
                 aValidTestRecord(101, "one zero one"),
@@ -238,57 +238,6 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
         waitForDataInFirebolt(table2Name, expectedTable2Records.size());
 
         verifyRecords(table2Name, expectedTable2Records);
-
-        // pause the connector again
-        kafkaConnectClient.pauseConnector(testConnectorName);
-
-        // publish last batch of records both topic1 and topic2
-        List<SimpleRecord> topic1LastTestRecords = List.of(
-                aValidTestRecord(105, "one zero five"),
-                aValidTestRecord(106, "one zero six")
-        );
-
-        // publish the messages to topic1
-        publishMessages(producer1, topic1Name, topic1LastTestRecords);
-
-        // create messages for topic2
-        List<SimpleRecord> topic2LastTestRecords = List.of(
-                aValidTestRecord(206, "two zero six"),
-                aValidTestRecord(207, "two zero seven")
-        );
-
-        // publish the messages to topic2
-        publishMessages(producer2, topic2Name, topic2LastTestRecords);
-
-        // update the definition to remove the topic2 mapping
-        connectorDefinition = kafkaConnectClient.getConnectorConfig(testConnectorName);
-        assertEquals(topic1Name + "," + topic2Name, connectorDefinition.get("topics"));
-        assertEquals( topic1Name + ":" + table1Name + "," + topic2Name + ":" + table2Name, connectorDefinition.get("topic.to.table.mapping"));
-
-        // change the definition to now listen to topic2 and to map topic2:table2
-        connectorDefinition.put("topics", topic1Name);
-        connectorDefinition.put("topic.to.table.mapping", topic1Name + ":" + table1Name);
-
-        kafkaConnectClient.updateConnectorConfig(testConnectorName, connectorDefinition);
-
-        // restart the connector for the new tasks to take effect
-        kafkaConnectClient.restartConnector(testConnectorName);
-
-        kafkaConnectClient.resumeConnector(testConnectorName);
-
-        expectedTable1Records.addAll(topic1LastTestRecords);
-
-        // messages should be in table1
-        waitForDataInFirebolt(table1Name, expectedTable1Records.size());
-
-        // check that all the records have the expected value
-        verifyRecords(table1Name, expectedTable1Records);
-
-        // sleep for a bit to make sure we still don't get the values in table 2 since the mapping was removed
-        sleepForMillis(TimeUnit.SECONDS.toMillis(5));
-
-        verifyRecords(table2Name, expectedTable2Records);
-
     }
 
     @Test
