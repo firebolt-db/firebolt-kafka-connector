@@ -34,6 +34,7 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -57,7 +58,7 @@ public abstract class BaseIntegrationTest {
     protected static final String KAFKA_CONNECT_HOST = System.getenv().getOrDefault("KAFKA_CONNECT_URL", "http://localhost:8083");
     protected static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
     protected static final String SCHEMA_REGISTRY_URL = System.getenv().getOrDefault("SCHEMA_REGISTRY_URL", "http://localhost:8081");
-    protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
+    protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(20);
 
     protected static final String DEFAULT_DATABASE_NAME = "integration_test_db";
 
@@ -138,6 +139,8 @@ public abstract class BaseIntegrationTest {
             result.all().get(60, TimeUnit.SECONDS);
             
             log.info("Successfully created Kafka topic: {}", topicName);
+            // Ensure topic is fully discoverable/ready across the cluster
+            waitForTopicReady(topicName, Duration.ofSeconds(60));
             
         } catch (ExecutionException e) {
             if (e.getCause() instanceof TopicExistsException) {
@@ -161,6 +164,42 @@ public abstract class BaseIntegrationTest {
      */
     protected void createKafkaTopic(String topicName) {
         createKafkaTopic(topicName, TopicOptions.defaults());
+    }
+
+    protected void waitForTopicReady(String topicName, Duration timeout) {
+        log.info("Waiting for topic '{}' to be ready...", topicName);
+
+        Properties adminProps = new Properties();
+        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
+        adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
+        adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 60000);
+
+        try (AdminClient adminClient = AdminClient.create(adminProps)) {
+            await()
+                .atMost(timeout)
+                .pollInterval(Duration.ofSeconds(2))
+                .until(() -> {
+                    try {
+                        TopicDescription desc = adminClient
+                                .describeTopics(java.util.Collections.singletonList(topicName))
+                                .values()
+                                .get(topicName)
+                                .get(10, TimeUnit.SECONDS);
+                        boolean ready = desc != null &&
+                                desc.partitions() != null &&
+                                !desc.partitions().isEmpty() &&
+                                desc.partitions().stream().allMatch(p -> p.leader() != null);
+                        if (!ready) {
+                            log.debug("Topic '{}' not ready yet. Description: {}", topicName, desc);
+                        }
+                        return ready;
+                    } catch (Exception e) {
+                        log.debug("Topic '{}' not ready yet: {}", topicName, e.getMessage());
+                        return false;
+                    }
+                });
+            log.info("Topic '{}' is ready", topicName);
+        }
     }
     
     /**

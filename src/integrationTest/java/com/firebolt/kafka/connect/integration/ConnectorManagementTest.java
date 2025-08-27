@@ -136,6 +136,7 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
         kafkaConnectClient.updateConnectorConfig(testConnectorName, connectorDefinition);
 
         kafkaConnectClient.resumeConnector(testConnectorName);
+        kafkaConnectClient.waitForConnectorRunning(testConnectorName, Duration.ofSeconds(30));
 
         // publish one more message to topic1
         List<SimpleRecord> topic1NewRecords = List.of(
@@ -241,7 +242,7 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
     }
 
     @Test
-    void restartingTheConnectorAppliesTheNewDefinition() throws Exception {
+    void restartingTheConnectorKeepsTheNewDefinition() throws Exception {
         // create
         Map<String, Object> connectorDefinition = kafkaConnectClient.getConnectorConfig(testConnectorName);
         assertEquals(topic1Name, connectorDefinition.get("topics"));
@@ -251,9 +252,9 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
         connectorDefinition.put("topics", topic1Name + "," + topic2Name);
         connectorDefinition.put("topic.to.table.mapping", topic1Name + ":" + table1Name + "," + topic2Name + ":" + table2Name);
         kafkaConnectClient.updateConnectorConfig(testConnectorName, connectorDefinition);
+        kafkaConnectClient.waitForConnectorRunning(testConnectorName, Duration.ofSeconds(30));
 
         kafkaConnectClient.restartConnector(testConnectorName);
-
         kafkaConnectClient.waitForConnectorRunning(testConnectorName, Duration.ofSeconds(30));
 
         List<SimpleRecord> topic1TestRecords = List.of(
@@ -293,9 +294,11 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
         connectorDefinition.put("topics", topic1Name);
         connectorDefinition.put("topic.to.table.mapping", topic1Name + ":" + table1Name);
         kafkaConnectClient.updateConnectorConfig(testConnectorName, connectorDefinition);
+        kafkaConnectClient.waitForConnectorRunning(testConnectorName, Duration.ofSeconds(30));
 
         // restart the connector
         kafkaConnectClient.restartConnector(testConnectorName);
+        kafkaConnectClient.waitForConnectorRunning(testConnectorName, Duration.ofSeconds(30));
 
         List<SimpleRecord> topic1NewRecords = List.of(
                 aValidTestRecord(303, "three zero three")
@@ -417,6 +420,9 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
     }
 
     private void publishMessages(Producer<String, SimpleRecord> producer, String topicName, List<SimpleRecord> records) throws Exception {
+        // Ensure the topic is fully ready before producing to avoid metadata timeouts
+        waitForTopicReady(topicName, Duration.ofSeconds(60));
+
         for (SimpleRecord record : records) {
             String key = "large-message-test-key-" + record.getId();
             ProducerRecord<String, SimpleRecord> producerRecord =
