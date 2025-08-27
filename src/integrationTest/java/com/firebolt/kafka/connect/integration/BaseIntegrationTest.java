@@ -2,17 +2,21 @@ package com.firebolt.kafka.connect.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.clients.FireboltClient;
+import com.firebolt.kafka.connect.clients.KafkaConnectClient;
 import com.firebolt.kafka.connect.clients.SchemaRegistryClient;
+import com.firebolt.kafka.connect.integration.json.datatype.SimpleRecord;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import com.firebolt.kafka.connect.utils.ServiceHealthExtension;
 import com.firebolt.kafka.connect.utils.TestSetupExtension;
 import com.firebolt.kafka.connect.utils.TopicOptions;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -30,6 +34,7 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -43,6 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith({ServiceHealthExtension.class, TestSetupExtension.class})
 public abstract class BaseIntegrationTest {
@@ -69,6 +75,7 @@ public abstract class BaseIntegrationTest {
 
     protected FireboltClient fireboltDefaultDbClient;
     protected SchemaRegistryClient schemaRegistryClient;
+    protected KafkaConnectClient kafkaConnectClient;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -78,6 +85,7 @@ public abstract class BaseIntegrationTest {
         try {
             this.fireboltDefaultDbClient = FireboltClient.createFor(getDatabaseName());
             this.schemaRegistryClient = new SchemaRegistryClient(SCHEMA_REGISTRY_URL, httpClient, objectMapper);
+            this.kafkaConnectClient = new KafkaConnectClient(KAFKA_CONNECT_HOST, httpClient, objectMapper);
         } catch (SQLException e) {
             log.error("Failed to create FireboltClient: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to initialize Firebolt connection", e);
@@ -131,6 +139,8 @@ public abstract class BaseIntegrationTest {
             result.all().get(60, TimeUnit.SECONDS);
             
             log.info("Successfully created Kafka topic: {}", topicName);
+            // Ensure topic is fully discoverable/ready across the cluster
+            waitForTopicReady(topicName, Duration.ofSeconds(60));
             
         } catch (ExecutionException e) {
             if (e.getCause() instanceof TopicExistsException) {
@@ -154,6 +164,42 @@ public abstract class BaseIntegrationTest {
      */
     protected void createKafkaTopic(String topicName) {
         createKafkaTopic(topicName, TopicOptions.defaults());
+    }
+
+    protected void waitForTopicReady(String topicName, Duration timeout) {
+        log.info("Waiting for topic '{}' to be ready...", topicName);
+
+        Properties adminProps = new Properties();
+        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
+        adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
+        adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 60000);
+
+        try (AdminClient adminClient = AdminClient.create(adminProps)) {
+            await()
+                .atMost(timeout)
+                .pollInterval(Duration.ofSeconds(2))
+                .until(() -> {
+                    try {
+                        TopicDescription desc = adminClient
+                                .describeTopics(java.util.Collections.singletonList(topicName))
+                                .values()
+                                .get(topicName)
+                                .get(10, TimeUnit.SECONDS);
+                        boolean ready = desc != null &&
+                                desc.partitions() != null &&
+                                !desc.partitions().isEmpty() &&
+                                desc.partitions().stream().allMatch(p -> p.leader() != null);
+                        if (!ready) {
+                            log.debug("Topic '{}' not ready yet. Description: {}", topicName, desc);
+                        }
+                        return ready;
+                    } catch (Exception e) {
+                        log.debug("Topic '{}' not ready yet: {}", topicName, e.getMessage());
+                        return false;
+                    }
+                });
+            log.info("Topic '{}' is ready", topicName);
+        }
     }
     
     /**
@@ -252,7 +298,7 @@ public abstract class BaseIntegrationTest {
 
         // Create the connector
         createConnector(connectorName, connectorConfig);
-        waitForConnectorRunning(connectorName);
+        kafkaConnectClient.waitForConnectorRunning(connectorName, DEFAULT_TIMEOUT);
         
         log.info("✅ Connector '{}' registered and running with topic-to-table mapping: {}", 
                 connectorName, topicToTableMappings);
@@ -410,39 +456,7 @@ public abstract class BaseIntegrationTest {
         }
     }
     
-    protected void waitForConnectorRunning(String connectorName) {
-        log.info("Waiting for connector '{}' to be running...", connectorName);
-        
-        await()
-            .atMost(DEFAULT_TIMEOUT)
-            .pollInterval(Duration.ofSeconds(5))
-            .until(() -> {
-                try {
-                    Request request = new Request.Builder()
-                            .url(KAFKA_CONNECT_HOST + "/connectors/" + connectorName + "/status")
-                            .get()
-                            .build();
-                    
-                    try (Response response = httpClient.newCall(request).execute()) {
-                        if (response.isSuccessful()) {
-                            String responseBody = response.body().string();
-                            Map<String, Object> status = objectMapper.readValue(responseBody, Map.class);
-                            Map<String, Object> connector = (Map<String, Object>) status.get("connector");
-                            String state = (String) connector.get("state");
-                            
-                            log.debug("Connector '{}' state: {}", connectorName, state);
-                            return "RUNNING".equals(state);
-                        }
-                        return false;
-                    }
-                } catch (Exception e) {
-                    log.debug("Error checking connector status: {}", e.getMessage());
-                    return false;
-                }
-            });
-        
-        log.info("Connector '{}' is running!", connectorName);
-    }
+    
     
     protected void waitForDataInFirebolt(String tableName, int expectedRowCount) throws SQLException {
         waitForDataInFirebolt(tableName, expectedRowCount, DEFAULT_TIMEOUT);
@@ -645,5 +659,45 @@ public abstract class BaseIntegrationTest {
                 "  },\n" +
                 "  \"required\": [\"ID\", \"Text\", \"localdate\", \"bigInt\"]\n" +
                 "}";
+    }
+
+    protected void verifyRecords(String tableName, List<SimpleRecord> expectedRecords) throws SQLException {
+        // Count total records
+        int actualCount = fireboltDefaultDbClient.countRows(tableName);
+        assertEquals(expectedRecords.size(), actualCount,
+                "Expected " + expectedRecords.size() + " records but found " + actualCount);
+
+        // Verify specific records by recordId
+        String selectQuery = String.format(
+                "SELECT \"id\", \"value\" " +
+                        "FROM \"%s\" ORDER BY \"id\"", tableName);
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
+            int recordIndex = 0;
+
+            while (rs.next()) {
+                assertTrue(recordIndex < expectedRecords.size(),
+                        "More records found in database than expected");
+
+                SimpleRecord expected = expectedRecords.get(recordIndex);
+
+                // Verify each field
+                assertEquals(expected.getId(), rs.getInt("id"));
+                assertEquals(expected.getValue(), rs.getString("value"));
+
+                recordIndex++;
+            }
+
+            assertEquals(expectedRecords.size(), recordIndex,
+                    "Expected to verify " + expectedRecords.size() + " records, but only found " + recordIndex);
+        }
+    }
+
+    protected void sleepForMillis(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            // do nothing
+        }
     }
 }
