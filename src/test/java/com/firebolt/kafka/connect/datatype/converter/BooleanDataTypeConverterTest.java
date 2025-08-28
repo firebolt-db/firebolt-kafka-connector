@@ -62,4 +62,27 @@ public class BooleanDataTypeConverterTest {
 
         assertEquals("Database error", exception.getMessage());
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "true",
+            "false",
+            "TRUE",
+            "FALSE",
+            "t",
+            "f",
+            "T",
+            "F",
+            "1",
+            "0"
+    })
+    void testConvertAndSetWithValidBooleanStrings(String stringValue) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(stringValue)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setString(1, stringValue);
+    }
 }

@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect.integration.json;
 
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.BooleanTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,7 +15,6 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -79,81 +77,98 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
 
     /**
      * Creates test records covering all scenarios.
+     *
+     * NOTE: for booleanFromString value, we will set the odd ones as true, and even ones as false as it would make it easier for verification
      */
     private List<BooleanTestRecord> createTestRecords() {
         return Arrays.asList(
             // Complete record with typical values
             aValidTestRecord(1)
+                .booleanFromString("true")
                 .build(),
 
             // Record with false value
             aValidTestRecord(2)
                 .requiredBoolean(false)
+                .booleanFromString("false")
                 .build(),
 
             // Record with true value
             aValidTestRecord(3)
                 .requiredBoolean(true)
+                .booleanFromString("TRUE")
                 .build(),
 
             // Record with null boolean
             aValidTestRecord(4)
                 .optionalBoolean(null)
+                .booleanFromString("FALSE")
                 .build(),
 
             // required list with nullable (empty list)
             aValidTestRecord(5)
                 .requiredListWithNullableElements(new ArrayList<>())
+                .booleanFromString("True")
                 .build(),
 
             // required list but with null values
             aValidTestRecord(6)
                 .requiredListWithNullableElements(Arrays.asList(true, null, false))
+                .booleanFromString("False")
                 .build(),
 
             // required list with mixed true/false and null values
             aValidTestRecord(7)
                 .requiredListWithNullableElements(Arrays.asList(null, null, true, false))
+                .booleanFromString("t")
                 .build(),
 
             // required list with non-null values, but empty list
             aValidTestRecord(8)
                 .requiredListWithNonNullElements(new ArrayList<>())
+                .booleanFromString("f")
                 .build(),
 
             // required list with non-null values - all true
             aValidTestRecord(9)
                 .requiredListWithNonNullElements(Arrays.asList(true, true, true, true))
+                .booleanFromString("T")
                 .build(),
 
             // Record with empty but valid optional list
             aValidTestRecord(10)
                 .optionalList(new ArrayList<>())
+                .booleanFromString("F")
                 .build(),
 
             // Record with null optional list
             aValidTestRecord(11)
                 .optionalList(null)
+                .booleanFromString("1")
                 .build(),
 
             // Record with valid optional list (includes nulls)
             aValidTestRecord(12)
                 .optionalList(Arrays.asList(false, true, null))
+                .booleanFromString("0")
                 .build(),
 
             // Record with valid optional list with null values, but empty array
             aValidTestRecord(13)
                 .optionalListWithNonNullElements(new ArrayList<>())
+                .booleanFromString("true")
                 .build(),
 
             // Record with valid optional list with null values, but null
             aValidTestRecord(14)
                 .optionalListWithNonNullElements(null)
+                .booleanFromString("false")
                 .build(),
 
             // Record with valid optional list without null values - all false
             aValidTestRecord(15)
                 .optionalListWithNonNullElements(Arrays.asList(false, false, false))
+                .booleanFromString("true")
                 .build(),
 
             // Record with large lists (5000 elements each)
@@ -164,6 +179,7 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
                 .requiredListWithNonNullElements(createLargeListWithoutNulls(5000))
                 .optionalList(createOptionalLargeList(5000))
                 .optionalListWithNonNullElements(createOptionalLargeList(3000))  // Different size for variety
+                .booleanFromString("false")
                 .build()
         );
     }
@@ -176,7 +192,8 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
                 "\"requiredListWithNullableElements\" ARRAY(BOOLEAN NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BOOLEAN NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NULL, " +
+                "\"booleanFromString\" BOOLEAN NOT NULL" +
                 ")";
     }
     
@@ -241,9 +258,13 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
+                "    },\n" +
+                "    \"booleanFromString\": {\n" +
+                "      \"type\": \"string\",\n" +
+                "      \"description\": \"Boolean value represented as string (\\\"true\\\"/\\\"false\\\")\"\n" +
                 "    }\n" +
                 "  },\n" +
-                "  \"required\": [\"recordId\", \"requiredBoolean\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]\n" +
+                "  \"required\": [\"recordId\", \"requiredBoolean\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"booleanFromString\"]\n" +
                 "}";
     }
     
@@ -278,12 +299,11 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
         assertEquals(expectedRecords.size(), actualCount, 
             "Expected " + expectedRecords.size() + " records but found " + actualCount);
 
-        
         // Verify specific records by recordId
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredBoolean\", \"optionalBoolean\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\" " +
+            "\"optionalListWithNonNullElements\", \"booleanFromString\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -299,6 +319,7 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
                 Integer actualRecordId = rs.getInt("recordId");
                 Boolean actualRequiredBoolean = rs.getBoolean("requiredBoolean");
                 Boolean actualOptionalBoolean = rs.getObject("optionalBoolean") != null ? rs.getBoolean("optionalBoolean") : null;
+                Boolean actualBooleanFromString = rs.getBoolean("booleanFromString");
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -335,6 +356,11 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
                 // Optional list with non-null elements verification
                 verifyBooleanArray("optionalListWithNonNullElements", 
                     expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
+
+                // Verify booleanFromString column matches parsed value of string
+                boolean expectedBooleanFromString = actualRecordId % 2 == 0 ? false : true;
+                assertEquals(expectedBooleanFromString, actualBooleanFromString,
+                    "booleanFromString mismatch at index " + recordIndex);
                 
                 recordIndex++;
             }
