@@ -4,6 +4,8 @@ import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -47,8 +49,13 @@ public class InsertPreparedStatement {
 
             // Execute batch insert
             for (FireboltRecord record : fireboltRecords) {
-                setStatementParameters(preparedStatement, record, tableSchema, validColumnNames);
-                preparedStatement.addBatch();
+                try {
+                    setStatementParameters(preparedStatement, record, tableSchema, validColumnNames);
+                    preparedStatement.addBatch();
+                } catch (RecordConversionFailedException e) {
+                    // send the record to the dead letter queue
+                    log.warn("Record from partition {} at offset {} will be submitted to the deadletter queue ", e.getKafkaPartition(), e.getKafkaOffset());
+                }
             }
 
             try {
@@ -120,7 +127,7 @@ public class InsertPreparedStatement {
         return sql.toString();
     }
 
-    private void setStatementParameters(PreparedStatement stmt, FireboltRecord record, TableSchema schema, Map<String, String> validColumnNames) throws SQLException {
+    private void setStatementParameters(PreparedStatement stmt, FireboltRecord record, TableSchema schema, Map<String, String> validColumnNames) throws SQLException, RecordConversionFailedException {
         int parameterIndex = 1;
         for (TableSchema.Column column : schema.getColumns()) {
             if (validColumnNames.containsKey(column.getName())) {
@@ -131,7 +138,19 @@ public class InsertPreparedStatement {
                     stmt.setNull(parameterIndex, column.getSqlType());
                 } else {
                     ColumnDataTypeConverter columnDataTypeConverter = ColumnDataTypeConverterFactory.getInstance().getConverter(column);
-                    columnDataTypeConverter.convertAndSet(stmt, parameterIndex, value, column);
+                    try {
+                        columnDataTypeConverter.convertAndSet(stmt, parameterIndex, value, column);
+                    } catch (ColumnConversionFailedException e) {
+                        log.error("Conversion failed for table {} column {} for kafka record from partition {} offset {}", schema.getTableName(), column.getName(), record.getPartition(), record.getOffset());
+
+                        // as of now we are failing at the first column conversion failure. We could try to convert all the columns so we give all the data in one record convertion exception.
+                        throw RecordConversionFailedException.builder()
+                                .tableName(schema.getTableName())
+                                .kafkaPartition(record.getPartition())
+                                .kafkaOffset(record.getOffset())
+                                .topicName(record.getTopic())
+                                .build();
+                    }
                 }
 
                 parameterIndex++;

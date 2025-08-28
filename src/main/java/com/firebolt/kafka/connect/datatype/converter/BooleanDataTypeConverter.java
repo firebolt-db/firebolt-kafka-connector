@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Set;
@@ -18,17 +19,23 @@ public class BooleanDataTypeConverter implements ColumnDataTypeConverter {
         // we can set boolean value from multiple object types so go over these types one by one
         if (kafkaMessageColumnValue.getValue() instanceof Boolean) {
             statement.setBoolean(paramIndex, (Boolean) kafkaMessageColumnValue.getValue());
-        } else if (kafkaMessageColumnValue.getValue() instanceof String) {
+            return;
+        }
+
+        if (kafkaMessageColumnValue.getValue() instanceof String) {
             String kafkaValue = (String) kafkaMessageColumnValue.getValue();
             if (isValidBooleanValueAsString(kafkaValue)) {
                 log.debug("Setting the string value {} as a boolean", kafkaValue);
                 statement.setString(paramIndex, kafkaValue);
+                return;
             }
         }
+
+        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert kafka message attribute to a boolean value in firebolt");
     }
 
-    private boolean isValidBooleanValueAsString(String valueFromKakfaMessage) {
-        return ALLOWED_STRING_VALUES_AS_BOOLEAN.contains(valueFromKakfaMessage.toLowerCase());
+    private boolean isValidBooleanValueAsString(String valueFromKafkaMessage) {
+        return ALLOWED_STRING_VALUES_AS_BOOLEAN.contains(valueFromKafkaMessage.toLowerCase());
     }
 
 }
