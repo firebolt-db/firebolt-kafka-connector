@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect.integration.json;
 
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.BigIntTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,7 +15,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -78,6 +77,38 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
         
         // Verify records in Firebolt
         verifyBigIntRecordsInFirebolt(testRecords);
+    }
+
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeJsonProducer();
+
+        BigIntTestRecord validRecord1 = aValidTestRecord(301)
+                .stringBigInt("1234567890123")
+                .build();
+        BigIntTestRecord validRecord2 = aValidTestRecord(302)
+                .stringBigInt("-999999999999")
+                .build();
+        BigIntTestRecord invalidRecord1 = aValidTestRecord(303)
+                .stringBigInt("abc")
+                .build();
+        BigIntTestRecord invalidRecord2 = aValidTestRecord(304)
+                .stringBigInt("9223372036854775808")
+                .build();
+
+        List<BigIntTestRecord> testRecords = List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2
+        );
+
+        publishMessages(testRecords);
+
+        List<BigIntTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyBigIntRecordsInFirebolt(expectedRecords);
     }
     
     private List<BigIntTestRecord> createTestRecords() {
@@ -176,7 +207,11 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 "\"requiredListWithNullableElements\" ARRAY(BIGINT NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BIGINT NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BIGINT NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(BIGINT NOT NULL) NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(BIGINT NOT NULL) NULL, " +
+                "\"stringBigInt\" BIGINT NOT NULL, " +
+                "\"optionalShort\" BIGINT NULL, " +
+                "\"optionalInt\" BIGINT NULL, " +
+                "\"optionalByte\" BIGINT NULL" +
                 ")";
     }
     
@@ -194,13 +229,13 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 "    },\n" +
                 "    \"requiredBigInt\": {\n" +
                 "      \"type\": \"integer\",\n" +
-                "      \"format\": \"int64\",\n" +
+                "      \"connect.type\": \"int64\",\n" +
                 "      \"description\": \"Required big integer field - must not be null\"\n" +
                 "    },\n" +
                 "    \"optionalBigInt\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"integer\", \"format\": \"int64\"}\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int64\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional big integer field - can be null or omitted\"\n" +
                 "    },\n" +
@@ -209,14 +244,14 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 "      \"items\": {\n" +
                 "        \"oneOf\": [\n" +
                 "          {\"type\": \"null\"},\n" +
-                "          {\"type\": \"integer\", \"format\": \"int64\"}\n" +
+                "          {\"type\": \"integer\", \"connect.type\": \"int64\"}\n" +
                 "        ]\n" +
                 "      },\n" +
                 "      \"description\": \"Required list where individual elements can be null\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNonNullElements\": {\n" +
                 "      \"type\": \"array\",\n" +
-                "      \"items\": {\"type\": \"integer\", \"format\": \"int64\"},\n" +
+                "      \"items\": {\"type\": \"integer\", \"connect.type\": \"int64\"},\n" +
                 "      \"description\": \"Required list where individual elements cannot be null\"\n" +
                 "    },\n" +
                 "    \"optionalList\": {\n" +
@@ -227,7 +262,7 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"integer\", \"format\": \"int64\"}\n" +
+                "              {\"type\": \"integer\", \"connect.type\": \"int64\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
@@ -239,13 +274,32 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
                 "        {\n" +
                 "          \"type\": \"array\",\n" +
-                "          \"items\": {\"type\": \"integer\", \"format\": \"int64\"}\n" +
+                "          \"items\": {\"type\": \"integer\", \"connect.type\": \"int64\"}\n" +
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
+                "    },\n" +
+                "    \"stringBigInt\": {\n" +
+                "      \"type\": \"string\",\n" +
+                "      \"description\": \"BigInt value represented as string\"\n" +
+                "    },\n" +
+                "    \"optionalShort\": {\n" +
+                "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int16\",\n" +
+                "      \"description\": \"Optional short stored as BIGINT in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalInt\": {\n" +
+                "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
+                "      \"description\": \"Optional int stored as BIGINT in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalByte\": {\n" +
+                "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int8\",\n" +
+                "      \"description\": \"Optional byte stored as BIGINT in Firebolt\"\n" +
                 "    }\n" +
                 "  },\n" +
-                "  \"required\": [\"recordId\", \"requiredBigInt\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]\n" +
+                "  \"required\": [\"recordId\", \"requiredBigInt\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"stringBigInt\"]\n" +
                 "}";
     }
     
@@ -270,7 +324,7 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredBigInt\", \"optionalBigInt\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", " +
-            "\"optionalList\", \"optionalListWithNonNullElements\" " +
+            "\"optionalList\", \"optionalListWithNonNullElements\", \"stringBigInt\", \"optionalShort\", \"optionalInt\", \"optionalByte\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -286,6 +340,10 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 Integer actualRecordId = rs.getInt("recordId");
                 Long actualRequiredBigInt = rs.getLong("requiredBigInt");
                 Long actualOptionalBigInt = rs.getObject("optionalBigInt", Long.class);
+                Long actualStringBigInt = rs.getLong("stringBigInt");
+                Long actualOptionalShort = rs.getObject("optionalShort", Long.class);
+                Long actualOptionalInt = rs.getObject("optionalInt", Long.class);
+                Long actualOptionalByte = rs.getObject("optionalByte", Long.class);
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -320,6 +378,28 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 
                 verifyBigIntArray("optionalListWithNonNullElements", 
                     expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
+
+                // Verify stringBigInt parsed value
+                long expectedStringBigInt = Long.parseLong(expected.getStringBigInt());
+                assertEquals(expectedStringBigInt, actualStringBigInt,
+                        "stringBigInt mismatch at index " + recordIndex);
+
+                // Verify widened numeric optionals
+                if (expected.getOptionalShort() == null) {
+                    assertNull(actualOptionalShort, "optionalShort should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalShort().longValue(), actualOptionalShort);
+                }
+                if (expected.getOptionalInt() == null) {
+                    assertNull(actualOptionalInt, "optionalInt should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalInt().longValue(), actualOptionalInt);
+                }
+                if (expected.getOptionalByte() == null) {
+                    assertNull(actualOptionalByte, "optionalByte should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalByte().longValue(), actualOptionalByte);
+                }
                 
                 recordIndex++;
             }
@@ -393,6 +473,10 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
             .requiredListWithNullableElements(Arrays.asList(1L, 2L, 3L))
             .requiredListWithNonNullElements(Arrays.asList(10L, 20L, 30L))
             .optionalList(Arrays.asList(100L, 200L, 300L))
-            .optionalListWithNonNullElements(Arrays.asList(1000L, 2000L, 3000L));
+            .optionalListWithNonNullElements(Arrays.asList(1000L, 2000L, 3000L))
+            .stringBigInt(String.valueOf(recordId))
+            .optionalShort((short) (recordId % 2 == 0 ? 0 : 1))
+            .optionalInt(recordId * 10)
+            .optionalByte((byte) (recordId % 128));
     }
 } 
