@@ -15,6 +15,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -74,6 +75,40 @@ public class BooleanSerializerTest extends BaseIntegrationTest {
         
         verifyBooleanRecordsInFirebolt(testRecords);
     }
+
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeJsonProducer();
+
+        BooleanTestRecord validRecord1 = aValidTestRecord(101)
+                .booleanFromString("true")
+                .build();
+        BooleanTestRecord validRecord2 = aValidTestRecord(102)
+                .booleanFromString("false")
+                .build();
+        BooleanTestRecord invalidRecord1 = aValidTestRecord(103)
+                .booleanFromString("invalid boolean")
+                .build();
+        BooleanTestRecord invalidRecord2 = aValidTestRecord(104)
+                .booleanFromString("09-07-2025")
+                .build();
+
+        // create 2 valid records and 2 invalid records
+        List<BooleanTestRecord> testRecords = List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2
+        );
+
+        publishMessages(testRecords);
+
+        List<BooleanTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyBooleanRecordsInFirebolt(expectedRecords);
+    }
+
 
     /**
      * Creates test records covering all scenarios.

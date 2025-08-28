@@ -16,6 +16,13 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Mockito;
+import org.mockito.MockedStatic;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
+import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -128,6 +135,62 @@ public class InsertPreparedStatementTest {
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
         verify(psFail, times(1)).executeBatch();
+    }
+
+    @Test
+    void willPropagateColumnConversionFailureAsRecordConversionFailedException() throws Exception {
+        // Arrange a record with values that will trigger a converter failure
+        FireboltRecord record = buildRecord(TABLE_NAME, 7, 123L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("not_a_boolean").schemaType(Schema.Type.STRING).build()
+        ));
+
+        // Mock converter to throw ColumnConversionFailedException
+        ColumnDataTypeConverter mockConverter = mock(ColumnDataTypeConverter.class);
+        Mockito.doThrow(new ColumnConversionFailedException(COLUMN_NAME_2, "text", "boom"))
+                .when(mockConverter).convertAndSet(Mockito.any(), Mockito.anyInt(), Mockito.any(), Mockito.any());
+
+        ColumnDataTypeConverterFactory mockFactory = mock(ColumnDataTypeConverterFactory.class);
+        Mockito.when(mockFactory.getConverter(Mockito.any())).thenReturn(mockConverter);
+
+        // Valid column names map (firebolt column name -> record attribute name)
+        Map<String, String> validColumnNames = new java.util.HashMap<>();
+        validColumnNames.put(COLUMN_NAME_1, "id");
+        validColumnNames.put(COLUMN_NAME_2, "NAME");
+
+        try (MockedStatic<ColumnDataTypeConverterFactory> factoryStatic = Mockito.mockStatic(ColumnDataTypeConverterFactory.class)) {
+            factoryStatic.when(ColumnDataTypeConverterFactory::getInstance).thenReturn(mockFactory);
+
+            // Use reflection to invoke private setStatementParameters and verify it throws RecordConversionFailedException
+            java.lang.reflect.Method method = InsertPreparedStatement.class.getDeclaredMethod(
+                    "setStatementParameters", PreparedStatement.class, FireboltRecord.class, TableSchema.class, Map.class);
+            method.setAccessible(true);
+
+            RecordConversionFailedException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+                    RecordConversionFailedException.class,
+                    () -> {
+                        try {
+                            method.invoke(insertPreparedStatement, mockPreparedStatement, record, mockTableSchema, validColumnNames);
+                        } catch (java.lang.reflect.InvocationTargetException ite) {
+                            // unwrap
+                            Throwable cause = ite.getCause();
+                            if (cause instanceof RuntimeException) {
+                                throw (RuntimeException) cause;
+                            }
+                            if (cause instanceof Error) {
+                                throw (Error) cause;
+                            }
+                            throw new RuntimeException(cause);
+                        }
+                    }
+            );
+
+            // Assert details propagated to record-level exception
+            org.junit.jupiter.api.Assertions.assertEquals(TABLE_NAME, thrown.getTableName());
+            org.junit.jupiter.api.Assertions.assertEquals("topic", thrown.getTopicName());
+            org.junit.jupiter.api.Assertions.assertEquals(7, thrown.getKafkaPartition());
+            org.junit.jupiter.api.Assertions.assertEquals(123L, thrown.getKafkaOffset());
+        }
     }
 
     @Test
