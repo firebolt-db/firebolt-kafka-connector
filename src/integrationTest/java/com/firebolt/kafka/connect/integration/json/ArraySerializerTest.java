@@ -229,6 +229,7 @@ public class ArraySerializerTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"recordId\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Record identification number\"\n" +
                 "    },\n" +
                 "    \"requiredArrayWithNullableElements\": {\n" +

@@ -189,6 +189,7 @@ public class BigIntSerializerTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"recordId\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Record identification number\"\n" +
                 "    },\n" +
                 "    \"requiredBigInt\": {\n" +
