@@ -690,7 +690,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "    \"colDoublePrecision\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"number\"}\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Double precision field\"\n" +
                 "    },\n" +
@@ -861,7 +861,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"number\"}\n" +
+                "              {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +

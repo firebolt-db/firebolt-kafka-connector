@@ -2,15 +2,16 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,62 +34,149 @@ public class DoubleDataTypeConverterTest {
 
     @ParameterizedTest
     @CsvSource({
-        "0.0",                    // Zero
-        "42.5",                   // Positive value
-        "-42.5",                  // Negative value
-        "1.0",                    // Small positive
-        "-1.0",                   // Small negative
-        "1000000.0",              // Large positive
-        "-1000000.0",             // Large negative
-        "3.14159265359",          // Pi
-        "-3.14159265359",         // Negative Pi
-        "1.23E-10",               // Very small positive
-        "-1.23E-10",              // Very small negative
-        "1.23E+10",               // Very large positive
-        "-1.23E+10",              // Very large negative
-        "Double.MAX_VALUE",       // Maximum double value
-        "Double.MIN_VALUE",       // Minimum double value
-        "Double.NEGATIVE_INFINITY", // Negative infinity
-        "Double.POSITIVE_INFINITY"  // Positive infinity
+            "0",
+            "1",
+            "-1",
+            "42",
+            "-42",
+            "127",
+            "-128"
     })
-    void testConvertAndSetWithValidDoubleValues(String doubleValueStr) throws SQLException {
-        Double doubleValue;
-        
-        switch (doubleValueStr) {
-            case "Double.MAX_VALUE":
-                doubleValue = Double.MAX_VALUE;
-                break;
-            case "Double.MIN_VALUE":
-                doubleValue = Double.MIN_VALUE;
-                break;
-            case "Double.NEGATIVE_INFINITY":
-                doubleValue = Double.NEGATIVE_INFINITY;
-                break;
-            case "Double.POSITIVE_INFINITY":
-                doubleValue = Double.POSITIVE_INFINITY;
-                break;
-            default:
-                doubleValue = Double.parseDouble(doubleValueStr);
-        }
-        
+    void testConvertAndSetWithByteValues(byte value) throws SQLException {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
-                .value(doubleValue)
+                .value(value)
                 .build();
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
 
-        verify(mockStatement).setDouble(1, doubleValue);
+        verify(mockStatement).setDouble(1, (double) value);
     }
 
-    @Test
-    void testConvertAndSetWithNonDoubleValueThrowsException() {
+    @ParameterizedTest
+    @CsvSource({
+            "0",
+            "1",
+            "-1",
+            "42",
+            "-42",
+            "32767",
+            "-32768"
+    })
+    void testConvertAndSetWithShortValues(short value) throws SQLException {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
-                .value("not a number")
+                .value(value)
                 .build();
 
-        assertThrows(ClassCastException.class, () -> {
-            converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-        });
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setDouble(1, (double) value);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "0",
+            "1",
+            "-1",
+            "42",
+            "-42",
+            "100000",
+            "-100000"
+    })
+    void testConvertAndSetWithIntValues(int value) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setDouble(1, (double) value);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "0",
+            "1",
+            "-1",
+            "42",
+            "-42",
+            "10000000000",
+            "-10000000000"
+    })
+    void testConvertAndSetWithLongValues(long value) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setDouble(1, (double) value);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "0.0",
+            "1.5",
+            "-1.5",
+            "42.25",
+            "-42.25"
+    })
+    void testConvertAndSetWithFloatValues(float value) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setDouble(1, (double) value);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "0.0",
+            "42.5",
+            "-42.5",
+            "1.23E-10",
+            "1.23E+10"
+    })
+    void testConvertAndSetWithDoubleValues(double value) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setDouble(1, value);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "0",
+            "42.5",
+            "-42.5",
+            "1e3",
+            "-1e-3",
+            "  12.34  "
+    })
+    void testConvertAndSetWithValidStringValues(String input) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(input)
+                .build();
+
+        double expected = Double.parseDouble(input.trim());
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setDouble(1, expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc", "", " ", "+-1", "1,23"})
+    void testConvertAndSetWithInvalidStringValuesThrowsColumnConversionFailed(String input) {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(input)
+                .build();
+
+        assertThrows(ColumnConversionFailedException.class, () -> converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
     }
 
     @Test
@@ -97,15 +185,11 @@ public class DoubleDataTypeConverterTest {
                 .value(123.45)
                 .build();
 
-        // Mock the statement to throw SQLException
         org.mockito.Mockito.doThrow(new SQLException("Database error"))
                 .when(mockStatement).setDouble(1, 123.45);
 
-        SQLException exception = assertThrows(SQLException.class, () -> {
-            converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-        });
+        SQLException exception = assertThrows(SQLException.class, () -> converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
 
         assertEquals("Database error", exception.getMessage());
     }
-
 }
