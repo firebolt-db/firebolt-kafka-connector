@@ -61,4 +61,26 @@ public class BigIntTestRecord {
      * Record ID for test identification and ordering.
      */
     private Integer recordId;
+
+    /**
+     * BigInt value represented as a string in JSON (e.g., "1234567890123").
+     * Mapped to a BIGINT column in the database.
+     */
+    private String stringBigInt;
+
+    /**
+     * Optional short represented as a smaller integer type; schema uses connect.type int16.
+     * Still mapped to BIGINT in Firebolt.
+     */
+    private Short optionalShort;
+
+    /**
+     * Optional int represented as connect.type int32; maps to BIGINT in Firebolt.
+     */
+    private Integer optionalInt;
+
+    /**
+     * Optional byte represented as connect.type int8; maps to BIGINT in Firebolt.
+     */
+    private Byte optionalByte;
 } 
