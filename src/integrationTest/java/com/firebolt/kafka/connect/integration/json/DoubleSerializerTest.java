@@ -1,10 +1,6 @@
 package com.firebolt.kafka.connect.integration.json;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.DoubleTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -18,8 +14,8 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -221,6 +217,12 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredDouble\" DOUBLE PRECISION NOT NULL, " +
                 "\"optionalDouble\" DOUBLE PRECISION NULL, " +
+                "\"optionalByte\" DOUBLE PRECISION NULL, " +
+                "\"optionalShort\" DOUBLE PRECISION NULL, " +
+                "\"optionalInt\" DOUBLE PRECISION NULL, " +
+                "\"optionalLong\" DOUBLE PRECISION NULL, " +
+                "\"optionalReal\" DOUBLE PRECISION NULL, " +
+                "\"doubleFromString\" DOUBLE PRECISION NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(DOUBLE PRECISION NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(DOUBLE PRECISION NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(DOUBLE PRECISION NULL) NULL, " +
@@ -242,29 +244,71 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 "    },\n" +
                 "    \"requiredDouble\": {\n" +
                 "      \"type\": \"number\",\n" +
-                "      \"format\": \"double\",\n" +
+                "      \"connect.type\": \"float64\",\n" +
                 "      \"description\": \"Required double field - must not be null\"\n" +
                 "    },\n" +
                 "    \"optionalDouble\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"number\", \"format\": \"double\"}\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional double field - can be null or omitted\"\n" +
+                "    },\n" +
+                "    \"optionalByte\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int8\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional byte mapped to DOUBLE PRECISION in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalShort\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int16\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional short mapped to DOUBLE PRECISION in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalInt\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int32\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional int mapped to DOUBLE PRECISION in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalLong\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int64\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional long mapped to DOUBLE PRECISION in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalReal\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float32\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional real (float32) mapped to DOUBLE PRECISION in Firebolt\"\n" +
+                "    },\n" +
+                "    \"doubleFromString\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"string\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Double value represented as string, mapped to DOUBLE PRECISION in Firebolt\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNullableElements\": {\n" +
                 "      \"type\": \"array\",\n" +
                 "      \"items\": {\n" +
                 "        \"oneOf\": [\n" +
                 "          {\"type\": \"null\"},\n" +
-                "          {\"type\": \"number\", \"format\": \"double\"}\n" +
+                "          {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
                 "        ]\n" +
                 "      },\n" +
                 "      \"description\": \"Required list where individual elements can be null\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNonNullElements\": {\n" +
                 "      \"type\": \"array\",\n" +
-                "      \"items\": {\"type\": \"number\", \"format\": \"double\"},\n" +
+                "      \"items\": {\"type\": \"number\", \"connect.type\": \"float64\"},\n" +
                 "      \"description\": \"Required list where individual elements cannot be null\"\n" +
                 "    },\n" +
                 "    \"optionalList\": {\n" +
@@ -275,7 +319,7 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"number\", \"format\": \"double\"}\n" +
+                "              {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
@@ -287,7 +331,7 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
                 "        {\n" +
                 "          \"type\": \"array\",\n" +
-                "          \"items\": {\"type\": \"number\", \"format\": \"double\"}\n" +
+                "          \"items\": {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
@@ -331,6 +375,7 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
         // Verify specific records by recordId
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredDouble\", \"optionalDouble\", " +
+            "\"optionalByte\", \"optionalShort\", \"optionalInt\", \"optionalLong\", \"optionalReal\", \"doubleFromString\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -353,6 +398,14 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 
                 // Handle optionalDouble
                 Double actualOptionalDouble = rs.getObject("optionalDouble") != null ? rs.getDouble("optionalDouble") : null;
+
+                // Handle additional optionals mapped to DOUBLE PRECISION
+                Double actualOptionalByte = rs.getObject("optionalByte") != null ? rs.getDouble("optionalByte") : null;
+                Double actualOptionalShort = rs.getObject("optionalShort") != null ? rs.getDouble("optionalShort") : null;
+                Double actualOptionalInt = rs.getObject("optionalInt") != null ? rs.getDouble("optionalInt") : null;
+                Double actualOptionalLong = rs.getObject("optionalLong") != null ? rs.getDouble("optionalLong") : null;
+                Double actualOptionalReal = rs.getObject("optionalReal") != null ? rs.getDouble("optionalReal") : null;
+                Double actualDoubleFromString = rs.getObject("doubleFromString") != null ? rs.getDouble("doubleFromString") : null;
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -366,10 +419,14 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 
                 // Use tolerance for double comparison to handle floating-point precision issues
                 if (expected.getRequiredDouble() != null) {
+                    Double expectedRequiredDoubleObj = expected.getRequiredDouble();
+                    double expectedRequiredDouble = expectedRequiredDoubleObj.doubleValue();
+                    assertNotNull(actualRequiredDouble, "RequiredDouble should not be null at index " + recordIndex);
+                    double actualRequiredDoublePrimitive = actualRequiredDouble.doubleValue();
                     // Calculate appropriate tolerance based on the magnitude of the expected value
-                    double tolerance = Math.max(1e-15, Math.abs(expected.getRequiredDouble()) * 1e-15);
-                    assertEquals(expected.getRequiredDouble(), actualRequiredDouble, tolerance,
-                        "RequiredDouble mismatch at index " + recordIndex + " ==> expected: <" + expected.getRequiredDouble() + "> but was: <" + actualRequiredDouble + ">");
+                    double tolerance = Math.max(1e-15, Math.abs(expectedRequiredDouble) * 1e-15);
+                    assertEquals(expectedRequiredDouble, actualRequiredDoublePrimitive, tolerance,
+                        "RequiredDouble mismatch at index " + recordIndex + " ==> expected: <" + expectedRequiredDouble + "> but was: <" + actualRequiredDoublePrimitive + ">");
                 }
 
                 // Null handling verification for optional double
@@ -377,10 +434,75 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                     assertNull(actualOptionalDouble, 
                         "OptionalDouble should be null at index " + recordIndex);
                 } else {
+                    Double expectedOptionalDoubleObj = expected.getOptionalDouble();
+                    double expectedOptionalDouble = expectedOptionalDoubleObj.doubleValue();
+                    assertNotNull(actualOptionalDouble, "OptionalDouble should not be null at index " + recordIndex);
+                    double actualOptionalDoublePrimitive = actualOptionalDouble.doubleValue();
                     // Calculate appropriate tolerance based on the magnitude of the expected value
-                    double tolerance = Math.max(1e-15, Math.abs(expected.getOptionalDouble()) * 1e-15);
-                    assertEquals(expected.getOptionalDouble(), actualOptionalDouble, tolerance,
-                        "OptionalDouble mismatch at index " + recordIndex + " ==> expected: <" + expected.getOptionalDouble() + "> but was: <" + actualOptionalDouble + ">");
+                    double tolerance = Math.max(1e-15, Math.abs(expectedOptionalDouble) * 1e-15);
+                    assertEquals(expectedOptionalDouble, actualOptionalDoublePrimitive, tolerance,
+                        "OptionalDouble mismatch at index " + recordIndex + " ==> expected: <" + expectedOptionalDouble + "> but was: <" + actualOptionalDoublePrimitive + ">");
+                }
+
+                // Validate additional optionals mapped to DOUBLE PRECISION
+                if (expected.getOptionalByte() == null) {
+                    assertNull(actualOptionalByte, "OptionalByte should be null at index " + recordIndex);
+                } else {
+                    double expectedValue = expected.getOptionalByte().doubleValue();
+                    assertNotNull(actualOptionalByte, "OptionalByte should not be null at index " + recordIndex);
+                    double tolerance = 0.0;
+                    assertEquals(expectedValue, actualOptionalByte.doubleValue(), tolerance,
+                        "OptionalByte mismatch at index " + recordIndex);
+                }
+
+                if (expected.getOptionalShort() == null) {
+                    assertNull(actualOptionalShort, "OptionalShort should be null at index " + recordIndex);
+                } else {
+                    double expectedValue = expected.getOptionalShort().doubleValue();
+                    assertNotNull(actualOptionalShort, "OptionalShort should not be null at index " + recordIndex);
+                    double tolerance = 0.0;
+                    assertEquals(expectedValue, actualOptionalShort.doubleValue(), tolerance,
+                        "OptionalShort mismatch at index " + recordIndex);
+                }
+
+                if (expected.getOptionalInt() == null) {
+                    assertNull(actualOptionalInt, "OptionalInt should be null at index " + recordIndex);
+                } else {
+                    double expectedValue = expected.getOptionalInt().doubleValue();
+                    assertNotNull(actualOptionalInt, "OptionalInt should not be null at index " + recordIndex);
+                    double tolerance = 0.0;
+                    assertEquals(expectedValue, actualOptionalInt.doubleValue(), tolerance,
+                        "OptionalInt mismatch at index " + recordIndex);
+                }
+
+                if (expected.getOptionalLong() == null) {
+                    assertNull(actualOptionalLong, "OptionalLong should be null at index " + recordIndex);
+                } else {
+                    double expectedValue = expected.getOptionalLong().doubleValue();
+                    assertNotNull(actualOptionalLong, "OptionalLong should not be null at index " + recordIndex);
+                    double tolerance = 0.0;
+                    assertEquals(expectedValue, actualOptionalLong.doubleValue(), tolerance,
+                        "OptionalLong mismatch at index " + recordIndex);
+                }
+
+                if (expected.getOptionalReal() == null) {
+                    assertNull(actualOptionalReal, "OptionalReal should be null at index " + recordIndex);
+                } else {
+                    double expectedValue = expected.getOptionalReal().doubleValue();
+                    assertNotNull(actualOptionalReal, "OptionalReal should not be null at index " + recordIndex);
+                    double tolerance = Math.max(1e-7, Math.abs(expectedValue) * 1e-7);
+                    assertEquals(expectedValue, actualOptionalReal.doubleValue(), tolerance,
+                        "OptionalReal mismatch at index " + recordIndex);
+                }
+
+                if (expected.getDoubleFromString() == null) {
+                    assertNull(actualDoubleFromString, "DoubleFromString should be null at index " + recordIndex);
+                } else {
+                    double expectedValue = Double.parseDouble(expected.getDoubleFromString());
+                    assertNotNull(actualDoubleFromString, "DoubleFromString should not be null at index " + recordIndex);
+                    double tolerance = Math.max(1e-15, Math.abs(expectedValue) * 1e-15);
+                    assertEquals(expectedValue, actualDoubleFromString.doubleValue(), tolerance,
+                        "DoubleFromString mismatch at index " + recordIndex);
                 }
                 
                 // Array verification using getArray()
@@ -533,10 +655,48 @@ public class DoubleSerializerTest extends BaseIntegrationTest {
                 .recordId(recordId)
                 .requiredDouble(42.5)
                 .optionalDouble(100.75)
+                .optionalByte((byte) (recordId % 3))
+                .optionalShort((short) (recordId % 5))
+                .optionalInt(recordId * 10)
+                .optionalLong((long) recordId * 100)
+                .optionalReal(12.5f)
+                .doubleFromString("123.45")
                 .requiredListWithNullableElements(Arrays.asList(1.5, null, 3.25, null, 5.75))
                 .requiredListWithNonNullElements(Arrays.asList(10.1, 20.2, 30.3, 40.4, 50.5))
                 .optionalList(Arrays.asList(100.1, 200.2, 300.3))
                 .optionalListWithNonNullElements(Arrays.asList(111.1, 222.2, 333.3));
+    }
+
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeJsonProducer();
+
+        DoubleTestRecord validRecord1 = aValidTestRecord(301)
+                .doubleFromString("42.42")
+                .build();
+        DoubleTestRecord validRecord2 = aValidTestRecord(302)
+                .doubleFromString("-17.5")
+                .build();
+        DoubleTestRecord invalidRecord1 = aValidTestRecord(303)
+                .doubleFromString("abc")
+                .build();
+        DoubleTestRecord invalidRecord2 = aValidTestRecord(304)
+                .doubleFromString("09-07-2025")
+                .build();
+
+        List<DoubleTestRecord> testRecords = List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2
+        );
+
+        publishMessages(testRecords);
+
+        List<DoubleTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyDoubleRecordsInFirebolt(expectedRecords);
     }
 
 }

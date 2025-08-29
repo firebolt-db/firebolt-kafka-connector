@@ -22,6 +22,18 @@ public class DoubleTestRecord {
     
     private Double optionalDouble;
     
+    private Byte optionalByte;
+    
+    private Short optionalShort;
+    
+    private Integer optionalInt;
+    
+    private Long optionalLong;
+    
+    private Float optionalReal;
+    
+    private String doubleFromString;
+    
     private List<Double> requiredListWithNullableElements;
     
     private List<Double> requiredListWithNonNullElements;
