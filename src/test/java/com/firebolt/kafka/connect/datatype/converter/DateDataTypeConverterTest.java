@@ -2,12 +2,11 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import org.apache.kafka.connect.data.Schema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -36,88 +35,108 @@ public class DateDataTypeConverterTest {
         testColumn = new TableSchema.Column("test_column", "date", 91, true);
     }
 
-    // Tests for INT32 schema type (Days since epoch - Kafka Connect Date logical type)
-    
-    @ParameterizedTest
-    @CsvSource({
-        "0, 1970-01-01",        // Unix epoch (day 0)
-        "1, 1970-01-02",        // Day 1 after epoch
-        "365, 1971-01-01",      // One year after epoch
-        "19737, 2024-01-15",    // The example from DateSerializerTest
-        "18628, 2021-01-01",    // New Year 2021
-        "19358, 2023-01-01",    // New Year 2023
-        "20089, 2025-01-01",    // Future date 2025
-        "10957, 2000-01-01",    // Y2K
-        "18262, 2020-01-01",    // Leap year 2020
-        "15003, 2011-01-29",    // Random date
-        "17532, 2018-01-01",    // Another date
-        "11323, 2001-01-01",    // 2001
-        "-1, 1969-12-31",       // One day before epoch
-        "-365, 1969-01-01"      // One year before epoch
-    })
-    void testConvertAndSetWithInt32SchemaType(String daysStr, String expectedDateStr) throws SQLException {
-        Integer daysValue = Integer.parseInt(daysStr);
-        
+    @Test
+    void testConvertAndSetWithUtilDate() throws SQLException {
+        Date sqlDate = Date.valueOf("2023-01-01");
+        java.util.Date utilDate = new java.util.Date(sqlDate.getTime());
+
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
-                .value(daysValue)
-                .schemaType(Schema.Type.INT32)
+                .value(utilDate)
                 .build();
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
 
-        // Verify that setDate is called with the correct Date object
-        Date expectedDate = Date.valueOf(expectedDateStr);
-        verify(mockStatement).setDate(1, expectedDate);
+        verify(mockStatement).setDate(1, Date.valueOf("2023-01-01"));
     }
 
-    // Tests for STRING schema type
-
     @ParameterizedTest
     @CsvSource({
-        "'2023-01-01'",
-        "'2023-12-31'",
-        "'2000-02-29'",         // Leap year
-        "'1900-01-01'",         // Historical date
-        "'2025-06-15'",         // Future date
-        "'2023-02-14'",         // Valentine's Day
-        "'2023-07-04'",         // Independence Day
-        "'2023-10-31'",         // Halloween
-        "'2023-12-25'",         // Christmas
-        "'1970-01-01'",         // Unix epoch
-        "'9999-12-31'",         // Max date
-        "'0001-01-01'",         // Min date
-        "'2020-02-29'",         // Leap year Feb 29
-        "'2021-02-28'",         // Non-leap year Feb 28
-        "'2023-06-30'"          // End of June
+        "2023-01-01",
+        "2023-12-31",
+        "2000-02-29",
+        "1900-01-01",
+        "2025-06-15",
+        "2023-02-14",
+        "2023-07-04",
+        "2023-10-31",
+        "2023-12-25",
+        "1970-01-01",
+        "9999-12-31",
+        "0001-01-01",
+        "2020-02-29",
+        "2021-02-28",
+        "2023-06-30"
     })
-    void testConvertAndSetWithStringSchemaType(String dateString) throws SQLException {
-        // Remove quotes from CSV source parameter
-        String actualDateString = dateString.substring(1, dateString.length() - 1);
-        
+    void testConvertAndSetWithValidIsoDateString(String dateString) throws SQLException {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
-                .value(actualDateString)
-                .schemaType(Schema.Type.STRING)
+                .value(dateString)
                 .build();
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
 
-        verify(mockStatement).setString(1, actualDateString);
+        verify(mockStatement).setString(1, dateString);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "abc",
+        "2024-1-02",
+        "2024-01-2",
+        "2024-02-30",
+        "''",
+        "2024/01/01",
+        "01-01-2024",
+        "2024-13-01",
+        "2024-00-10"
+    })
+    void testThrowsOnInvalidIsoDateString(String invalid) {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(invalid)
+                .build();
+
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
     }
 
     @Test
-    void testConvertAndSetWithInt32SQLExceptionPropagation() throws SQLException {
+    void testThrowsOnNullValue() {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
-                .value(19358) // 2023-01-01 as days since epoch
-                .schemaType(Schema.Type.INT32)
+                .value(null)
                 .build();
 
-        Date expectedDate = Date.valueOf("2023-01-01");
-        org.mockito.Mockito.doThrow(new SQLException("Database error"))
-                .when(mockStatement).setDate(1, expectedDate);
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
+    }
 
-        SQLException exception = assertThrows(SQLException.class, () -> {
-            converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-        });
+    @Test
+    void testSQLExceptionPropagationForSetDate() throws SQLException {
+        Date sqlDate = Date.valueOf("2023-01-01");
+        java.util.Date utilDate = new java.util.Date(sqlDate.getTime());
+
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(utilDate)
+                .build();
+
+        org.mockito.Mockito.doThrow(new SQLException("Database error"))
+                .when(mockStatement).setDate(eq(1), any(Date.class));
+
+        SQLException exception = assertThrows(SQLException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
+
+        assertEquals("Database error", exception.getMessage());
+    }
+
+    @Test
+    void testSQLExceptionPropagationForSetString() throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value("2023-01-01")
+                .build();
+
+        org.mockito.Mockito.doThrow(new SQLException("Database error"))
+                .when(mockStatement).setString(1, "2023-01-01");
+
+        SQLException exception = assertThrows(SQLException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
 
         assertEquals("Database error", exception.getMessage());
     }

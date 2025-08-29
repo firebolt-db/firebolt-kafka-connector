@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -701,4 +702,10 @@ public abstract class BaseIntegrationTest {
             // do nothing
         }
     }
+
+    protected int dateToEpochDays(java.util.Date date) {
+        long normalized = date.toInstant().atZone(ZoneId.of("UTC")).toLocalDate().toEpochDay();
+        return Math.toIntExact(normalized);
+    }
+
 }

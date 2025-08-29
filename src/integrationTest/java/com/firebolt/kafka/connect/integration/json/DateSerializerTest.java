@@ -8,17 +8,19 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Calendar;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -30,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
 public class DateSerializerTest extends BaseIntegrationTest {
+    private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private static final String TOPIC_NAME = "date-test-topic";
     private static final String TABLE_NAME = "date_test_table";
@@ -79,6 +82,38 @@ public class DateSerializerTest extends BaseIntegrationTest {
         verifyDateRecordsInFirebolt(testRecords);
     }
 
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeJsonProducer();
+
+        DateTestRecord validRecord1 = aValidTestRecord(401)
+                .dateAsString("2024-01-15")
+                .build();
+        DateTestRecord validRecord2 = aValidTestRecord(402)
+                .dateAsString("2025-12-31")
+                .build();
+        DateTestRecord invalidRecord1 = aValidTestRecord(403)
+                .dateAsString("abc")
+                .build();
+        DateTestRecord invalidRecord2 = aValidTestRecord(404)
+                .dateAsString("09-07-2025")
+                .build();
+
+        List<DateTestRecord> testRecords = List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2
+        );
+
+        publishMessages(testRecords);
+
+        List<DateTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyDateRecordsInFirebolt(expectedRecords);
+    }
+
     /**
      * Creates test records covering all scenarios.
      */
@@ -86,85 +121,157 @@ public class DateSerializerTest extends BaseIntegrationTest {
         return Arrays.asList(
             // Complete record with typical values
             aValidTestRecord(1)
+                .optionalLocalDate(LocalDate.of(2024, 3, 1))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 2)))
+                .localDateIso8601(LocalDate.of(2024, 1, 10))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 1, 10), LocalDate.of(2024, 1, 11)))
+                .dateAsString("2024-01-15")
+                .dateAsIso8601List(Arrays.asList("2024-01-10", "2024-01-11"))
                 .build(),
 
             // Record with recent dates
             aValidTestRecord(2)
-                .requiredDate(LocalDate.of(2024, 12, 31))
-                .optionalDate(LocalDate.of(2025, 1, 1))
+                .requiredDate(createDate(2024, Calendar.DECEMBER, 31))
+                .optionalDate(createDate(2025, Calendar.JANUARY, 1))
+                .optionalLocalDate(LocalDate.of(2025, 2, 1))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2025, 2, 1), LocalDate.of(2025, 2, 2)))
+                .localDateIso8601(LocalDate.of(2025, 2, 15))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2025, 2, 15), LocalDate.of(2025, 2, 16)))
+                .dateAsString("2025-02-01")
+                .dateAsIso8601List(Arrays.asList("2025-02-15", "2025-02-16"))
                 .build(),
 
             // Record with historical dates
             aValidTestRecord(3)
-                .requiredDate(LocalDate.of(1970, 1, 1))  // Unix epoch
-                .optionalDate(LocalDate.of(2000, 1, 1))  // Y2K
+                .requiredDate(createDate(1970, Calendar.JANUARY, 1))  // Unix epoch
+                .optionalDate(createDate(2000, Calendar.JANUARY, 1))  // Y2K
+                .optionalLocalDate(LocalDate.of(2000, 1, 1))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(1970, 1, 1), LocalDate.of(2000, 1, 1)))
+                .localDateIso8601(LocalDate.of(2000, 1, 2))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(1970, 1, 1), LocalDate.of(2000, 1, 2)))
+                .dateAsString("2000-01-01")
+                .dateAsIso8601List(Arrays.asList("1970-01-01", "2000-01-02"))
                 .build(),
 
             // Record with null optional date
             aValidTestRecord(4)
                 .optionalDate(null)
+                .optionalLocalDate(null)
+                .optionalLocalDateList(null)
+                .localDateIso8601(null)
+                .localDateIso8601List(null)
+                .dateAsString(null)
+                .dateAsIso8601List(null)
                 .build(),
 
             // Record with empty lists
             aValidTestRecord(5)
                 .requiredListWithNullableElements(new ArrayList<>())
                 .requiredListWithNonNullElements(new ArrayList<>())
+                .optionalLocalDate(LocalDate.of(2024, 6, 1))
+                .optionalLocalDateList(new ArrayList<>())
+                .localDateIso8601(LocalDate.of(2024, 6, 2))
+                .localDateIso8601List(new ArrayList<>())
+                .dateAsString("2024-06-01")
+                .dateAsIso8601List(new ArrayList<>())
                 .build(),
 
             // Record with nullable elements in list
             aValidTestRecord(6)
                 .requiredListWithNullableElements(Arrays.asList(
-                    LocalDate.of(2024, 1, 1), null, LocalDate.of(2024, 12, 31)))
+                    createDate(2024, Calendar.JANUARY, 1), null, createDate(2024, Calendar.DECEMBER, 31)))
+                .optionalLocalDate(LocalDate.of(2024, 12, 31))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 12, 30), null, LocalDate.of(2024, 12, 31)))
+                .localDateIso8601(LocalDate.of(2024, 12, 25))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 12, 25), LocalDate.of(2024, 12, 31)))
+                .dateAsString("2024-12-31")
+                .dateAsIso8601List(Arrays.asList("2024-12-25", "2024-12-31"))
                 .build(),
 
             // Record with various date ranges
             aValidTestRecord(7)
                 .requiredListWithNullableElements(Arrays.asList(
-                    null, LocalDate.of(1970, 1, 1), LocalDate.of(2024, 6, 15)))
+                    null, createDate(1970, Calendar.JANUARY, 1), createDate(2024, Calendar.JUNE, 15)))
                 .requiredListWithNonNullElements(Arrays.asList(
-                    LocalDate.of(2023, 1, 1), LocalDate.of(2024, 6, 15), LocalDate.of(2025, 12, 31)))
+                    createDate(2023, Calendar.JANUARY, 1), createDate(2024, Calendar.JUNE, 15), createDate(2025, Calendar.DECEMBER, 31)))
+                .optionalLocalDate(LocalDate.of(2023, 1, 1))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2023, 1, 1), LocalDate.of(2024, 6, 15), LocalDate.of(2025, 12, 31)))
+                .localDateIso8601(LocalDate.of(2023, 2, 1))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2023, 2, 1), LocalDate.of(2024, 6, 15), LocalDate.of(2025, 12, 31)))
+                .dateAsString("2023-01-01")
+                .dateAsIso8601List(Arrays.asList("2023-02-01", "2024-06-15", "2025-12-31"))
                 .build(),
 
             // Record with null optional lists
             aValidTestRecord(8)
                 .optionalList(null)
                 .optionalListWithNonNullElements(null)
+                .optionalLocalDate(LocalDate.of(2024, 7, 1))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 7, 1)))
+                .localDateIso8601(LocalDate.of(2024, 7, 2))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 7, 2)))
+                .dateAsString("2024-07-01")
+                .dateAsIso8601List(Arrays.asList("2024-07-02"))
                 .build(),
 
             // Record with empty optional lists
             aValidTestRecord(9)
                 .optionalList(new ArrayList<>())
                 .optionalListWithNonNullElements(new ArrayList<>())
+                .optionalLocalDate(LocalDate.of(2024, 8, 1))
+                .optionalLocalDateList(new ArrayList<>())
+                .localDateIso8601(LocalDate.of(2024, 8, 2))
+                .localDateIso8601List(new ArrayList<>())
+                .dateAsString("2024-08-01")
+                .dateAsIso8601List(new ArrayList<>())
                 .build(),
 
             // Record with valid optional lists
             aValidTestRecord(10)
-                .optionalList(Arrays.asList(LocalDate.of(2024, 3, 15), null, LocalDate.of(2024, 9, 30)))
-                .optionalListWithNonNullElements(Arrays.asList(LocalDate.of(2024, 4, 1), LocalDate.of(2024, 8, 31)))
+                .optionalList(Arrays.asList(createDate(2024, Calendar.MARCH, 15), null, createDate(2024, Calendar.SEPTEMBER, 30)))
+                .optionalListWithNonNullElements(Arrays.asList(createDate(2024, Calendar.APRIL, 1), createDate(2024, Calendar.AUGUST, 31)))
+                .optionalLocalDate(LocalDate.of(2024, 9, 1))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 4, 1), LocalDate.of(2024, 8, 31)))
+                .localDateIso8601(LocalDate.of(2024, 9, 2))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 4, 2), LocalDate.of(2024, 8, 31)))
+                .dateAsString("2024-09-01")
+                .dateAsIso8601List(Arrays.asList("2024-04-02", "2024-08-31"))
                 .build(),
 
             // Record with leap year dates (February 29th)
             aValidTestRecord(11)
-                .requiredDate(LocalDate.of(2024, 2, 29))  // Leap year date
-                .optionalDate(LocalDate.of(2020, 2, 29))  // Another leap year date
+                .requiredDate(createDate(2024, Calendar.FEBRUARY, 29))  // Leap year date
+                .optionalDate(createDate(2020, Calendar.FEBRUARY, 29))  // Another leap year date
                 .requiredListWithNullableElements(Arrays.asList(
-                    LocalDate.of(2024, 2, 29), null, LocalDate.of(2020, 2, 29), null, LocalDate.of(2000, 2, 29)))
+                    createDate(2024, Calendar.FEBRUARY, 29), null, createDate(2020, Calendar.FEBRUARY, 29), null, createDate(2000, Calendar.FEBRUARY, 29)))
                 .requiredListWithNonNullElements(Arrays.asList(
-                    LocalDate.of(2024, 2, 29), LocalDate.of(2020, 2, 29), LocalDate.of(2016, 2, 29)))
+                    createDate(2024, Calendar.FEBRUARY, 29), createDate(2020, Calendar.FEBRUARY, 29), createDate(2016, Calendar.FEBRUARY, 29)))
                 .optionalList(Arrays.asList(
-                    null, LocalDate.of(2024, 2, 29), null, LocalDate.of(2012, 2, 29), null))
+                    null, createDate(2024, Calendar.FEBRUARY, 29), null, createDate(2012, Calendar.FEBRUARY, 29), null))
                 .optionalListWithNonNullElements(Arrays.asList(
-                    LocalDate.of(2008, 2, 29), LocalDate.of(2004, 2, 29)))
+                    createDate(2008, Calendar.FEBRUARY, 29), createDate(2004, Calendar.FEBRUARY, 29)))
+                .optionalLocalDate(LocalDate.of(2024, 2, 29))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 2, 29), LocalDate.of(2020, 2, 29)))
+                .localDateIso8601(LocalDate.of(2024, 2, 28))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 2, 28), LocalDate.of(2020, 2, 29)))
+                .dateAsString("2024-02-29")
+                .dateAsIso8601List(Arrays.asList("2024-02-28", "2020-02-29"))
                 .build(),
 
             // Record with large lists (100 elements each for performance testing)
             aValidTestRecord(12)
-                .requiredDate(LocalDate.of(2024, 1, 1))
-                .optionalDate(LocalDate.of(2024, 12, 31))
+                .requiredDate(createDate(2024, Calendar.JANUARY, 1))
+                .optionalDate(createDate(2024, Calendar.DECEMBER, 31))
                 .requiredListWithNullableElements(createLargeDateListWithNulls(100))
                 .requiredListWithNonNullElements(createLargeDateListWithoutNulls(100))
                 .optionalList(createOptionalLargeDateListWithNulls(100))  // Use version with nulls
                 .optionalListWithNonNullElements(createOptionalLargeDateList(80))  // Use version without nulls
+                .optionalLocalDate(LocalDate.of(2024, 12, 31))
+                .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)))
+                .localDateIso8601(LocalDate.of(2024, 12, 30))
+                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 1, 2), LocalDate.of(2024, 12, 30)))
+                .dateAsString("2024-12-31")
+                .dateAsIso8601List(Arrays.asList("2024-01-02", "2024-12-30"))
                 .build()
         );
     }
@@ -172,11 +279,11 @@ public class DateSerializerTest extends BaseIntegrationTest {
     /**
      * Helper method to create a large list with nullable date elements.
      */
-    private List<LocalDate> createLargeDateListWithNulls(int size) {
-        List<LocalDate> result = new ArrayList<>();
-        LocalDate baseDate = LocalDate.of(2024, 1, 1);
+    private List<java.util.Date> createLargeDateListWithNulls(int size) {
+        List<java.util.Date> result = new ArrayList<>();
+        java.util.Date baseDate = createDate(2024, Calendar.JANUARY, 1);
         for (int i = 0; i < size; i++) {
-            result.add(i % 5 == 0 ? null : baseDate.plusDays(i));  // Every 5th element is null
+            result.add(i % 5 == 0 ? null : baseDate);
         }
         return result;
     }
@@ -184,11 +291,11 @@ public class DateSerializerTest extends BaseIntegrationTest {
     /**
      * Helper method to create a large list without null date elements.
      */
-    private List<LocalDate> createLargeDateListWithoutNulls(int size) {
-        List<LocalDate> result = new ArrayList<>();
-        LocalDate baseDate = LocalDate.of(2023, 1, 1);
+    private List<java.util.Date> createLargeDateListWithoutNulls(int size) {
+        List<java.util.Date> result = new ArrayList<>();
+        java.util.Date baseDate = createDate(2023, Calendar.JANUARY, 1);
         for (int i = 0; i < size; i++) {
-            result.add(baseDate.plusDays(i * 2));  // Every other day
+            result.add(baseDate);
         }
         return result;
     }
@@ -197,11 +304,11 @@ public class DateSerializerTest extends BaseIntegrationTest {
      * Helper method to create an optional large list with different date range.
      * Used for both optionalList and optionalListWithNonNullElements, so no nulls.
      */
-    private List<LocalDate> createOptionalLargeDateList(int size) {
-        List<LocalDate> result = new ArrayList<>();
-        LocalDate baseDate = LocalDate.of(2025, 1, 1);
+    private List<java.util.Date> createOptionalLargeDateList(int size) {
+        List<java.util.Date> result = new ArrayList<>();
+        java.util.Date baseDate = createDate(2025, Calendar.JANUARY, 1);
         for (int i = 0; i < size; i++) {
-            result.add(baseDate.plusDays(i * 3));  // Every third day
+            result.add(baseDate);
         }
         return result;
     }
@@ -209,33 +316,47 @@ public class DateSerializerTest extends BaseIntegrationTest {
     /**
      * Helper method to create an optional large list WITH null values for testing nullable lists.
      */
-    private List<LocalDate> createOptionalLargeDateListWithNulls(int size) {
-        List<LocalDate> result = new ArrayList<>();
-        LocalDate baseDate = LocalDate.of(2025, 1, 1);
+    private List<java.util.Date> createOptionalLargeDateListWithNulls(int size) {
+        List<java.util.Date> result = new ArrayList<>();
+        java.util.Date baseDate = createDate(2025, Calendar.JANUARY, 1);
         for (int i = 0; i < size; i++) {
-            // Every 7th element is null to test null handling in optional lists
             if (i % 7 == 0) {
                 result.add(null);
             } else {
-                result.add(baseDate.plusDays(i * 3));  // Every third day
+                result.add(baseDate);
             }
         }
         return result;
     }
 
     private DateTestRecord.DateTestRecordBuilder aValidTestRecord(int recordId) {
+        Calendar calRequired = Calendar.getInstance();
+        calRequired.set(2024, Calendar.JANUARY, 15, 5, 0, 0);
+        calRequired.set(Calendar.MILLISECOND, 0);
+
+        Calendar calOptional = Calendar.getInstance();
+        calOptional.set(2024, Calendar.FEBRUARY, 28, 5, 0, 0);
+        calOptional.set(Calendar.MILLISECOND, 0);
+
         return DateTestRecord.builder()
                 .recordId(recordId)
-                .requiredDate(LocalDate.of(2024, 1, 15))
-                .optionalDate(LocalDate.of(2024, 2, 28))
+                .requiredDate(calRequired.getTime())
+                .optionalDate(calOptional.getTime())
                 .requiredListWithNullableElements(Arrays.asList(
-                    LocalDate.of(2024, 3, 1), null, LocalDate.of(2024, 3, 31), null, LocalDate.of(2024, 4, 15)))
+                    createDate(2024, Calendar.MARCH, 1), null, createDate(2024, Calendar.MARCH, 31), null, createDate(2024, Calendar.APRIL, 15)))
                 .requiredListWithNonNullElements(Arrays.asList(
-                    LocalDate.of(2024, 5, 1), LocalDate.of(2024, 6, 15), LocalDate.of(2024, 7, 31)))
+                    createDate(2024, Calendar.MAY, 1), createDate(2024, Calendar.JUNE, 15), createDate(2024, Calendar.JULY, 31)))
                 .optionalList(Arrays.asList(
-                    LocalDate.of(2024, 8, 1), LocalDate.of(2024, 9, 15), LocalDate.of(2024, 10, 31)))
+                    createDate(2024, Calendar.AUGUST, 1), createDate(2024, Calendar.SEPTEMBER, 15), createDate(2024, Calendar.OCTOBER, 31)))
                 .optionalListWithNonNullElements(Arrays.asList(
-                    LocalDate.of(2024, 11, 1), LocalDate.of(2024, 11, 15), LocalDate.of(2024, 12, 1)));
+                    createDate(2024, Calendar.NOVEMBER, 1), createDate(2024, Calendar.NOVEMBER, 15), createDate(2024, Calendar.DECEMBER, 1)));
+    }
+
+    private java.util.Date createDate(int year, int monthConstant, int dayOfMonth) {
+        Calendar c = Calendar.getInstance();
+        c.set(year, monthConstant, dayOfMonth, 0, 0, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTime();
     }
 
     private Supplier<String> dateTableSchema() {
@@ -243,10 +364,16 @@ public class DateSerializerTest extends BaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredDate\" DATE NOT NULL, " +
                 "\"optionalDate\" DATE NULL, " +
+                "\"optionalLocalDate\" DATE NULL, " +
+                "\"optionalLocalDateList\" ARRAY(DATE NULL) NULL, " +
+                "\"localDateIso8601\" DATE NULL, " +
+                "\"localDateIso8601List\" ARRAY(DATE NULL) NULL, " +
+                "\"dateAsIso8601List\" ARRAY(DATE NULL) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(DATE NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(DATE NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(DATE NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(DATE NOT NULL) NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(DATE NOT NULL) NULL, " +
+                "\"dateAsString\" DATE NULL" +
                 ")";
     }
     
@@ -263,23 +390,35 @@ public class DateSerializerTest extends BaseIntegrationTest {
                         "\"description\": \"Record identification number\"" +
                     "}," +
                     "\"requiredDate\": {" +
-                        "\"type\": \"integer\"," +
+                        "\"type\": \"string\"," +
+                        "\"format\": \"date\"," +
                         "\"connect.type\": \"int32\"," +
-                        "\"connect.version\": 1," +
-                        "\"connect.name\": \"org.apache.kafka.connect.data.Date\"," +
+                        "\"title\": \"org.apache.kafka.connect.data.Date\"," +
                         "\"description\": \"Required date field\"" +
                     "}," +
                     "\"optionalDate\": {" +
                         "\"oneOf\": [" +
                             "{\"type\": \"null\"}," +
                             "{" +
-                                "\"type\": \"integer\"," +
+                                "\"type\": \"string\"," +
+                                "\"format\": \"date\"," +
                                 "\"connect.type\": \"int32\"," +
-                                "\"connect.version\": 1," +
-                                "\"connect.name\": \"org.apache.kafka.connect.data.Date\"" +
+                                "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                             "}" +
                         "]," +
                         "\"description\": \"Optional date field\"" +
+                    "}," +
+                    "\"optionalLocalDate\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\"}," +
+                            "{" +
+                                "\"type\": \"string\"," +
+                                "\"format\": \"date\"," +
+                                "\"connect.type\": \"int32\"," +
+                                "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                            "}" +
+                        "]," +
+                        "\"description\": \"Optional LocalDate field\"" +
                     "}," +
                     "\"requiredListWithNullableElements\": {" +
                         "\"type\": \"array\"," +
@@ -287,10 +426,10 @@ public class DateSerializerTest extends BaseIntegrationTest {
                             "\"oneOf\": [" +
                                 "{\"type\": \"null\"}," +
                                 "{" +
-                                    "\"type\": \"integer\"," +
+                                    "\"type\": \"string\"," +
+                                    "\"format\": \"date\"," +
                                     "\"connect.type\": \"int32\"," +
-                                    "\"connect.version\": 1," +
-                                    "\"connect.name\": \"org.apache.kafka.connect.data.Date\"" +
+                                    "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                                 "}" +
                             "]" +
                         "}," +
@@ -299,10 +438,10 @@ public class DateSerializerTest extends BaseIntegrationTest {
                     "\"requiredListWithNonNullElements\": {" +
                         "\"type\": \"array\"," +
                         "\"items\": {" +
-                            "\"type\": \"integer\"," +
+                            "\"type\": \"string\"," +
+                            "\"format\": \"date\"," +
                             "\"connect.type\": \"int32\"," +
-                            "\"connect.version\": 1," +
-                            "\"connect.name\": \"org.apache.kafka.connect.data.Date\"" +
+                            "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                         "}," +
                         "\"description\": \"Required list with non-null elements\"" +
                     "}," +
@@ -315,10 +454,10 @@ public class DateSerializerTest extends BaseIntegrationTest {
                                     "\"oneOf\": [" +
                                         "{\"type\": \"null\"}," +
                                         "{" +
-                                            "\"type\": \"integer\"," +
+                                            "\"type\": \"string\"," +
+                                            "\"format\": \"date\"," +
                                             "\"connect.type\": \"int32\"," +
-                                            "\"connect.version\": 1," +
-                                            "\"connect.name\": \"org.apache.kafka.connect.data.Date\"" +
+                                            "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                                         "}" +
                                     "]" +
                                 "}" +
@@ -332,14 +471,79 @@ public class DateSerializerTest extends BaseIntegrationTest {
                             "{" +
                                 "\"type\": \"array\"," +
                                 "\"items\": {" +
-                                    "\"type\": \"integer\"," +
+                                    "\"type\": \"string\"," +
+                                    "\"format\": \"date\"," +
                                     "\"connect.type\": \"int32\"," +
-                                    "\"connect.version\": 1," +
-                                    "\"connect.name\": \"org.apache.kafka.connect.data.Date\"" +
+                                    "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                                 "}" +
                             "}" +
                         "]," +
                         "\"description\": \"Optional list with non-null elements\"" +
+                    "}," +
+                    "\"optionalLocalDateList\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\"}," +
+                            "{" +
+                                "\"type\": \"array\"," +
+                                "\"items\": {" +
+                                    "\"oneOf\": [" +
+                                        "{\"type\": \"null\"}," +
+                                        "{" +
+                                            "\"type\": \"string\"," +
+                                            "\"format\": \"date\"," +
+                                            "\"connect.type\": \"int32\"," +
+                                            "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                                        "}" +
+                                    "]" +
+                                "}" +
+                            "}" +
+                        "]," +
+                        "\"description\": \"Optional LocalDate list field\"" +
+                    "}," +
+                    "\"localDateIso8601\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\"}," +
+                            "{" +
+                                "\"type\": \"string\"," +
+                                "\"format\": \"date\"" +
+                            "}" +
+                        "]," +
+                        "\"description\": \"ISO-8601 LocalDate string field\"" +
+                    "}," +
+                    "\"localDateIso8601List\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\"}," +
+                            "{" +
+                                "\"type\": \"array\"," +
+                                "\"items\": {" +
+                                    "\"oneOf\": [" +
+                                        "{\"type\": \"null\"}," +
+                                        "{" +
+                                            "\"type\": \"string\"," +
+                                            "\"format\": \"date\"" +
+                                        "}" +
+                                    "]" +
+                                "}" +
+                            "}" +
+                        "]," +
+                        "\"description\": \"ISO-8601 LocalDate list field\"" +
+                    "}," +
+                    "\"dateAsIso8601List\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\"}," +
+                            "{" +
+                                "\"type\": \"array\"," +
+                                "\"items\": {\"type\": \"string\", \"format\": \"date\"}" +
+                            "}" +
+                        "]," +
+                        "\"description\": \"ISO-8601 date string list mapped to ARRAY(DATE)\"" +
+                    "}," +
+                    "\"dateAsString\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\"}," +
+                            "{\"type\": \"string\"}" +
+                        "]," +
+                        "\"description\": \"Date string in ISO-8601 format (yyyy-MM-dd)\"" +
                     "}" +
                 "}," +
                 "\"required\": [\"recordId\", \"requiredDate\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]" +
@@ -354,20 +558,8 @@ public class DateSerializerTest extends BaseIntegrationTest {
         for (DateTestRecord record : records) {
             String key = "date-test-key-" + record.getRecordId();
             
-            // Convert LocalDate objects to integers (days since epoch) for Kafka Connect Date logical type
-            Map<String, Object> recordMap = new HashMap<>();
-            recordMap.put("recordId", record.getRecordId());
-            recordMap.put("requiredDate", localDateToEpochDays(record.getRequiredDate()));
-            recordMap.put("optionalDate", record.getOptionalDate() != null ? localDateToEpochDays(record.getOptionalDate()) : null);
-            
-            // Convert date arrays
-            recordMap.put("requiredListWithNullableElements", convertDateListToIntegerList(record.getRequiredListWithNullableElements()));
-            recordMap.put("requiredListWithNonNullElements", convertDateListToIntegerList(record.getRequiredListWithNonNullElements()));
-            recordMap.put("optionalList", record.getOptionalList() != null ? convertDateListToIntegerList(record.getOptionalList()) : null);
-            recordMap.put("optionalListWithNonNullElements", record.getOptionalListWithNonNullElements() != null ? convertDateListToIntegerList(record.getOptionalListWithNonNullElements()) : null);
-            
-            ProducerRecord<String, Object> producerRecord = 
-                new ProducerRecord<>(TOPIC_NAME, key, recordMap);
+            ProducerRecord<String, Object> producerRecord =
+                new ProducerRecord<>(TOPIC_NAME, key, record);
             
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
@@ -381,24 +573,16 @@ public class DateSerializerTest extends BaseIntegrationTest {
         
         producer.flush();
     }
-    
-    /**
-     * Converts LocalDate to days since Unix epoch (1970-01-01).
-     */
-    private int localDateToEpochDays(LocalDate date) {
-        return Math.toIntExact(date.toEpochDay());
-    }
-    
-    /**
-     * Converts a list of LocalDate objects to a list of integers (days since epoch).
-     */
-    private List<Integer> convertDateListToIntegerList(List<LocalDate> dateList) {
-        if (dateList == null) {
+
+    private String toIsoDate(java.util.Date date) {
+        if (date == null) {
             return null;
         }
-        return dateList.stream()
-            .map(date -> date != null ? localDateToEpochDays(date) : null)
-            .collect(java.util.stream.Collectors.toList());
+        if (date instanceof java.sql.Date) {
+            java.time.LocalDate ld = ((java.sql.Date) date).toLocalDate();
+            return ISO_DATE_FORMATTER.format(ld);
+        }
+        return ISO_DATE_FORMATTER.format(date.toInstant().atZone(ZoneId.systemDefault()));
     }
     
     /**
@@ -412,7 +596,7 @@ public class DateSerializerTest extends BaseIntegrationTest {
         
         // Verify specific records by recordId
         String selectQuery = String.format(
-            "SELECT \"recordId\", \"requiredDate\", \"optionalDate\", " +
+            "SELECT \"recordId\", \"requiredDate\", \"optionalDate\", \"optionalLocalDate\", \"optionalLocalDateList\", \"localDateIso8601\", \"localDateIso8601List\", \"dateAsString\", \"dateAsIso8601List\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -428,10 +612,14 @@ public class DateSerializerTest extends BaseIntegrationTest {
                 
                 // Verify each field
                 Integer actualRecordId = rs.getInt("recordId");
-                LocalDate actualRequiredDate = rs.getDate("requiredDate") != null ? 
-                    rs.getDate("requiredDate").toLocalDate() : null;
-                LocalDate actualOptionalDate = rs.getDate("optionalDate") != null ? 
-                    rs.getDate("optionalDate").toLocalDate() : null;
+                java.sql.Date actualRequiredDate = rs.getDate("requiredDate");
+                java.sql.Date actualOptionalDate = rs.getDate("optionalDate");
+                java.sql.Date actualOptionalLocalDate = rs.getDate("optionalLocalDate");
+                Array actualOptionalLocalDateListArray = rs.getArray("optionalLocalDateList");
+                java.sql.Date actualLocalDateIso8601 = rs.getDate("localDateIso8601");
+                Array actualLocalDateIso8601ListArray = rs.getArray("localDateIso8601List");
+                java.sql.Date actualDateAsString = rs.getDate("dateAsString");
+                Array actualDateAsIso8601ListArray = rs.getArray("dateAsIso8601List");
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -442,7 +630,9 @@ public class DateSerializerTest extends BaseIntegrationTest {
                 // Basic field verification
                 assertEquals(expected.getRecordId(), actualRecordId, 
                     "RecordId mismatch at index " + recordIndex);
-                assertEquals(expected.getRequiredDate(), actualRequiredDate, 
+                String expectedRequiredDateIso = toIsoDate(expected.getRequiredDate());
+                String actualRequiredDateIso = toIsoDate(actualRequiredDate);
+                assertEquals(expectedRequiredDateIso, actualRequiredDateIso, 
                     "RequiredDate mismatch at index " + recordIndex);
                 
                 // Null handling verification for optional date
@@ -450,24 +640,130 @@ public class DateSerializerTest extends BaseIntegrationTest {
                     assertNull(actualOptionalDate, 
                         "OptionalDate should be null at index " + recordIndex);
                 } else {
-                    assertEquals(expected.getOptionalDate(), actualOptionalDate, 
+                    String expectedOptionalDateIso = toIsoDate(expected.getOptionalDate());
+                    String actualOptionalDateIso = toIsoDate(actualOptionalDate);
+                    assertEquals(expectedOptionalDateIso, actualOptionalDateIso,
                         "OptionalDate mismatch at index " + recordIndex);
+                }
+
+                // localDateIso8601 verification
+                if (expected.getLocalDateIso8601() == null) {
+                    assertNull(actualLocalDateIso8601, 
+                        "localDateIso8601 should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getLocalDateIso8601().toString(), actualLocalDateIso8601.toLocalDate().toString(),
+                        "localDateIso8601 mismatch at index " + recordIndex);
+                }
+
+                // localDateIso8601List verification
+                if (expected.getLocalDateIso8601List() == null) {
+                    assertNull(actualLocalDateIso8601ListArray, 
+                        "localDateIso8601List should be null at index " + recordIndex);
+                } else {
+                    assertNotNull(actualLocalDateIso8601ListArray, 
+                        "localDateIso8601List should not be null at index " + recordIndex);
+                    int baseType3 = actualLocalDateIso8601ListArray.getBaseType();
+                    assertEquals(Types.DATE, baseType3,
+                        "localDateIso8601List should have base type DATE (91) at index " + recordIndex);
+
+                    Date[] arrayElements3 = (Date[]) actualLocalDateIso8601ListArray.getArray();
+                    List<String> actualIsoList2 = new ArrayList<>();
+                    for (Date d : arrayElements3) {
+                        actualIsoList2.add(d == null ? null : d.toLocalDate().toString());
+                    }
+                    List<String> expectedIsoList2 = new ArrayList<>();
+                    for (LocalDate d : expected.getLocalDateIso8601List()) {
+                        expectedIsoList2.add(d == null ? null : d.toString());
+                    }
+                    assertEquals(expectedIsoList2, actualIsoList2,
+                        "localDateIso8601List mismatch at index " + recordIndex);
+                }
+
+                // dateAsString verification
+                if (expected.getDateAsString() == null) {
+                    assertNull(actualDateAsString, 
+                        "dateAsString should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getDateAsString(), actualDateAsString.toLocalDate().toString(),
+                        "dateAsString mismatch at index " + recordIndex);
+                }
+
+                // dateAsIso8601List verification
+                if (expected.getDateAsIso8601List() == null) {
+                    assertNull(actualDateAsIso8601ListArray,
+                        "dateAsIso8601List should be null at index " + recordIndex);
+                } else {
+                    assertNotNull(actualDateAsIso8601ListArray,
+                        "dateAsIso8601List should not be null at index " + recordIndex);
+                    int baseType4 = actualDateAsIso8601ListArray.getBaseType();
+                    assertEquals(Types.DATE, baseType4,
+                        "dateAsIso8601List should have base type DATE (91) at index " + recordIndex);
+
+                    Date[] arrayElements4 = (Date[]) actualDateAsIso8601ListArray.getArray();
+                    List<String> actualIsoList3 = new ArrayList<>();
+                    for (Date d : arrayElements4) {
+                        actualIsoList3.add(d == null ? null : d.toLocalDate().toString());
+                    }
+                    List<String> expectedIsoList3 = expected.getDateAsIso8601List();
+                    assertEquals(expectedIsoList3, actualIsoList3,
+                        "dateAsIso8601List mismatch at index " + recordIndex);
                 }
                 
                 // Array verification using getArray()
                 verifyDateArray("requiredListWithNullableElements", 
-                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
+                    expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
                     
                 verifyDateArray("requiredListWithNonNullElements", 
-                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
+                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex);
                 
                 // Optional list verification
                 verifyDateArray("optionalList", 
-                    expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
+                    expected.getOptionalList(), actualOptionalListArray, recordIndex);
                 
                 // Optional list with non-null elements verification
                 verifyDateArray("optionalListWithNonNullElements", 
-                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
+                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
+
+                // optionalLocalDate verification
+                if (expected.getOptionalLocalDate() == null) {
+                    assertNull(actualOptionalLocalDate, 
+                        "OptionalLocalDate should be null at index " + recordIndex);
+                } else {
+                    String expectedOptionalLocalDateIso = expected.getOptionalLocalDate().toString();
+                    String actualOptionalLocalDateIso = actualOptionalLocalDate.toLocalDate().toString();
+                    assertEquals(expectedOptionalLocalDateIso, actualOptionalLocalDateIso,
+                        "OptionalLocalDate mismatch at index " + recordIndex);
+                }
+
+                // optionalLocalDateList verification
+                if (expected.getOptionalLocalDateList() == null) {
+                    assertNull(actualOptionalLocalDateListArray, 
+                        "optionalLocalDateList should be null at index " + recordIndex);
+                } else {
+                    assertNotNull(actualOptionalLocalDateListArray, 
+                        "optionalLocalDateList should not be null at index " + recordIndex);
+                    int baseType2 = actualOptionalLocalDateListArray.getBaseType();
+                    assertEquals(Types.DATE, baseType2,
+                        "optionalLocalDateList should have base type DATE (91) at index " + recordIndex);
+
+                    Date[] arrayElements2 = (Date[]) actualOptionalLocalDateListArray.getArray();
+                    List<String> actualIsoList = new ArrayList<>();
+                    for (Date d : arrayElements2) {
+                        if (d == null) {
+                            actualIsoList.add(null);
+                        } else {
+                            actualIsoList.add(d.toLocalDate().toString());
+                        }
+                    }
+
+                    List<String> expectedIsoList = new ArrayList<>();
+                    for (LocalDate d : expected.getOptionalLocalDateList()) {
+                        expectedIsoList.add(d == null ? null : d.toString());
+                    }
+
+                    assertEquals(expectedIsoList, actualIsoList,
+                        "optionalLocalDateList mismatch at index " + recordIndex);
+                }
                 
                 recordIndex++;
             }
@@ -480,8 +776,8 @@ public class DateSerializerTest extends BaseIntegrationTest {
     /**
      * Verifies a date array field using Array object instead of string parsing.
      */
-    private void verifyDateArray(String fieldName, List<LocalDate> expected, Array actualArray, 
-                               int recordIndex, boolean allowNullElements) throws SQLException {
+    private void verifyDateArray(String fieldName, List<java.util.Date> expected, Array actualArray, 
+                               int recordIndex) throws SQLException {
         if (expected == null) {
             assertNull(actualArray, fieldName + " should be null at index " + recordIndex);
             return;
@@ -497,19 +793,17 @@ public class DateSerializerTest extends BaseIntegrationTest {
 
         // Get the array as Date array and convert to List<LocalDate>
         Date[] arrayElements = (Date[]) actualArray.getArray();
-        List<LocalDate> actualList = new ArrayList<>();
+        List<java.util.Date> actualList = new ArrayList<>();
         
         for (Date date : arrayElements) {
             if (date != null) {
-                actualList.add(date.toLocalDate());
+                actualList.add(date);
             } else {
                 actualList.add(null);
             }
         }
 
-        // Direct list comparison
-        assertEquals(expected, actualList,
-            fieldName + " mismatch at index " + recordIndex);
+        assertEquals(expected, actualList, fieldName + " mismatch at index " + recordIndex);
     }
 
 }
