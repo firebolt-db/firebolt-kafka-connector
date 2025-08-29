@@ -61,4 +61,24 @@ public class RealTestRecord {
      * Record ID for test identification and ordering.
      */
     private Integer recordId;
+
+    /**
+     * Optional byte value (connect.type int8) that maps to REAL column in Firebolt.
+     */
+    private Byte optionalByte;
+
+    /**
+     * Optional short value (connect.type int16) that maps to REAL column in Firebolt.
+     */
+    private Short optionalShort;
+
+    /**
+     * Optional int value (connect.type int32) that maps to REAL column in Firebolt.
+     */
+    private Integer optionalInt;
+
+    /**
+     * Real value represented as string in JSON, mapped to REAL in Firebolt.
+     */
+    private String realFromString;
 } 

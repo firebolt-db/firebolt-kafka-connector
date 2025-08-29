@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -81,25 +82,23 @@ public class RealDataTypeConverterTest {
     }
 
     @Test
-    void testConvertAndSetWithNullValue() throws SQLException {
+    void testConvertAndSetWithNullValue() {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(null)
                 .build();
 
-        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-
-        verify(mockStatement).setString(1, "null");
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
     }
 
     @Test
-    void testConvertAndSetWithNonFloatValue() throws SQLException {
+    void testConvertAndSetWithNonFloatValue() {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value("not a number")
                 .build();
 
-        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-
-        verify(mockStatement).setString(1, "not a number");
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
     }
 
     @Test
@@ -110,29 +109,49 @@ public class RealDataTypeConverterTest {
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
 
-        verify(mockStatement).setString(1, "42");
+        verify(mockStatement).setFloat(1, 42);
     }
 
     @Test
-    void testConvertAndSetWithDoubleValue() throws SQLException {
+    void testConvertAndSetWithShortValue() throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(Short.valueOf("12"))
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setFloat(1, 12);
+    }
+
+    @Test
+    void testConvertAndSetWithByteValue() throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(Byte.valueOf("34"))
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setFloat(1, 34);
+    }
+
+    @Test
+    void testConvertAndSetWithDoubleValue() {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(42.5) // Double instead of Float
                 .build();
 
-        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-
-        verify(mockStatement).setString(1, "42.5");
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
     }
 
     @Test
-    void testConvertAndSetWithBooleanValue() throws SQLException {
+    void testConvertAndSetWithBooleanValue() {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(true) // Boolean instead of Float
                 .build();
 
-        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-
-        verify(mockStatement).setString(1, "true");
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn));
     }
 
     @Test

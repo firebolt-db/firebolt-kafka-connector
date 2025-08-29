@@ -683,7 +683,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "    \"colReal\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"number\"}\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float32\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Real field\"\n" +
                 "    },\n" +
@@ -818,7 +818,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"number\"}\n" +
+                "              {\"type\": \"number\", \"connect.type\": \"float32\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
