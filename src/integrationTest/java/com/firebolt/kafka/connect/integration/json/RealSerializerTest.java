@@ -1,9 +1,7 @@
 package com.firebolt.kafka.connect.integration.json;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.RealTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,7 +14,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -75,6 +73,38 @@ public class RealSerializerTest extends BaseIntegrationTest {
         waitForDataInFirebolt(TABLE_NAME, testRecords.size());
         
         verifyRealRecordsInFirebolt(testRecords);
+    }
+
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeJsonProducer();
+
+        RealTestRecord validRecord1 = aValidTestRecord(401)
+                .realFromString("12.34")
+                .build();
+        RealTestRecord validRecord2 = aValidTestRecord(402)
+                .realFromString("-0.56")
+                .build();
+        RealTestRecord invalidRecord1 = aValidTestRecord(403)
+                .realFromString("abc")
+                .build();
+        RealTestRecord invalidRecord2 = aValidTestRecord(404)
+                .realFromString("12.34.56")
+                .build();
+
+        java.util.List<RealTestRecord> testRecords = java.util.List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2
+        );
+
+        publishMessages(testRecords);
+
+        java.util.List<RealTestRecord> expectedRecords = java.util.List.of(validRecord1, validRecord2);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyRealRecordsInFirebolt(expectedRecords);
     }
 
     /**
@@ -172,10 +202,14 @@ public class RealSerializerTest extends BaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredReal\" REAL NOT NULL, " +
                 "\"optionalReal\" REAL NULL, " +
+                "\"optionalByte\" REAL NULL, " +
+                "\"optionalShort\" REAL NULL, " +
+                "\"optionalInt\" REAL NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(REAL NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(REAL NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(REAL NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(REAL NOT NULL) NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(REAL NOT NULL) NULL, " +
+                "\"realFromString\" REAL NULL" +
                 ")";
     }
     
@@ -203,6 +237,34 @@ public class RealSerializerTest extends BaseIntegrationTest {
                             "{\"type\": \"number\", \"connect.type\": \"float32\"}" +
                         "]," +
                         "\"description\": \"Optional real field - can be null or omitted\"" +
+                    "}," +
+                    "\"optionalByte\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\", \"title\": \"Not included\"}," +
+                            "{\"type\": \"integer\", \"connect.type\": \"int8\"}" +
+                        "]," +
+                        "\"description\": \"Optional byte stored as REAL in Firebolt\"" +
+                    "}," +
+                    "\"optionalShort\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\", \"title\": \"Not included\"}," +
+                            "{\"type\": \"integer\", \"connect.type\": \"int16\"}" +
+                        "]," +
+                        "\"description\": \"Optional short stored as REAL in Firebolt\"" +
+                    "}," +
+                    "\"optionalInt\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\", \"title\": \"Not included\"}," +
+                            "{\"type\": \"integer\", \"connect.type\": \"int32\"}" +
+                        "]," +
+                        "\"description\": \"Optional int stored as REAL in Firebolt\"" +
+                    "}," +
+                    "\"realFromString\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\", \"title\": \"Not included\"}," +
+                            "{\"type\": \"string\"}" +
+                        "]," +
+                        "\"description\": \"Real value represented as string\"" +
                     "}," +
                     "\"requiredListWithNullableElements\": {" +
                         "\"type\": \"array\"," +
@@ -286,9 +348,9 @@ public class RealSerializerTest extends BaseIntegrationTest {
         
         // Verify specific records by recordId
         String selectQuery = String.format(
-            "SELECT \"recordId\", \"requiredReal\", \"optionalReal\", " +
+            "SELECT \"recordId\", \"requiredReal\", \"optionalReal\", \"optionalByte\", \"optionalShort\", \"optionalInt\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\" " +
+            "\"optionalListWithNonNullElements\", \"realFromString\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -304,6 +366,10 @@ public class RealSerializerTest extends BaseIntegrationTest {
                 Integer actualRecordId = rs.getInt("recordId");
                 Float actualRequiredReal = rs.getFloat("requiredReal");
                 Float actualOptionalReal = rs.getObject("optionalReal") != null ? rs.getFloat("optionalReal") : null;
+                Float actualOptionalByte = rs.getObject("optionalByte") != null ? rs.getFloat("optionalByte") : null;
+                Float actualOptionalShort = rs.getObject("optionalShort") != null ? rs.getFloat("optionalShort") : null;
+                Float actualOptionalInt = rs.getObject("optionalInt") != null ? rs.getFloat("optionalInt") : null;
+                Float actualRealFromString = rs.getObject("realFromString") != null ? rs.getFloat("realFromString") : null;
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -324,6 +390,27 @@ public class RealSerializerTest extends BaseIntegrationTest {
                 } else {
                     assertEquals(expected.getOptionalReal(), actualOptionalReal, 0.0001f,
                         "OptionalReal mismatch at index " + recordIndex);
+                }
+
+                if (expected.getOptionalByte() == null) {
+                    assertNull(actualOptionalByte, "OptionalByte should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalByte().floatValue(), actualOptionalByte, 0.0001f);
+                }
+                if (expected.getOptionalShort() == null) {
+                    assertNull(actualOptionalShort, "OptionalShort should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalShort().floatValue(), actualOptionalShort, 0.0001f);
+                }
+                if (expected.getOptionalInt() == null) {
+                    assertNull(actualOptionalInt, "OptionalInt should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalInt().floatValue(), actualOptionalInt, 0.0001f);
+                }
+                if (expected.getRealFromString() == null) {
+                    assertNull(actualRealFromString, "realFromString should be null at index " + recordIndex);
+                } else {
+                    assertEquals(Float.parseFloat(expected.getRealFromString()), actualRealFromString, 0.0001f);
                 }
                 
                 // Array verification using getArray()
@@ -405,6 +492,10 @@ public class RealSerializerTest extends BaseIntegrationTest {
                 .recordId(recordId)
                 .requiredReal(299.95f)                    // Realistic price-like value
                 .optionalReal(1234.56f)                   // Realistic decimal value
+                .optionalByte((byte) (recordId % 2 == 0 ? 0 : 1))
+                .optionalShort((short) (recordId % 3))
+                .optionalInt(recordId)
+                .realFromString("123.45")
                 .requiredListWithNullableElements(Arrays.asList(15.75f, null, 89.25f, null, 156.50f))
                 .requiredListWithNonNullElements(Arrays.asList(23.45f, 67.89f, 134.12f, 256.78f, 398.99f))
                 .optionalList(Arrays.asList(499.99f, 799.50f, 1299.75f))
