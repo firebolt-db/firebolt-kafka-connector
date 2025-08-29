@@ -197,11 +197,11 @@ public class InsertPreparedStatementTest {
     void shouldBuildCorrectInsertSQLAndSetParametersWithCaseInsensitiveColumnNames() throws SQLException {        
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 10L, mapOf(
-                "ID", KafkaMessageColumnValue.builder().value(123L).schemaType(Schema.Type.INT64).build(),
+                "ID", KafkaMessageColumnValue.builder().value(Integer.valueOf(123)).schemaType(Schema.Type.INT32).build(),
                 "name", KafkaMessageColumnValue.builder().value("Alice").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 11L, mapOf(
-                "ID", KafkaMessageColumnValue.builder().value(456L).schemaType(Schema.Type.INT64).build(),
+                "ID", KafkaMessageColumnValue.builder().value(Integer.valueOf(456)).schemaType(Schema.Type.INT32).build(),
                 "name", KafkaMessageColumnValue.builder().value("Bob").schemaType(Schema.Type.STRING).build()
         )));
 
@@ -224,12 +224,12 @@ public class InsertPreparedStatementTest {
     void shouldHandleNullValuesAndSetSqlNull() throws SQLException {
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 100L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(Integer.valueOf(1)).schemaType(Schema.Type.INT32).build(),
                 "name", KafkaMessageColumnValue.builder().value("Carol").schemaType(Schema.Type.STRING).build()
         )));
         // name missing -> should be setNull
         records.add(buildRecord(TABLE_NAME, 0, 101L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(2L).schemaType(Schema.Type.INT64).build()
+                "id", KafkaMessageColumnValue.builder().value(Integer.valueOf(2)).schemaType(Schema.Type.INT32).build()
         )));
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
@@ -251,7 +251,7 @@ public class InsertPreparedStatementTest {
     @Test
     void shouldIgnoreExtraColumnsNotInSchema() throws SQLException {
         Map<String, KafkaMessageColumnValue> values = new HashMap<>();
-        values.put("id", KafkaMessageColumnValue.builder().value(100L).schemaType(Schema.Type.INT64).build());
+        values.put("id", KafkaMessageColumnValue.builder().value(100).schemaType(Schema.Type.INT32).build());
         values.put("name", KafkaMessageColumnValue.builder().value("widget").schemaType(Schema.Type.STRING).build());
         values.put("unknown", KafkaMessageColumnValue.builder().value("ignored").schemaType(Schema.Type.STRING).build());
 
@@ -269,7 +269,7 @@ public class InsertPreparedStatementTest {
     @Test
     void willOnlyCreatePreparedStatementWithColumnsInRecordsIfNotAllColumnsArePresent() throws SQLException {
         Map<String, KafkaMessageColumnValue> values = new HashMap<>();
-        values.put("id", KafkaMessageColumnValue.builder().value(100L).schemaType(Schema.Type.INT64).build());
+        values.put("id", KafkaMessageColumnValue.builder().value(100).schemaType(Schema.Type.INT32).build());
 
         List<FireboltRecord> records = List.of(buildRecord(TABLE_NAME, 0, 1L, values));
 

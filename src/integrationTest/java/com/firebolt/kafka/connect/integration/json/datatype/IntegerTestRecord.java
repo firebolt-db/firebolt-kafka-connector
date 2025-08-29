@@ -36,6 +36,16 @@ public class IntegerTestRecord {
     private Integer optionalInteger;
     
     /**
+     * Optional short represented as connect.type int16; maps to INTEGER in Firebolt.
+     */
+    private Short optionalShort;
+    
+    /**
+     * Optional byte represented as connect.type int8; maps to INTEGER in Firebolt.
+     */
+    private Byte optionalByte;
+    
+    /**
      * Required list of integers where the list itself cannot be null,
      * but individual elements within the list can be null.
      * Maps to ARRAY(INTEGER) NOT NULL column.
@@ -61,4 +71,10 @@ public class IntegerTestRecord {
      * Record ID for test identification and ordering.
      */
     private Integer recordId;
+
+    /**
+     * Integer value represented as a string in JSON (e.g., "123").
+     * Mapped to an INTEGER column in the database.
+     */
+    private String integerFromString;
 } 

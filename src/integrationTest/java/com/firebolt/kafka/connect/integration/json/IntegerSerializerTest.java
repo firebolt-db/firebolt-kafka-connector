@@ -15,6 +15,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -75,6 +76,36 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
         
         // check that all the records have the expected value
         verifyIntegerRecordsInFirebolt(testRecords);
+    }
+
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeJsonProducer();
+
+        IntegerTestRecord validRecord1 = aValidTestRecord(201)
+                .build();
+        IntegerTestRecord validRecord2 = aValidTestRecord(202)
+                .build();
+        IntegerTestRecord invalidRecord1 = aValidTestRecord(203)
+                .integerFromString("abc")
+                .build();
+        IntegerTestRecord invalidRecord2 = aValidTestRecord(204)
+                .integerFromString("1.23")
+                .build();
+
+        List<IntegerTestRecord> testRecords = List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2
+        );
+
+        publishMessages(testRecords);
+
+        List<IntegerTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyIntegerRecordsInFirebolt(expectedRecords);
     }
 
     /**
@@ -173,10 +204,13 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredInteger\" INTEGER NOT NULL, " +
                 "\"optionalInteger\" INTEGER NULL, " +
+                "\"optionalShort\" INTEGER NULL, " +
+                "\"optionalByte\" INTEGER NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(INTEGER NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(INTEGER NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(INTEGER NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(INTEGER NOT NULL) NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(INTEGER NOT NULL) NULL, " +
+                "\"integerFromString\" INTEGER NOT NULL" +
                 ")";
     }
     
@@ -189,32 +223,48 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"recordId\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\", \n " +
                 "      \"description\": \"Record identification number\"\n" +
                 "    },\n" +
                 "    \"requiredInteger\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\", \n " +
                 "      \"description\": \"Required integer field - must not be null\"\n" +
                 "    },\n" +
                 "    \"optionalInteger\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"integer\"}\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int32\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional integer field - can be null or omitted\"\n" +
+                "    },\n" +
+                "    \"optionalShort\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int16\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional short stored as INTEGER in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalByte\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int8\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional byte stored as INTEGER in Firebolt\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNullableElements\": {\n" +
                 "      \"type\": \"array\",\n" +
                 "      \"items\": {\n" +
                 "        \"oneOf\": [\n" +
                 "          {\"type\": \"null\"},\n" +
-                "          {\"type\": \"integer\"}\n" +
+                "          {\"type\": \"integer\", \"connect.type\": \"int32\"}\n" +
                 "        ]\n" +
                 "      },\n" +
                 "      \"description\": \"Required list where individual elements can be null\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNonNullElements\": {\n" +
                 "      \"type\": \"array\",\n" +
-                "      \"items\": {\"type\": \"integer\"},\n" +
+                "      \"items\": {\"type\": \"integer\", \"connect.type\": \"int32\"},\n" +
                 "      \"description\": \"Required list where individual elements cannot be null\"\n" +
                 "    },\n" +
                 "    \"optionalList\": {\n" +
@@ -225,7 +275,7 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"integer\"}\n" +
+                "              {\"type\": \"integer\", \"connect.type\": \"int32\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
@@ -237,13 +287,17 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
                 "        {\n" +
                 "          \"type\": \"array\",\n" +
-                "          \"items\": {\"type\": \"integer\"}\n" +
+                "          \"items\": {\"type\": \"integer\", \"connect.type\": \"int32\"}\n" +
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
+                "    },\n" +
+                "    \"integerFromString\": {\n" +
+                "      \"type\": \"string\",\n" +
+                "      \"description\": \"Integer value represented as string\"\n" +
                 "    }\n" +
                 "  },\n" +
-                "  \"required\": [\"recordId\", \"requiredInteger\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]\n" +
+                "  \"required\": [\"recordId\", \"requiredInteger\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"integerFromString\"]\n" +
                 "}";
     }
     
@@ -275,8 +329,9 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
         // Verify specific records by recordId
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredInteger\", \"optionalInteger\", " +
+            "\"optionalShort\", \"optionalByte\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\" " +
+            "\"optionalListWithNonNullElements\", \"integerFromString\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -292,6 +347,9 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                 Integer actualRecordId = rs.getInt("recordId");
                 Integer actualRequiredInteger = rs.getInt("requiredInteger");
                 Integer actualOptionalInteger = rs.getObject("optionalInteger") != null ? rs.getInt("optionalInteger") : null;
+                Integer actualOptionalShort = rs.getObject("optionalShort") != null ? rs.getInt("optionalShort") : null;
+                Integer actualOptionalByte = rs.getObject("optionalByte") != null ? rs.getInt("optionalByte") : null;
+                Integer actualIntegerFromString = rs.getInt("integerFromString");
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -313,6 +371,20 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                     assertEquals(expected.getOptionalInteger(), actualOptionalInteger, 
                         "OptionalInteger mismatch at index " + recordIndex);
                 }
+                if (expected.getOptionalShort() == null) {
+                    assertNull(actualOptionalShort, 
+                        "OptionalShort should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalShort().intValue(), actualOptionalShort, 
+                        "OptionalShort mismatch at index " + recordIndex);
+                }
+                if (expected.getOptionalByte() == null) {
+                    assertNull(actualOptionalByte, 
+                        "OptionalByte should be null at index " + recordIndex);
+                } else {
+                    assertEquals(expected.getOptionalByte().intValue(), actualOptionalByte, 
+                        "OptionalByte mismatch at index " + recordIndex);
+                }
                 
                 // Array verification using getArray()
                 verifyIntegerArray("requiredListWithNullableElements", 
@@ -328,6 +400,11 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                 // Optional list with non-null elements verification
                 verifyIntegerArray("optionalListWithNonNullElements", 
                     expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
+
+                // Verify integerFromString column matches parsed value of string
+                int expectedIntegerFromString = Integer.parseInt(expected.getIntegerFromString());
+                assertEquals(expectedIntegerFromString, actualIntegerFromString,
+                    "integerFromString mismatch at index " + recordIndex);
                 
                 recordIndex++;
             }
@@ -402,10 +479,13 @@ public class IntegerSerializerTest extends BaseIntegrationTest {
                 .recordId(recordId)
                 .requiredInteger(42)
                 .optionalInteger(100)
+                .optionalShort((short) (recordId % 2 == 0 ? 0 : 1))
+                .optionalByte((byte) (recordId % 128))
                 .requiredListWithNullableElements(Arrays.asList(1, null, 3, null, 5))
                 .requiredListWithNonNullElements(Arrays.asList(10, 20, 30, 40, 50))
                 .optionalList(Arrays.asList(100, 200, 300))
-                .optionalListWithNonNullElements(Arrays.asList(111, 222, 333));
+                .optionalListWithNonNullElements(Arrays.asList(111, 222, 333))
+                .integerFromString(String.valueOf(recordId));
     }
 
 }

@@ -352,6 +352,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 "\"properties\": {" +
                     "\"recordId\": {" +
                         "\"type\": \"integer\"," +
+                        "\"connect.type\": \"int32\",\n" +
                         "\"description\": \"Record identification number\"" +
                     "}," +
                     "\"requiredTimestamptz\": {" +

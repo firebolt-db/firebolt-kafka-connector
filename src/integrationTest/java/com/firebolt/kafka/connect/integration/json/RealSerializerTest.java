@@ -188,6 +188,8 @@ public class RealSerializerTest extends BaseIntegrationTest {
                 "\"properties\": {" +
                     "\"recordId\": {" +
                         "\"type\": \"integer\"," +
+                        "\"connect.type\": \"int32\",\n" +
+                        "\"connect.type\": \"int32\",\n" +
                         "\"description\": \"Record identification number\"" +
                     "}," +
                     "\"requiredReal\": {" +

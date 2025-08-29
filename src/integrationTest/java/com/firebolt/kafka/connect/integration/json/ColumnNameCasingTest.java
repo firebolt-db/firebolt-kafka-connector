@@ -100,6 +100,7 @@ public class ColumnNameCasingTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"ID\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Record identification number\"\n" +
                 "    },\n" +
                 "    \"Text\": {\n" +

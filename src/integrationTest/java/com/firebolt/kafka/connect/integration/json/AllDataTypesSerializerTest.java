@@ -657,6 +657,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"colInteger\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Integer field (NOT NULL)\"\n" +
                 "    },\n" +
                 "    \"colBigint\": {\n" +

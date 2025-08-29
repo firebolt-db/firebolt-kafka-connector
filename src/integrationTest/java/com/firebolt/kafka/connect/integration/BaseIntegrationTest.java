@@ -651,6 +651,7 @@ public abstract class BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"id\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Record identification number\"\n" +
                 "    },\n" +
                 "    \"value\": {\n" +

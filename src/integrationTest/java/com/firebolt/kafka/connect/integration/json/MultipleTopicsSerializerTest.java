@@ -301,6 +301,7 @@ public class MultipleTopicsSerializerTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"id\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Record ID\"\n" +
                 "    },\n" +
                 "    \"text\": {\n" +
@@ -321,6 +322,7 @@ public class MultipleTopicsSerializerTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"id\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Record ID\"\n" +
                 "    },\n" +
                 "    \"value\": {\n" +
@@ -345,6 +347,7 @@ public class MultipleTopicsSerializerTest extends BaseIntegrationTest {
                 "  \"properties\": {\n" +
                 "    \"id\": {\n" +
                 "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
                 "      \"description\": \"Record ID\"\n" +
                 "    },\n" +
                 "    \"userIds\": {\n" +
