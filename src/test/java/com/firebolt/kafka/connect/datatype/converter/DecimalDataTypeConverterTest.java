@@ -30,6 +30,56 @@ public class DecimalDataTypeConverterTest {
         testColumn = new TableSchema.Column("test_column", "decimal", 2, true);
     }
 
+    @Test
+    void testConvertAndSetWithBigDecimal() throws SQLException {
+        java.math.BigDecimal bd = new java.math.BigDecimal("123.456");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(bd)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setString(1, bd.toString());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "0",
+            "1",
+            "-1",
+            "42",
+            "-42",
+            "32767",
+            "-32768"
+    })
+    void testConvertAndSetWithIntegralNumbers(short value) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setString(1, java.math.BigDecimal.valueOf((long) value).toString());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "0.0",
+            "1.5",
+            "-1.5",
+            "42.25",
+            "-42.25"
+    })
+    void testConvertAndSetWithFloatingNumbers(double value) throws SQLException {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setString(1, java.math.BigDecimal.valueOf(value).toString());
+    }
+
     @ParameterizedTest
     @CsvSource({
         "'123.45'",
@@ -65,6 +115,33 @@ public class DecimalDataTypeConverterTest {
         assertThrows(ClassCastException.class, () -> {
             converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
         });
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"abc", "", " ", "+-1", "1,23"})
+    void testConvertAndSetWithInvalidDecimalStringThrowsColumnConversionFailed(String input) {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(input)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException.class,
+                () -> converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn)
+        );
+    }
+
+    @Test
+    void testConvertAndSetWithUnsupportedTypeThrowsColumnConversionFailed() {
+        Object unsupported = new Object();
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(unsupported)
+                .build();
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException.class,
+                () -> converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn)
+        );
     }
 
 } 

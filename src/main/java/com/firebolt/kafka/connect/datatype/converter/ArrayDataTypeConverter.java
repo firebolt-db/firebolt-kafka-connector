@@ -53,8 +53,9 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
                 return connection.createArrayOf("string", elements.toArray());
             }
         } else if (typeName.equals("numeric")) {
-            if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING) {
-                return connection.createArrayOf("string", elements.toArray());
+            if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING ||
+                    kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.BYTES) {
+                return connection.createArrayOf("string", elements.stream().map(objectValue -> objectValue == null ? null : String.valueOf(objectValue)).toArray());
             }
         } else if (typeName.equals("real")) {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.FLOAT32) {
