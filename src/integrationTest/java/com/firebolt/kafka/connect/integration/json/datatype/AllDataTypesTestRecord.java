@@ -1,17 +1,14 @@
 package com.firebolt.kafka.connect.integration.json.datatype;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,29 +16,6 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-/**
- * Custom serializer for List<BigDecimal> to ensure each element is serialized as a string.
- */
-class BigDecimalListSerializer extends JsonSerializer<List<BigDecimal>> {
-    @Override
-    public void serialize(List<BigDecimal> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-        if (value == null) {
-            gen.writeNull();
-            return;
-        }
-        
-        gen.writeStartArray();
-        for (BigDecimal decimal : value) {
-            if (decimal == null) {
-                gen.writeNull();
-            } else {
-                gen.writeString(decimal.toString());
-            }
-        }
-        gen.writeEndArray();
-    }
-}
 
 /**
  * Custom serializer for OffsetDateTime to convert to timestamp value (microseconds since epoch).
@@ -102,8 +76,6 @@ public class AllDataTypesTestRecord {
     private Integer colInteger;           // colInteger INTEGER NOT NULL
     private Long colBigint;              // colBigint BIGINT
 
-    @JsonSerialize(using = ToStringSerializer.class)
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private BigDecimal colNumeric;       // colNumeric NUMERIC(38,9) - serialized as string to preserve precision
     private Float colReal;               // colReal REAL
     private Double colDoublePrecision;   // colDoublePrecision DOUBLE PRECISION
@@ -131,7 +103,6 @@ public class AllDataTypesTestRecord {
     private List<LocalDate> colArrayDate;         // colArrayDate ARRAY(DATE)
     private List<Float> colArrayReal;             // colArrayReal ARRAY(REAL)
 
-    @JsonSerialize(using = BigDecimalListSerializer.class)
     private List<BigDecimal> colArrayNumeric;     // colArrayNumeric ARRAY(NUMERIC)
     private List<Double> colArrayDoublePrecision; // colArrayDoublePrecision ARRAY(DOUBLE PRECISION)
     @JsonSerialize(using = OffsetDateTimeListSerializer.class)

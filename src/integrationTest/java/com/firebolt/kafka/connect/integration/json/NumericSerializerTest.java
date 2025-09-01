@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect.integration.json;
 
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.NumericTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.math.BigDecimal;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -17,7 +16,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.TestInfo;
@@ -76,6 +75,38 @@ public class NumericSerializerTest extends BaseIntegrationTest {
         waitForDataInFirebolt(TABLE_NAME, testRecords.size());
         
         verifyNumericRecordsInFirebolt(testRecords);
+    }
+
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeJsonProducer();
+
+        NumericTestRecord validRecord1 = aValidTestRecord(301)
+                .bigDecimalFromString("42.42")
+                .build();
+        NumericTestRecord validRecord2 = aValidTestRecord(302)
+                .bigDecimalFromString("-17.5")
+                .build();
+        NumericTestRecord invalidRecord1 = aValidTestRecord(303)
+                .bigDecimalFromString("abc")
+                .build();
+        NumericTestRecord invalidRecord2 = aValidTestRecord(304)
+                .bigDecimalFromString("1,23")
+                .build();
+
+        List<NumericTestRecord> testRecords = List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2
+        );
+
+        publishMessages(testRecords);
+
+        List<NumericTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyNumericRecordsInFirebolt(expectedRecords);
     }
 
     /**
@@ -171,6 +202,13 @@ public class NumericSerializerTest extends BaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredNumeric\" NUMERIC(38,9) NOT NULL, " +
                 "\"optionalNumeric\" NUMERIC(38,9) NULL, " +
+                "\"optionalByte\" NUMERIC(38,9) NULL, " +
+                "\"optionalShort\" NUMERIC(38,9) NULL, " +
+                "\"optionalInt\" NUMERIC(38,9) NULL, " +
+                "\"optionalLong\" NUMERIC(38,9) NULL, " +
+                "\"optionalReal\" NUMERIC(38,9) NULL, " +
+                "\"optionalDouble\" NUMERIC(38,9) NULL, " +
+                "\"bigDecimalFromString\" NUMERIC(38,9) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(NUMERIC(38,9) NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(NUMERIC(38,9) NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(NUMERIC(38,9) NULL) NULL, " +
@@ -191,13 +229,65 @@ public class NumericSerializerTest extends BaseIntegrationTest {
                 "      \"description\": \"Record identification number\"\n" +
                 "    },\n" +
                 "    \"requiredNumeric\": {\n" +
-                "      \"type\": \"string\",\n" +
+                "      \"type\": \"number\",\n" +
+                "      \"connect.type\": \"bytes\",\n" +
+                "      \"title\": \"org.apache.kafka.connect.data.Decimal\", \n" +
+                "      \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" }, \n " +
                 "      \"description\": \"Required numeric field - must not be null\"\n" +
+                "    },\n" +
+                "    \"optionalByte\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int8\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional byte mapped to NUMERIC in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalShort\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int16\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional short mapped to NUMERIC in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalInt\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int32\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional int mapped to NUMERIC in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalLong\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int64\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional long mapped to NUMERIC in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalReal\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float32\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional real mapped to NUMERIC in Firebolt\"\n" +
+                "    },\n" +
+                "    \"optionalDouble\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional double mapped to NUMERIC in Firebolt\"\n" +
+                "    },\n" +
+                "    \"bigDecimalFromString\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"string\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"BigDecimal represented as string; mapped to NUMERIC in Firebolt\"\n" +
                 "    },\n" +
                 "    \"optionalNumeric\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"string\"}\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"bytes\", \"title\": \"org.apache.kafka.connect.data.Decimal\", \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" } }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional numeric field - can be null or omitted\"\n" +
                 "    },\n" +
@@ -206,14 +296,14 @@ public class NumericSerializerTest extends BaseIntegrationTest {
                 "      \"items\": {\n" +
                 "        \"oneOf\": [\n" +
                 "          {\"type\": \"null\"},\n" +
-                "          {\"type\": \"string\"}\n" +
+                "          {\"type\": \"number\", \"connect.type\": \"bytes\", \"title\": \"org.apache.kafka.connect.data.Decimal\", \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" } }\n" +
                 "        ]\n" +
                 "      },\n" +
                 "      \"description\": \"Required list where individual elements can be null\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNonNullElements\": {\n" +
                 "      \"type\": \"array\",\n" +
-                "      \"items\": {\"type\": \"string\"},\n" +
+                "      \"items\": {\"type\": \"number\", \"connect.type\": \"bytes\", \"title\": \"org.apache.kafka.connect.data.Decimal\", \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" } },\n" +
                 "      \"description\": \"Required list where individual elements cannot be null\"\n" +
                 "    },\n" +
                 "    \"optionalList\": {\n" +
@@ -224,7 +314,7 @@ public class NumericSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"string\"}\n" +
+                "              {\"type\": \"number\", \"connect.type\": \"bytes\", \"title\": \"org.apache.kafka.connect.data.Decimal\", \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" } }\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
@@ -236,7 +326,7 @@ public class NumericSerializerTest extends BaseIntegrationTest {
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
                 "        {\n" +
                 "          \"type\": \"array\",\n" +
-                "          \"items\": {\"type\": \"string\"}\n" +
+                "          \"items\": {\"type\": \"number\", \"connect.type\": \"bytes\", \"title\": \"org.apache.kafka.connect.data.Decimal\", \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" } }\n" +
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
@@ -438,8 +528,15 @@ public class NumericSerializerTest extends BaseIntegrationTest {
     private NumericTestRecord.NumericTestRecordBuilder aValidTestRecord(int recordId) {
         return NumericTestRecord.builder()
                 .recordId(recordId)
-                .requiredNumeric(new BigDecimal("42.123456789"))
+                    .requiredNumeric(new BigDecimal("42.123456789"))
                 .optionalNumeric(new BigDecimal("100.987654321"))
+                .optionalByte((byte) (recordId % 3))
+                .optionalShort((short) (recordId % 5))
+                .optionalInt(recordId * 10)
+                .optionalLong((long) recordId * 100)
+                .optionalReal(12.5f)
+                .optionalDouble(123.456)
+                .bigDecimalFromString("123456.789123456")
                 .requiredListWithNullableElements(Arrays.asList(
                     new BigDecimal("1.111111111"), 
                     null, 

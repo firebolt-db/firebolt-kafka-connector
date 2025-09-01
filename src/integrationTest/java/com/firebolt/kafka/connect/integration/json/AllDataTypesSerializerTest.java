@@ -671,12 +671,10 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
                 "        {\n" +
-                "          \"type\": \"string\",\n" +
-                "          \"connect.type\": \"org.apache.kafka.connect.data.Decimal\",\n" +
-                "          \"connect.parameters\": {\n" +
-                "            \"scale\": \"9\"\n" +
-                "          },\n" +
-                "          \"description\": \"High-precision numeric value serialized as string to preserve full NUMERIC(38,9) precision\"\n" +
+                "          \"type\": \"number\",\n" +
+                "          \"connect.type\": \"bytes\",\n" +
+                "          \"title\": \"org.apache.kafka.connect.data.Decimal\",\n" +
+                "          \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" }\n" +
                 "        }\n" +
                 "      ]\n" +
                 "    },\n" +
@@ -846,7 +844,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"string\"}\n" +
+                "              {\"type\": \"number\", \"connect.type\": \"bytes\", \"title\": \"org.apache.kafka.connect.data.Decimal\", \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" } }\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
