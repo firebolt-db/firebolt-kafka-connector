@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import org.apache.kafka.connect.data.Schema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -61,7 +62,11 @@ public class TimestampDataTypeConverterTest {
         "'2023-12-25 23:59:59.999'",
         "'1970-01-01 00:00:00.0'",
         "'2000-02-29 12:30:45'",
-        "'1999-12-31 23:59:59.123456'"
+        "'1999-12-31 23:59:59.123456'",
+        "'2024-01-15T14:30:45'",
+        "'2024-01-15T14:30:45.123456789'",
+        "'2024-01-15T14:30:45.123456789Z'",
+        "'2024-01-15 14:30:45.123456789Z'"
     })
     void testConvertAndSetWithStringSchemaType(String timestampString) throws SQLException {
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
@@ -93,9 +98,9 @@ public class TimestampDataTypeConverterTest {
                 .schemaType(Schema.Type.STRING)
                 .build();
 
-        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
-
-        verify(mockStatement).setString(1, null);
+        org.junit.jupiter.api.Assertions.assertThrows(ColumnConversionFailedException.class, () -> {
+            converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+        });
     }
 
     @Test
@@ -133,5 +138,34 @@ public class TimestampDataTypeConverterTest {
 
         Timestamp expectedTimestamp = new Timestamp(0L);
         verify(mockStatement).setTimestamp(1, expectedTimestamp);
+    }
+
+    @Test
+    void testConvertAndSetWithDateValue() throws SQLException {
+        java.util.Date date = new java.util.Date(1700000000000L);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(date)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setTimestamp(1, new Timestamp(date.getTime()));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "'2024-01-15T14:30:45+01:00'",
+        "'not-a-date'",
+        "'2024-01-15T14:30:45.'"
+    })
+    void testConvertAndSetWithInvalidStringShouldThrow(String invalid) {
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(invalid)
+                .schemaType(Schema.Type.STRING)
+                .build();
+
+        assertThrows(ColumnConversionFailedException.class, () -> {
+            converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+        });
     }
 }

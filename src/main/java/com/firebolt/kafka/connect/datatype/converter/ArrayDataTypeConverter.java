@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Base64;
 import java.util.List;
@@ -21,6 +22,7 @@ import org.apache.kafka.connect.data.Schema;
 public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
 
     private static final String DATE_ARRAY_TYPE_NAME = "date";
+    private static final String TIMESTAMP_ARRAY_TYPE_NAME = "timestamp";
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
@@ -37,12 +39,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         }
 
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
-        if (typeName.equals("timestamp")) {
-            if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
-                return connection.createArrayOf(typeName, elements.stream().map(objectValue -> TimestampUtil.asTimestamp((Long) objectValue)).toArray());
-            } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
-                return connection.createArrayOf("string", elements.toArray());
-            }
+        if (typeName.equals(TIMESTAMP_ARRAY_TYPE_NAME)) {
+            return createTimestampArray(connection, kafkaMessageColumnValue, fireboltColumn);
         } else if (typeName.equals("timestamptz")) {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
                 return connection.createArrayOf(typeName, elements.stream().map(objectValue -> TimestampUtil.asOffsetDateTime((Long) objectValue)).toArray());
@@ -72,7 +70,7 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         if (fireboltColumn.getDataType().equals("array(integer)")) {
             return "integer";
         } else if (fireboltColumn.getDataType().equals("array(timestamp)")) {
-            return "timestamp";
+            return TIMESTAMP_ARRAY_TYPE_NAME;
         } else if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
             return "timestamptz";
         } else if (fireboltColumn.getDataType().equals("array(date)")) {
@@ -105,6 +103,35 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         }
 
         throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the date array to firebolt column");
+    }
+
+    private Array createTimestampArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+
+        if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
+            return connection.createArrayOf(TIMESTAMP_ARRAY_TYPE_NAME, elements.stream().map(this::asStringTimestamp).toArray());
+        } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
+            return connection.createArrayOf("string", elements.toArray());
+        } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
+            return connection.createArrayOf(TIMESTAMP_ARRAY_TYPE_NAME, elements.stream().map(this::asStringTimestamp).toArray());
+        }
+
+        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the timestamp array to firebolt column");
+    }
+
+    private Object asStringTimestamp(Object arrayElement) {
+        if (arrayElement == null) {
+            return null;
+        }
+
+        if (arrayElement instanceof java.util.Date) {
+            return new Timestamp(((java.util.Date) arrayElement).getTime());
+        } else if (arrayElement instanceof Long) {
+            return TimestampUtil.asTimestamp((Long) arrayElement);
+        }
+
+
+        throw new ColumnConversionFailedException("","", "failed to convert string as timestamp");
     }
 
     private Object asStringDate(Object arrayElement) {

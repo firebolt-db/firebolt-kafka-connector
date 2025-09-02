@@ -475,6 +475,45 @@ public class ArrayDataTypeConverterTest {
         verify(mockStatement).setArray(1, mockArray);
     }
 
+    @Test
+    void testConvertAndSetWithTimestampArrayInt64SchemaUsingDateValues() throws SQLException {
+        // Values as java.util.Date should be converted to java.sql.Timestamp
+        java.util.Date d1 = new java.util.Date(1700000000000L); // 2023-11-14T22:13:20Z approx
+        java.util.Date d2 = new java.util.Date(1700003600000L);
+        List<java.util.Date> timestampValues = Arrays.asList(d1, null, d2);
+
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(timestampValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, timestampArrayColumn);
+
+        Timestamp[] expected = new Timestamp[]{
+                new Timestamp(d1.getTime()),
+                null,
+                new Timestamp(d2.getTime())
+        };
+        verify(mockConnection).createArrayOf(eq("timestamp"), eq(expected));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTimestampArrayUnsupportedSubtypeThrows() {
+        List<Integer> values = Arrays.asList(1, 2, 3);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(values)
+                .schemaSubType(Schema.Type.INT32)
+                .build();
+
+        TableSchema.Column tsArrayColumn = new TableSchema.Column("test_column", "array(timestamp)", 2003, true);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException.class,
+                () -> converter.convertAndSet(mockStatement, 1, kafkaValue, tsArrayColumn)
+        );
+    }
+
     @ParameterizedTest
     @CsvSource({
         "0",                    // Epoch

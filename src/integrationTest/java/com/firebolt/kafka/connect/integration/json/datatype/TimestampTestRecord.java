@@ -1,5 +1,8 @@
 package com.firebolt.kafka.connect.integration.json.datatype;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateTimeListSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateTimeSerializer;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -33,38 +36,54 @@ public class TimestampTestRecord {
      * Required timestamp field - must not be null.
      * Maps to Firebolt TIMESTAMP NOT NULL.
      */
+    @JsonSerialize(using = LocalDateTimeSerializer.class)
     private LocalDateTime requiredTimestamp;
-    
-    /**
-     * Optional timestamp field - can be null or omitted.
-     * Maps to Firebolt TIMESTAMP NULL.
-     */
-    private LocalDateTime optionalTimestamp;
-    
+
     /**
      * Required array where individual timestamp elements can be null.
      * Maps to Firebolt ARRAY(TIMESTAMP NULL) NOT NULL.
      */
+    @JsonSerialize(using = LocalDateTimeListSerializer.class)
     private List<LocalDateTime> requiredListWithNullableElements;
-    
+
     /**
      * Required array where individual timestamp elements cannot be null.
      * Maps to Firebolt ARRAY(TIMESTAMP NOT NULL) NOT NULL.
      */
+    @JsonSerialize(using = LocalDateTimeListSerializer.class)
     private List<LocalDateTime> requiredListWithNonNullElements;
-    
+
+    /**
+     * Optional timestamp field - can be null or omitted.
+     * Maps to Firebolt TIMESTAMP NULL.
+     */
+    @JsonSerialize(using = LocalDateTimeSerializer.class)
+    private LocalDateTime optionalTimestamp;
+
+    /**
+     * This will be serialized as string
+     */
+    private LocalDateTime timestampAsString;
+
     /**
      * Optional array - entire array can be null/omitted, and elements can be null.
      * Maps to Firebolt ARRAY(TIMESTAMP NULL) NULL.
      */
+    @JsonSerialize(using = LocalDateTimeListSerializer.class)
     private List<LocalDateTime> optionalList;
     
     /**
      * Optional array where individual timestamp elements cannot be null.
      * Maps to Firebolt ARRAY(TIMESTAMP NOT NULL) NULL.
      */
+    @JsonSerialize(using = LocalDateTimeListSerializer.class)
     private List<LocalDateTime> optionalListWithNonNullElements;
-    
+
+    /**
+     * These values will be serialized as strings
+     */
+    private List<LocalDateTime> timestampListAsString;
+
     /**
      * Microsecond precision timestamp as Long (microseconds since epoch).
      * This field preserves microsecond precision by bypassing Kafka Connect's Timestamp logical type.
