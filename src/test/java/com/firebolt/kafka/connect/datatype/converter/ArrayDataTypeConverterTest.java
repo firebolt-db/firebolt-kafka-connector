@@ -16,6 +16,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -533,14 +534,18 @@ public class ArrayDataTypeConverterTest {
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn);
 
-        // Verify that createArrayOf is called with timestamptz type and any array of objects
-        verify(mockConnection).createArrayOf(eq("timestamptz"), any(Object[].class));
+        // Verify values converted to OffsetDateTime via TimestampUtil
+        Object[] expected = timestampValues.stream()
+                .map(TimestampUtil::asOffsetDateTime)
+                .toArray();
+        verify(mockConnection).createArrayOf(eq("timestamptz"), eq(expected));
         verify(mockStatement).setArray(1, mockArray);
     }
 
     @Test
     void testConvertAndSetWithTimestamptzArrayStringSchema() throws SQLException {
-        List<String> timestampStrings = Arrays.asList("2021-01-01 00:00:00", "2024-12-31 23:59:59");
+        // Must be valid timestamptz strings
+        List<String> timestampStrings = Arrays.asList("2021-01-01 00:00:00+00:00", "2024-12-31T23:59:59Z");
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(timestampStrings)
                 .schemaSubType(Schema.Type.STRING)
@@ -582,8 +587,12 @@ public class ArrayDataTypeConverterTest {
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn);
 
-        // Verify that createArrayOf is called with timestamptz type and any array of objects
-        verify(mockConnection).createArrayOf(eq("timestamptz"), any(Object[].class));
+        Object[] expected = new Object[] {
+                TimestampUtil.asOffsetDateTime(1609459200000L),
+                null,
+                TimestampUtil.asOffsetDateTime(1609459260000L)
+        };
+        verify(mockConnection).createArrayOf(eq("timestamptz"), eq(expected));
         verify(mockStatement).setArray(1, mockArray);
     }
 
@@ -607,6 +616,20 @@ public class ArrayDataTypeConverterTest {
         // Verify that createArrayOf is called with timestamptz type and any array of objects
         verify(mockConnection).createArrayOf(eq("timestamptz"), any(Object[].class));
         verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTimestamptzArrayStringSchemaInvalidThrows() {
+        List<String> invalidStrings = Arrays.asList("2021-01-01 00:00:00", "invalid");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(invalidStrings)
+                .schemaSubType(Schema.Type.STRING)
+                .build();
+
+        TableSchema.Column timestamptzArrayColumn = new TableSchema.Column("test_column", "array(timestamptz)", 2003, true);
+
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, timestamptzArrayColumn));
     }
 
     @ParameterizedTest

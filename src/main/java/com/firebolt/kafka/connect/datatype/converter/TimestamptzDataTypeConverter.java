@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
@@ -14,8 +15,17 @@ public class TimestamptzDataTypeConverter extends CompositeDataTypeConverter {
         if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.INT64) {
             OffsetDateTime offsetDateTime = TimestampUtil.asOffsetDateTime((Long) kafkaMessageColumnValue.getValue());
             statement.setObject(paramIndex, offsetDateTime);
+            return;
         } else if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING) {
-            statement.setString(paramIndex, (String) kafkaMessageColumnValue.getValue());
+            String timestamp = (String) kafkaMessageColumnValue.getValue();
+
+            // make sure we can convert it to a valid timestamptz value
+            if (FireboltTimestamptzConverter.isValidTimestamptz(timestamp)) {
+                statement.setString(paramIndex, timestamp);
+                return;
+            }
         }
+
+        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert value to valid timestamptz column");
     }
 }

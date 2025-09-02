@@ -34,24 +34,24 @@ public class TimestamptzTestRecord {
      * Maps to Firebolt TIMESTAMPTZ NOT NULL.
      */
     private OffsetDateTime requiredTimestamptz;
-    
-    /**
-     * Optional timestamptz field - can be null or omitted.
-     * Maps to Firebolt TIMESTAMPTZ NULL.
-     */
-    private OffsetDateTime optionalTimestamptz;
-    
+
     /**
      * Required array where individual timestamptz elements can be null.
      * Maps to Firebolt ARRAY(TIMESTAMPTZ NULL) NOT NULL.
      */
     private List<OffsetDateTime> requiredListWithNullableElements;
-    
+
     /**
      * Required array where individual timestamptz elements cannot be null.
      * Maps to Firebolt ARRAY(TIMESTAMPTZ NOT NULL) NOT NULL.
      */
     private List<OffsetDateTime> requiredListWithNonNullElements;
+
+    /**
+     * Optional timestamptz field - can be null or omitted.
+     * Maps to Firebolt TIMESTAMPTZ NULL.
+     */
+    private OffsetDateTime optionalTimestamptz;
     
     /**
      * Optional array - entire array can be null/omitted, and elements can be null.
@@ -71,7 +71,9 @@ public class TimestamptzTestRecord {
      * Maps to Firebolt TIMESTAMPTZ NOT NULL.
      */
     private Long microsecondTimestamptz;
-    
+
+    private String timestamptzString;
+
     /**
      * Array of timestamptz strings with microsecond precision in ISO-8601 format.
      * Allows preservation of microsecond precision through string representation.
