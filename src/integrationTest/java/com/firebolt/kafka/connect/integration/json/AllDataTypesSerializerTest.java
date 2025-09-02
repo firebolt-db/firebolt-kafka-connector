@@ -5,16 +5,15 @@ import com.firebolt.kafka.connect.integration.json.datatype.AllDataTypesTestReco
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDate;
+import java.text.DateFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -38,13 +37,8 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
     private static final String ALL_DATA_TYPES_TABLE_NAME = "all_data_types_test_table";
     private static final String ALL_DATA_TYPES_TOPIC_NAME = "all-data-types-test-topic";
     private static final String ALL_DATA_TYPES_SCHEMA_SUBJECT = ALL_DATA_TYPES_TOPIC_NAME + "-value";
-    
-    // this is until we fix the offsetDateTime as it seems not to be working
-    DateTimeFormatter OFFSET_DATE_FORMATTER = new DateTimeFormatterBuilder()
-            .appendPattern("yyyy-MM-dd HH:mm:ss")
-            .appendFraction(ChronoField.MICRO_OF_SECOND, 1, 6, true)
-            .appendPattern("XXX")  // Accepts +00 or +03:00
-            .toFormatter();
+
+    private static final DateFormat ISO_8601_DATE_FORMAT = new java.text.SimpleDateFormat("yyyy-MM-dd");
 
     private Producer<String, AllDataTypesTestRecord> producer;
 
@@ -148,7 +142,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 .colDoublePrecision(Double.MAX_VALUE)
                 .colText("Edge Case Test Data with very long text that might exceed normal limits")
                 .colBoolean(false)
-                .colDate(LocalDate.of(2099, 12, 31))
+                .colDate(createDate(2099, Calendar.DECEMBER, 31))
                 .colTimestamp(LocalDateTime.of(2099, 12, 31, 23, 59, 59, 999999000))
                 .colTimestamptz(OffsetDateTime.of(2099, 12, 31, 23, 59, 59, 999999000, ZoneOffset.UTC))
                 .colBytea(Base64.getEncoder().encodeToString("edge_case_binary_data".getBytes()))
@@ -186,9 +180,9 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 .colArrayIntSyntax1(Arrays.asList(37, 40, 51, 35))
                 .colArrayIntSyntax2(Arrays.asList(774, 840, 130, 392))
                 .colArrayDate(Arrays.asList(
-                    LocalDate.of(2024, 1, 1),
-                    LocalDate.of(2024, 1, 2),
-                    LocalDate.of(2024, 1, 3)
+                    createDate(2024, Calendar.JANUARY, 1),
+                    createDate(2024, Calendar.JANUARY, 2),
+                    createDate(2024, Calendar.JANUARY, 3)
                 ))
                 .colArrayReal(Arrays.asList(37.7749f, 40.7128f, 51.5074f, 35.6762f))
                 .build(),
@@ -201,7 +195,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 .colDoublePrecision(-1.23456789)
                 .colText("Variety Test Data with special characters: !@#$%^&*()")
                 .colBoolean(true)
-                .colDate(LocalDate.of(1970, 1, 1))
+                .colDate(createDate(1970, Calendar.JANUARY, 1))
                 .colTimestamp(LocalDateTime.of(2000, 1, 1, 0, 0, 30, 0))
                 .colTimestamptz(OffsetDateTime.of(2000, 1, 1, 0, 0, 35, 0, ZoneOffset.UTC))
                 .colBytea(Base64.getEncoder().encodeToString("variety_binary_data".getBytes()))
@@ -226,6 +220,16 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
     }
 
     /**
+     * Helper to create java.util.Date at midnight UTC for a given Y/M/D.
+     */
+    private Date createDate(int year, int monthConstant, int dayOfMonth) {
+        Calendar c = Calendar.getInstance();
+        c.set(year, monthConstant, dayOfMonth, 0, 0, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTime();
+    }
+
+    /**
      * Helper method to create a valid AllDataTypesTestRecord with default values.
      */
     private AllDataTypesTestRecord.AllDataTypesTestRecordBuilder aValidAllDataTypesTestRecord(int colInteger) {
@@ -244,35 +248,35 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
             .colText("Basic Test Data")
             
             // Date and timestamp types
-            .colDate(LocalDate.of(2024, 1, 1))
+            .colDate(createDate(2024, Calendar.JANUARY, 1))
             .colTimestamp(LocalDateTime.of(2024, 1, 1, 12, 0, 15, 0))
             .colTimestamptz(OffsetDateTime.of(2024, 1, 1, 12, 0, 15, 0, ZoneOffset.UTC))
             
             // Binary type - base64 encoded "hello"
             .colBytea(Base64.getEncoder().encodeToString("hello".getBytes()))
-            
+
             // Array type with nullable elements
             .colArrayTextNullable(Arrays.asList("apple", null, "banana", "cherry"))
-            
+
             // Array type with non-null elements only
             .colArrayTextNotNull(Arrays.asList("apple", "banana", "cherry", "date"))
-            
+
             // Integer array types
             .colArrayIntSyntax1(Arrays.asList(1, 2, 3, 4, 5))
             .colArrayIntSyntax2(Arrays.asList(10, 20, 30, 40, 50))
-            
+
             // Date and Real array types
             .colArrayDate(Arrays.asList(
-                LocalDate.of(2024, 1, 1),
-                LocalDate.of(2024, 1, 2),
-                LocalDate.of(2024, 1, 3)
+                createDate(2024, 1, 1),
+                createDate(2024, 1, 2),
+                createDate(2024, 1, 3)
             ))
             .colArrayReal(Arrays.asList(1.1f, 2.2f, 3.3f, 4.4f, 5.5f))
 
             // New array types
             .colArrayNumeric(Arrays.asList(
                 new BigDecimal("100.123456789"),
-                new BigDecimal("200.987654321"), 
+                new BigDecimal("200.987654321"),
                 new BigDecimal("300.555555555")
             ))
             .colArrayDoublePrecision(Arrays.asList(1.11111, 2.22222, 3.33333, 4.44444))
@@ -359,10 +363,11 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 assertEquals(expected.getColBoolean(), actualColBoolean, 
                     "ColBoolean mismatch at index " + recordIndex);
                 
-                // Verify colDate field (convert java.sql.Date to LocalDate for comparison)
+                // Verify colDate field by ISO string compare
                 if (actualColDate != null && expected.getColDate() != null) {
-                    java.time.LocalDate actualLocalDate = actualColDate.toLocalDate();
-                    assertEquals(expected.getColDate(), actualLocalDate,
+                    String actualIso = actualColDate.toString();
+                    String expectedIso = ISO_8601_DATE_FORMAT.format(expected.getColDate());
+                    assertEquals(expectedIso, actualIso,
                         "ColDate mismatch at index " + recordIndex);
                 }
                 
@@ -419,10 +424,8 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                         throw new RuntimeException("Failed to parse colArrayTextNotNull PostgreSQL array", e);
                     }
                 } else if (actualColArrayTextNotNull == null && expected.getColArrayTextNotNull() == null) {
-                    // Both are null, which is valid
                     log.debug("Both actualColArrayTextNotNull and expected.getColArrayTextNotNull() are null");
                 } else {
-                    // One is null, the other is not - this is a mismatch
                     assertEquals(expected.getColArrayTextNotNull(), actualColArrayTextNotNull,
                         "ColArrayTextNotNull null mismatch at index " + recordIndex);
                 }
@@ -441,10 +444,8 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                         throw new RuntimeException("Failed to parse colArrayIntSyntax1 PostgreSQL array", e);
                     }
                 } else if (actualColArrayIntSyntax1 == null && expected.getColArrayIntSyntax1() == null) {
-                    // Both are null, which is valid
                     log.debug("Both actualColArrayIntSyntax1 and expected.getColArrayIntSyntax1() are null");
                 } else {
-                    // One is null, the other is not - this is a mismatch
                     assertEquals(expected.getColArrayIntSyntax1(), actualColArrayIntSyntax1,
                         "ColArrayIntSyntax1 null mismatch at index " + recordIndex);
                 }
@@ -476,10 +477,11 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                     try {
                         // Parse PostgreSQL array format: {"2024-01-01","2024-01-02","2024-01-03"}
                         List<String> actualStringArray = parsePostgreSQLArray(actualColArrayDate);
-                        List<LocalDate> actualArray = actualStringArray.stream()
-                                .map(LocalDate::parse)
+                        List<String> actualArray = actualStringArray;
+                        List<String> expectedArray = expected.getColArrayDate().stream()
+                                .map(d -> ISO_8601_DATE_FORMAT.format(d))
                                 .collect(Collectors.toList());
-                        assertEquals(expected.getColArrayDate(), actualArray,
+                        assertEquals(expectedArray, actualArray,
                             "ColArrayDate mismatch at index " + recordIndex);
                     } catch (Exception e) {
                         log.error("Failed to parse colArrayDate PostgreSQL array: {}", actualColArrayDate, e);
@@ -572,11 +574,10 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                     assertEquals(expected.getColArrayDoublePrecision(), actualColArrayDoublePrecision,
                         "ColArrayDoublePrecision null mismatch at index " + recordIndex);
                 }
-                
-                // Verify colArrayTimestamptz field (parse PostgreSQL array format)
+
+                // Verify colArrayTimestamptz field (parse PostgreSQL array format to OffsetDateTime)
                 if (actualColArrayTimestamptz != null && expected.getColArrayTimestamptz() != null) {
                     try {
-                        // Parse PostgreSQL array format: {"2024-01-01T12:00:00Z","2024-01-02T13:30:00+02:00"}
                         List<String> actualStringArray = parsePostgreSQLArray(actualColArrayTimestamptz);
                         List<OffsetDateTime> actualArray = actualStringArray.stream()
                                 .map(this::normalizePostgreSQLTimestamp)
@@ -598,15 +599,13 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                         throw new RuntimeException("Failed to parse colArrayTimestamptz PostgreSQL array", e);
                     }
                 } else if (actualColArrayTimestamptz == null && expected.getColArrayTimestamptz() == null) {
-                    // Both are null, which is valid
                     log.debug("Both actualColArrayTimestamptz and expected.getColArrayTimestamptz() are null");
                 } else {
-                    // One is null, the other is not - this is a mismatch
                     assertEquals(expected.getColArrayTimestamptz(), actualColArrayTimestamptz,
                         "ColArrayTimestamptz null mismatch at index " + recordIndex);
                 }
-                
-                // Verify colArrayTimestamp field (parse PostgreSQL array format)
+
+                // Verify colArrayTimestamp field (parse PostgreSQL array format to LocalDateTime)
                 if (actualColArrayTimestamp != null && expected.getColArrayTimestamp() != null) {
                     try {
                         // Parse PostgreSQL array format: {"2024-01-01T12:00:00","2024-01-02T13:30:00"}
@@ -628,10 +627,8 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                         throw new RuntimeException("Failed to parse colArrayTimestamp PostgreSQL array", e);
                     }
                 } else if (actualColArrayTimestamp == null && expected.getColArrayTimestamp() == null) {
-                    // Both are null, which is valid
                     log.debug("Both actualColArrayTimestamp and expected.getColArrayTimestamp() are null");
                 } else {
-                    // One is null, the other is not - this is a mismatch
                     assertEquals(expected.getColArrayTimestamp(), actualColArrayTimestamp,
                         "ColArrayTimestamp null mismatch at index " + recordIndex);
                 }
@@ -709,7 +706,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "    \"colDate\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"string\", \"format\": \"date\"}\n" +
+                "        {\"type\": \"integer\", \"connect.type\": \"int32\", \"title\": \"org.apache.kafka.connect.data.Date\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Date field\"\n" +
                 "    },\n" +
@@ -801,7 +798,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"string\", \"format\": \"date\"}\n" +
+                "              {\"type\": \"integer\", \"connect.type\": \"int32\", \"title\": \"org.apache.kafka.connect.data.Date\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
@@ -963,90 +960,6 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
         }
         
         // Add the last element
-        if (current.length() > 0) {
-            elements.add(current.toString());
-        }
-        
-        return elements;
-    }
-
-    /**
-     * Parses a PostgreSQL nested array string into a List of Lists of Integers.
-     * Handles NULL values, quoted strings, and simple nested arrays.
-     * @param arrayString The PostgreSQL nested array string (e.g., {{1,2},{3,4}})
-     * @return A List of Lists of Integers, with NULL values represented as null.
-     */
-    private List<List<Integer>> parsePostgreSQLNestedArray(String arrayString) {
-        List<List<Integer>> result = new ArrayList<>();
-        if (arrayString == null || arrayString.trim().isEmpty() || arrayString.equals("NULL")) {
-            return null; // Represent NULL as null
-        }
-
-        // Remove outer curly braces
-        String content = arrayString.substring(1, arrayString.length() - 1);
-        if (content.trim().isEmpty()) {
-            return result; // Empty array
-        }
-        
-        // Use a more sophisticated approach to parse nested arrays
-        // We need to track brace depth to properly identify inner arrays
-        List<String> innerArrayStrings = parseNestedArrayElements(content);
-        
-        for (String innerArrayString : innerArrayStrings) {
-            String trimmed = innerArrayString.trim();
-            if (trimmed.equals("NULL")) {
-                result.add(null); // PostgreSQL NULL becomes Java null
-            } else if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-                // Parse the inner array
-                List<Integer> innerArray = parsePostgreSQLArray(trimmed).stream()
-                        .map(Integer::parseInt)
-                        .collect(Collectors.toList());
-                result.add(innerArray);
-            } else {
-                // This case should ideally not happen for a valid nested array
-                log.warn("Unexpected element in nested array: {}", trimmed);
-                result.add(null); // Or throw an error, depending on desired strictness
-            }
-        }
-        return result;
-    }
-    
-    /**
-     * Parses nested array elements, properly handling brace-delimited inner arrays.
-     * Example: {{1,2},{3,4}} -> ["{1,2}", "{3,4}"]
-     */
-    private List<String> parseNestedArrayElements(String content) {
-        List<String> elements = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        int braceDepth = 0;
-        
-        for (int i = 0; i < content.length(); i++) {
-            char c = content.charAt(i);
-            
-            if (c == '{') {
-                braceDepth++;
-                current.append(c);
-            } else if (c == '}') {
-                braceDepth--;
-                current.append(c);
-                
-                // If we've closed all braces, we've found a complete inner array
-                if (braceDepth == 0) {
-                    elements.add(current.toString());
-                    current = new StringBuilder();
-                }
-            } else if (c == ',' && braceDepth == 0) {
-                // Comma at depth 0 separates inner arrays
-                if (current.length() > 0) {
-                    elements.add(current.toString());
-                    current = new StringBuilder();
-                }
-            } else {
-                current.append(c);
-            }
-        }
-        
-        // Add the last element if there's any remaining content
         if (current.length() > 0) {
             elements.add(current.toString());
         }

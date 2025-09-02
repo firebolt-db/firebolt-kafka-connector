@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.Date;
@@ -19,13 +20,15 @@ import org.apache.kafka.connect.data.Schema;
  */
 public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
 
+    private static final String DATE_ARRAY_TYPE_NAME = "date";
+
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
         Array array = convertToArray(statement.getConnection(), kafkaMessageColumnValue, fireboltColumn);
         statement.setArray(paramIndex, array);
     }
 
-    private Array convertToArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+    private Array convertToArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
         List<Object> elements = (List) kafkaMessageColumnValue.getValue();
 
         String typeName = detectTypeName(fireboltColumn);
@@ -46,12 +49,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
                 return connection.createArrayOf("string", elements.toArray());
             }
-        } else if (typeName.equals("date")) {
-            if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT32) {
-                return connection.createArrayOf(typeName, elements.stream().map(objectValue -> objectValue == null ? null : TimestampUtil.fromDaysSinceEpoch((Integer) objectValue)).toArray());
-            } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
-                return connection.createArrayOf("string", elements.toArray());
-            }
+        } else if (typeName.equals(DATE_ARRAY_TYPE_NAME)) {
+            return createDateArray(connection, kafkaMessageColumnValue, fireboltColumn);
         } else if (typeName.equals("numeric")) {
             if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING ||
                     kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.BYTES) {
@@ -77,7 +76,7 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         } else if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
             return "timestamptz";
         } else if (fireboltColumn.getDataType().equals("array(date)")) {
-            return "date";
+            return DATE_ARRAY_TYPE_NAME;
         } else if (fireboltColumn.getDataType().equals("array(numeric)")) {
             return "numeric";
         } else if (fireboltColumn.getDataType().equals("array(bigint)")) {
@@ -98,5 +97,30 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         return "string";
     }
 
+    private Array createDateArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+
+        if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING || kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT32) {
+            return connection.createArrayOf(DATE_ARRAY_TYPE_NAME, elements.stream().map(this::asStringDate).toArray());
+        }
+
+        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the date array to firebolt column");
+    }
+
+    private Object asStringDate(Object arrayElement) {
+        if (arrayElement == null) {
+            return null;
+        }
+
+        if (arrayElement instanceof java.util.Date) {
+            return new Date(((java.util.Date) arrayElement).getTime());
+        }
+
+        if (arrayElement instanceof String && isIsoLocalDate((String) arrayElement)) {
+            return arrayElement;
+        }
+
+        throw new ColumnConversionFailedException("","", "failed to convert string as date");
+    }
 
 }

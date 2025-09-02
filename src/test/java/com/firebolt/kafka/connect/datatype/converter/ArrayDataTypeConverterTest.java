@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.apache.kafka.connect.data.Schema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,7 @@ public class ArrayDataTypeConverterTest {
     private TableSchema.Column textArrayColumn;
     private TableSchema.Column timestampArrayColumn;
     private TableSchema.Column numericArrayColumn;
+    private TableSchema.Column dateArrayColumn;
 
     @BeforeEach
     void setUp() throws SQLException {
@@ -51,6 +53,7 @@ public class ArrayDataTypeConverterTest {
         textArrayColumn = new TableSchema.Column("test_column", "array(text)", 2003, true);
         timestampArrayColumn = new TableSchema.Column("test_column", "array(timestamp)", 2003, true);
         numericArrayColumn = new TableSchema.Column("test_column", "array(numeric)", 2003, true);
+        dateArrayColumn = new TableSchema.Column("test_column", "array(date)", 2003, true);
         
         when(mockStatement.getConnection()).thenReturn(mockConnection);
         when(mockConnection.createArrayOf(any(String.class), any(Object[].class))).thenReturn(mockArray);
@@ -241,21 +244,107 @@ public class ArrayDataTypeConverterTest {
     }
 
     @Test
-    void testConvertAndSetWithDateArrayType() throws SQLException {
-        // Convert timestamps to days since epoch for the new DateDataTypeConverter
-        // 1672531200000L -> 19358 days (2023-01-01)
-        // 1609459200000L -> 18628 days (2021-01-01) 
-        // 946684800000L -> 10957 days (2000-01-01)
-        List<Integer> dateValues = Arrays.asList(19358, 18628, 10957);
+    void testConvertAndSetWithDateArrayTypeStringSchemaValidStrings() throws SQLException {
+        List<String> dateValues = Arrays.asList("2023-01-01", "2024-12-31", null, "2000-02-29");
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(dateValues)
+                .schemaSubType(Schema.Type.STRING)
                 .build();
-
-        TableSchema.Column dateArrayColumn = new TableSchema.Column("test_column", "array(date)", 2003, true);
 
         converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn);
 
         verify(mockConnection).createArrayOf(eq("date"), eq(dateValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithDateArrayTypeStringSchemaUtilDates() throws SQLException {
+        java.sql.Date d1 = java.sql.Date.valueOf("2023-01-01");
+        java.sql.Date d2 = java.sql.Date.valueOf("2020-02-29");
+        java.util.Date u1 = new java.util.Date(d1.getTime());
+        java.util.Date u2 = new java.util.Date(d2.getTime());
+
+        List<Object> values = Arrays.asList(u1, null, u2);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(values)
+                .schemaSubType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn);
+
+        Object[] expected = new Object[]{java.sql.Date.valueOf("2023-01-01"), null, java.sql.Date.valueOf("2020-02-29")};
+        verify(mockConnection).createArrayOf(eq("date"), eq(expected));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithDateArrayTypeStringSchemaMixedValues() throws SQLException {
+        java.sql.Date d2 = java.sql.Date.valueOf("2020-02-29");
+        java.util.Date u2 = new java.util.Date(d2.getTime());
+        List<Object> values = Arrays.asList("2023-01-01", u2, null);
+
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(values)
+                .schemaSubType(Schema.Type.STRING)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn);
+
+        Object[] expected = new Object[]{"2023-01-01", java.sql.Date.valueOf("2020-02-29"), null};
+        verify(mockConnection).createArrayOf(eq("date"), eq(expected));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithEmptyDateArray() throws SQLException {
+        List<Object> emptyArray = new ArrayList<>();
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(emptyArray)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn);
+
+        verify(mockConnection).createArrayOf(eq("date"), eq(emptyArray.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithDateArrayInvalidStringThrows() {
+        List<String> badValues = Arrays.asList("2024-1-02", "abc");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(badValues)
+                .schemaSubType(Schema.Type.STRING)
+                .build();
+
+        assertThrows(ColumnConversionFailedException.class, () ->
+            converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn));
+    }
+
+    @Test
+    void testConvertAndSetWithDateArrayUnsupportedSchemaTypeThrows() {
+        List<String> dateValues = Arrays.asList("2023-01-01");
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(dateValues)
+                .schemaSubType(Schema.Type.INT64)
+                .build();
+
+        assertThrows(ColumnConversionFailedException.class, () ->
+            converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn));
+    }
+
+    @Test
+    void testConvertAndSetWithDateArrayWithInt32() throws SQLException {
+        java.sql.Date d2 = java.sql.Date.valueOf("2023-01-01");
+        java.util.Date u2 = new java.util.Date(d2.getTime());
+        List<Object> dateValues = Arrays.asList(u2);
+        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+                .value(dateValues)
+                .schemaSubType(Schema.Type.INT32)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, dateArrayColumn);
+        Object[] expected = new Object[]{java.sql.Date.valueOf("2023-01-01")};
+        verify(mockConnection).createArrayOf(eq("date"), eq(expected));
         verify(mockStatement).setArray(1, mockArray);
     }
 
