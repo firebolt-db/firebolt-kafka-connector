@@ -187,6 +187,15 @@ public class TextSerializerTest extends BaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredText\" TEXT NOT NULL, " +
                 "\"optionalText\" TEXT NULL, " +
+                "\"requiredInt\" TEXT NOT NULL, " +
+                "\"requiredFloat\" TEXT NOT NULL, " +
+                "\"requiredDouble\" TEXT NOT NULL, " +
+                "\"requiredBigInt\" TEXT NOT NULL, " +
+                "\"requiredBoolean\" TEXT NOT NULL, " +
+                "\"requiredBigDecimal\" TEXT NOT NULL, " +
+                "\"requiredLocalDate\" TEXT NOT NULL, " +
+                "\"requiredLocalDateTime\" TEXT NOT NULL, " +
+                "\"requiredTimestamptz\" TEXT NOT NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(TEXT NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(TEXT NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(TEXT NULL) NULL, " +
@@ -216,6 +225,39 @@ public class TextSerializerTest extends BaseIntegrationTest {
                 "        {\"type\": \"string\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional text field - can be null or omitted\"\n" +
+                "    },\n" +
+                "    \"requiredInt\": {\n" +
+                "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\"\n" +
+                "    },\n" +
+                "    \"requiredFloat\": {\n" +
+                "      \"type\": \"number\",\n" +
+                "      \"connect.type\": \"float32\"\n" +
+                "    },\n" +
+                "    \"requiredDouble\": {\n" +
+                "      \"type\": \"number\",\n" +
+                "      \"connect.type\": \"float64\"\n" +
+                "    },\n" +
+                "    \"requiredBigInt\": {\n" +
+                "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int64\"\n" +
+                "    },\n" +
+                "    \"requiredBoolean\": {\n" +
+                "      \"type\": \"boolean\"\n" +
+                "    },\n" +
+                "    \"requiredBigDecimal\": {\n" +
+                "      \"type\": \"number\"\n" +
+                "    },\n" +
+                "    \"requiredLocalDate\": {\n" +
+                "      \"type\": \"string\",\n" +
+                "      \"format\": \"date\"\n" +
+                "    },\n" +
+                "    \"requiredLocalDateTime\": {\n" +
+                "      \"type\": \"string\",\n" +
+                "      \"format\": \"date-time\"\n" +
+                "    },\n" +
+                "    \"requiredTimestamptz\": {\n" +
+                "      \"type\": \"string\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNullableElements\": {\n" +
                 "      \"type\": \"array\",\n" +
@@ -258,7 +300,7 @@ public class TextSerializerTest extends BaseIntegrationTest {
                 "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
                 "    }\n" +
                 "  },\n" +
-                "  \"required\": [\"recordId\", \"requiredText\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]\n" +
+                "  \"required\": [\"recordId\", \"requiredText\", \"requiredInt\", \"requiredFloat\", \"requiredDouble\", \"requiredBigInt\", \"requiredBoolean\", \"requiredBigDecimal\", \"requiredLocalDate\", \"requiredLocalDateTime\", \"requiredTimestamptz\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]\n" +
                 "}";
     }
     
@@ -296,6 +338,7 @@ public class TextSerializerTest extends BaseIntegrationTest {
         // Verify specific records by recordId
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredText\", \"optionalText\", " +
+            "\"requiredInt\", \"requiredFloat\", \"requiredDouble\", \"requiredBigInt\", \"requiredBoolean\", \"requiredBigDecimal\", \"requiredLocalDate\", \"requiredLocalDateTime\", \"requiredTimestamptz\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -314,6 +357,17 @@ public class TextSerializerTest extends BaseIntegrationTest {
                 String actualRequiredText = rs.getString("requiredText");
                 String actualOptionalText = rs.getString("optionalText");
                 
+                // Scalars stored as TEXT; read via getString
+                String actualRequiredInt = rs.getString("requiredInt");
+                String actualRequiredFloat = rs.getString("requiredFloat");
+                String actualRequiredDouble = rs.getString("requiredDouble");
+                String actualRequiredBigInt = rs.getString("requiredBigInt");
+                String actualRequiredBoolean = rs.getString("requiredBoolean");
+                String actualRequiredBigDecimal = rs.getString("requiredBigDecimal");
+                String actualRequiredLocalDate = rs.getString("requiredLocalDate");
+                String actualRequiredLocalDateTime = rs.getString("requiredLocalDateTime");
+                String actualRequiredTimestamptz = rs.getString("requiredTimestamptz");
+
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
                 Array actualRequiredListWithNonNullArray = rs.getArray("requiredListWithNonNullElements");
@@ -334,6 +388,19 @@ public class TextSerializerTest extends BaseIntegrationTest {
                     assertEquals(expected.getOptionalText(), actualOptionalText, 
                         "OptionalText mismatch at index " + recordIndex);
                 }
+
+                // Verify scalar TEXT columns as strings
+                assertEquals(String.valueOf(expected.getRequiredInt()), actualRequiredInt);
+                assertEquals(String.valueOf(expected.getRequiredFloat()), actualRequiredFloat);
+                assertEquals(String.valueOf(expected.getRequiredDouble()), actualRequiredDouble);
+                assertEquals(String.valueOf(expected.getRequiredBigInt()), actualRequiredBigInt);
+                assertEquals(String.valueOf(expected.getRequiredBoolean()), actualRequiredBoolean);
+                assertEquals(expected.getRequiredBigDecimal().toPlainString(), actualRequiredBigDecimal);
+
+                // LocalDate and LocalDateTime serialized; compare string forms
+                assertEquals("2024-01-15", actualRequiredLocalDate);
+                assertEquals("2024-01-15T14:30:45.123", actualRequiredLocalDateTime);
+                assertEquals("2024-01-15T14:30:45.123456Z", actualRequiredTimestamptz);
                 
                 // Array verification using getArray()
                 verifyTextArray("requiredListWithNullableElements", 
@@ -459,6 +526,15 @@ public class TextSerializerTest extends BaseIntegrationTest {
                 .recordId(recordId)
                 .requiredText("Default required text")
                 .optionalText("Default optional text")
+                .requiredInt(42)
+                .requiredFloat(3.14f)
+                .requiredDouble(2.718281828)
+                .requiredBigInt(1234567890123L)
+                .requiredBoolean(true)
+                .requiredBigDecimal(new java.math.BigDecimal("12345.6789"))
+                .requiredLocalDate(java.time.LocalDate.of(2024, 1, 15))
+                .requiredLocalDateTime(java.time.LocalDateTime.of(2024, 1, 15, 14, 30, 45, 123000000))
+                .requiredTimestamptz(java.time.OffsetDateTime.of(2024, 1, 15, 14, 30, 45, 123456000, java.time.ZoneOffset.UTC))
                 .requiredListWithNullableElements(Arrays.asList("first", null, "third", null, "fifth"))
                 .requiredListWithNonNullElements(Arrays.asList("non-null1", "non-null2", "non-null3", "non-null4", "non-null5"))
                 .optionalList(Arrays.asList("optional1", "optional2", "optional3"))

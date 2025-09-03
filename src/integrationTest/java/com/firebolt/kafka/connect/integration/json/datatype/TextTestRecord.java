@@ -1,10 +1,14 @@
 package com.firebolt.kafka.connect.integration.json.datatype;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
 
 /**
  * Test record for comprehensive Text serialization testing with JSON Schema and Kafka Connect.
@@ -64,4 +68,23 @@ public class TextTestRecord {
      * Maps to Firebolt ARRAY(TEXT NOT NULL) NULL.
      */
     private List<String> optionalListWithNonNullElements;
+
+    private Integer requiredInt;
+
+    private Float requiredFloat;
+
+    private Double requiredDouble;
+
+    private Long requiredBigInt;
+
+    private Boolean requiredBoolean;
+
+    private BigDecimal requiredBigDecimal;
+
+    private LocalDate requiredLocalDate;
+
+    private LocalDateTime requiredLocalDateTime;
+
+    private OffsetDateTime requiredTimestamptz;
+
 } 
