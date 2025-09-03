@@ -72,6 +72,7 @@ public class StructSerializerTest extends BaseIntegrationTest {
         "true,  'WITH null fields included in JSON as field: null'",
         "false, 'WITH null fields omitted from JSON entirely'"
     })
+    @Disabled("Disabled until JDBC driver array type fix FIR-48988")
     void testStructSerialization(boolean includeNulls, String testDescription) throws Exception {
         producer = initializeJsonProducer(includeNulls);
         
