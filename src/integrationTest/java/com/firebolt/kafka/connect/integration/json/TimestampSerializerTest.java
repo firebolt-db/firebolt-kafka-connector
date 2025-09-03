@@ -15,10 +15,8 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +27,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -580,19 +577,7 @@ public class TimestampSerializerTest extends BaseIntegrationTest {
         int truncatedNanos = (dateTime.getNano() / 1_000_000) * 1_000_000;
         return dateTime.withNano(truncatedNanos);
     }
-    
-    /**
-     * Converts a list of Date objects to a list of longs (milliseconds since epoch).
-     */
-    private List<Long> convertTimestampListToLongList(List<Date> timestampList) {
-        if (timestampList == null) {
-            return null;
-        }
-        return timestampList.stream()
-            .map(timestamp -> timestamp != null ? localDateTimeToEpochMillis(timestamp) : null)
-            .collect(java.util.stream.Collectors.toList());
-    }
-    
+
     /**
      * Verifies that the published timestamp records exist in the Firebolt table with correct null handling.
      */

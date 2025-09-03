@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.integration.json;
 
-import com.firebolt.jdbc.type.array.FireboltArray;
+import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
 import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.TimestamptzTestRecord;
 import java.sql.Array;
@@ -8,20 +8,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -46,22 +37,6 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, Object> producer;
-
-    private DateTimeFormatter OFFSET_DATE_FORMATTER = new DateTimeFormatterBuilder()
-            .appendPattern("yyyy-MM-dd HH:mm:ss")
-            .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 6, true)
-            .appendPattern("X")
-            .toFormatter();
-    private DateTimeFormatter OFFSET_DATE_FORMATTER_2 = new DateTimeFormatterBuilder()
-            .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
-            .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 6, true)
-            .appendPattern("X")
-            .toFormatter();
-
-    private DateTimeFormatter ARRAY_OFFSET_DATE_FORMATTER = new DateTimeFormatterBuilder()
-            .appendPattern("yyyy-MM-dd HH:mm:ss")
-            .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 6, true)
-            .toFormatter();
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -108,8 +83,50 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         verifyTimestamptzRecordsInFirebolt(expectedRecords);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "false, 'invalid records should not block valid records'"
+    })
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(boolean includeNulls, String testDescription) throws Exception {
+        producer = initializeJsonProducer(includeNulls);
+
+        List<TimestamptzTestRecord> mixedRecords = Arrays.asList(
+            aValidTestRecord(101)
+                .timestamptzString("2024-01-15 14:30:45.123456+02")
+                .build(),
+            aValidTestRecord(102)
+                .timestamptzString("not-a-date") // invalid
+                .build(),
+            aValidTestRecord(103)
+                .timestamptzString("2024-02-28 16:45:30.987654+02")
+                .build(),
+            aValidTestRecord(104)
+                .timestamptzString("2024-02-30 00:00:00Z") // invalid date
+                .build()
+        );
+
+        publishMessages(mixedRecords);
+
+        // Expect only the 2 valid records to land in Firebolt
+        waitForDataInFirebolt(TABLE_NAME, 2);
+
+        // expected timestamps will be in UTC so substract 2hours
+        List<TimestamptzTestRecord> expectedValid = Arrays.asList(
+            aValidTestRecord(101)
+                .timestamptzString("2024-01-15 12:30:45.123456+00")
+                .build(),
+            aValidTestRecord(103)
+                .timestamptzString("2024-02-28 14:45:30.987654+00")
+                .build()
+        );
+
+        List<TimestamptzTestRecord> expectedTruncated = createExpectedRecordsWithTruncatedNanoseconds(expectedValid);
+        verifyTimestamptzRecordsInFirebolt(expectedTruncated);
+    }
+
     /**
      * Creates test records covering all scenarios.
+     * NOTE all test records will be created at UTC+2 timezone
      */
     private List<TimestamptzTestRecord> createTestRecords() {
         return Arrays.asList(
@@ -119,14 +136,14 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
 
             // Record with recent timestamptz values
             aValidTestRecord(2)
-                .requiredTimestamptz(OffsetDateTime.of(2024, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC))
-                .optionalTimestamptz(OffsetDateTime.of(2025, 1, 1, 0, 0, 2, 0, ZoneOffset.UTC))
+                .requiredTimestamptz(OffsetDateTime.of(2024, 12, 31, 23, 59, 59, 0, ZoneOffset.ofHours(2)))
+                .optionalTimestamptz(OffsetDateTime.of(2025, 1, 1, 0, 0, 2, 0, ZoneOffset.ofHours(2)))
                 .build(),
 
             // Record with historical timestamptz values
             aValidTestRecord(3)
-                .requiredTimestamptz(OffsetDateTime.of(1970, 1, 1, 0, 0, 1, 0, ZoneOffset.UTC))  // Unix epoch + 1 second
-                .optionalTimestamptz(OffsetDateTime.of(2000, 1, 1, 0, 0, 30, 0, ZoneOffset.UTC))  // Y2K + 30 seconds
+                .requiredTimestamptz(OffsetDateTime.of(1970, 1, 1, 0, 0, 1, 0, ZoneOffset.ofHours(2)))  // Unix epoch + 1 second
+                .optionalTimestamptz(OffsetDateTime.of(2000, 1, 1, 0, 0, 30, 0, ZoneOffset.ofHours(2)))  // Y2K + 30 seconds
                 .build(),
 
             // Record with null optional timestamptz
@@ -143,15 +160,15 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
             // Record with nullable elements in list
             aValidTestRecord(6)
                 .requiredListWithNullableElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 1, 1, 12, 0, 15, 0, ZoneOffset.UTC), null, OffsetDateTime.of(2024, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2024, 1, 1, 12, 0, 15, 0, ZoneOffset.ofHours(2)), null, OffsetDateTime.of(2024, 12, 31, 23, 59, 59, 0, ZoneOffset.ofHours(2))))
                 .build(),
 
             // Record with various timestamptz ranges
             aValidTestRecord(7)
                 .requiredListWithNullableElements(Arrays.asList(
-                    null, OffsetDateTime.of(1970, 1, 1, 0, 0, 5, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 6, 15, 14, 30, 45, 0, ZoneOffset.UTC)))
+                    null, OffsetDateTime.of(1970, 1, 1, 0, 0, 5, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 6, 15, 14, 30, 45, 0, ZoneOffset.ofHours(2))))
                 .requiredListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2023, 1, 1, 9, 15, 30, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 6, 15, 18, 45, 15, 0, ZoneOffset.UTC), OffsetDateTime.of(2025, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2023, 1, 1, 9, 15, 30, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 6, 15, 18, 45, 15, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2025, 12, 31, 23, 59, 59, 0, ZoneOffset.ofHours(2))))
                 .build(),
 
             // Record with null optional lists
@@ -168,28 +185,28 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
 
             // Record with valid optional lists
             aValidTestRecord(10)
-                .optionalList(Arrays.asList(OffsetDateTime.of(2024, 3, 15, 10, 30, 10, 0, ZoneOffset.UTC), null, OffsetDateTime.of(2024, 9, 30, 16, 45, 30, 0, ZoneOffset.UTC)))
-                .optionalListWithNonNullElements(Arrays.asList(OffsetDateTime.of(2024, 4, 1, 8, 0, 10, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 8, 31, 17, 30, 45, 0, ZoneOffset.UTC)))
+                .optionalList(Arrays.asList(OffsetDateTime.of(2024, 3, 15, 10, 30, 10, 0, ZoneOffset.ofHours(2)), null, OffsetDateTime.of(2024, 9, 30, 16, 45, 30, 0, ZoneOffset.ofHours(2))))
+                .optionalListWithNonNullElements(Arrays.asList(OffsetDateTime.of(2024, 4, 1, 8, 0, 10, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 8, 31, 17, 30, 45, 0, ZoneOffset.ofHours(2))))
                 .build(),
 
             // Record with leap year timestamptz values (February 29th with timezone awareness)
             aValidTestRecord(11)
-                .requiredTimestamptz(OffsetDateTime.of(2024, 2, 29, 12, 0, 10, 0, ZoneOffset.UTC))  // Leap year timestamptz
-                .optionalTimestamptz(OffsetDateTime.of(2020, 2, 29, 23, 59, 59, 0, ZoneOffset.UTC))  // Another leap year timestamptz
+                .requiredTimestamptz(OffsetDateTime.of(2024, 2, 29, 12, 0, 10, 0, ZoneOffset.ofHours(2)))  // Leap year timestamptz
+                .optionalTimestamptz(OffsetDateTime.of(2020, 2, 29, 23, 59, 59, 0, ZoneOffset.ofHours(2)))  // Another leap year timestamptz
                 .requiredListWithNullableElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 2, 29, 6, 30, 15, 0, ZoneOffset.UTC), null, OffsetDateTime.of(2020, 2, 29, 18, 45, 30, 0, ZoneOffset.UTC), null, OffsetDateTime.of(2000, 2, 29, 12, 0, 10, 50, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2024, 2, 29, 6, 30, 15, 10, ZoneOffset.ofHours(2)), null, OffsetDateTime.of(2020, 2, 29, 18, 45, 30, 15, ZoneOffset.ofHours(2)), null, OffsetDateTime.of(2000, 2, 29, 12, 0, 10, 50, ZoneOffset.ofHours(2))))
                 .requiredListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 2, 29, 9, 15, 45, 0, ZoneOffset.UTC), OffsetDateTime.of(2020, 2, 29, 15, 30, 10, 0, ZoneOffset.UTC), OffsetDateTime.of(2016, 2, 29, 21, 45, 15, 50, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2024, 2, 29, 9, 15, 45, 100, ZoneOffset.ofHours(2)), OffsetDateTime.of(2020, 2, 29, 15, 30, 10, 30, ZoneOffset.ofHours(2)), OffsetDateTime.of(2016, 2, 29, 21, 45, 15, 50, ZoneOffset.ofHours(2))))
                 .optionalList(Arrays.asList(
-                    null, OffsetDateTime.of(2024, 2, 29, 3, 15, 30, 50, ZoneOffset.UTC), null, OffsetDateTime.of(2012, 2, 29, 14, 30, 45, 0, ZoneOffset.UTC), null))
+                    null, OffsetDateTime.of(2024, 2, 29, 3, 15, 30, 50, ZoneOffset.ofHours(2)), null, OffsetDateTime.of(2012, 2, 29, 14, 30, 45, 40, ZoneOffset.ofHours(2)), null))
                 .optionalListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2008, 2, 29, 11, 0, 10, 50, ZoneOffset.UTC), OffsetDateTime.of(2004, 2, 29, 20, 30, 15, 0, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2008, 2, 29, 11, 0, 10, 50, ZoneOffset.ofHours(2)), OffsetDateTime.of(2004, 2, 29, 20, 30, 15, 50, ZoneOffset.ofHours(2))))
                 .build(),
 
             // Record with large lists (100 elements each for performance testing)
             aValidTestRecord(12)
-                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 1, 12, 0, 10, 50, ZoneOffset.UTC))
-                .optionalTimestamptz(OffsetDateTime.of(2024, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC))
+                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 1, 12, 0, 10, 50, ZoneOffset.ofHours(2)))
+                .optionalTimestamptz(OffsetDateTime.of(2024, 12, 31, 23, 59, 59, 30, ZoneOffset.ofHours(2)))
                 .requiredListWithNullableElements(createLargeTimestamptzListWithNulls(100))
                 .requiredListWithNonNullElements(createLargeTimestamptzListWithoutNulls(100))
                 .optionalList(createOptionalLargeTimestamptzListWithNulls(100))  // Use version with nulls
@@ -198,55 +215,55 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
 
             // Record with microsecond precision (will be truncated to milliseconds by Kafka Connect)
             aValidTestRecord(13)
-                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 15, 14, 30, 45, 123456000, ZoneOffset.UTC))  // 123.456 ms -> 123 ms (truncated)
-                .optionalTimestamptz(OffsetDateTime.of(2024, 6, 30, 9, 15, 30, 987654000, ZoneOffset.UTC))   // 987.654 ms -> 987 ms (truncated)
+                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 15, 14, 30, 45, 123456000, ZoneOffset.ofHours(2)))  // 123.456 ms -> 123 ms (truncated)
+                .optionalTimestamptz(OffsetDateTime.of(2024, 6, 30, 9, 15, 30, 987654000, ZoneOffset.ofHours(2)))   // 987.654 ms -> 987 ms (truncated)
                 .requiredListWithNullableElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 3, 1, 10, 0, 10, 500000000, ZoneOffset.UTC),     // 500.000 ms = 500000 microseconds
+                    OffsetDateTime.of(2024, 3, 1, 10, 0, 10, 500000000, ZoneOffset.ofHours(2)),     // 500.000 ms = 500000 microseconds
                     null,
-                    OffsetDateTime.of(2024, 8, 15, 16, 45, 12, 123456000, ZoneOffset.UTC)))  // 123.456 ms = 123456 microseconds
+                    OffsetDateTime.of(2024, 8, 15, 16, 45, 12, 123456000, ZoneOffset.ofHours(2))))  // 123.456 ms = 123456 microseconds
                 .requiredListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 5, 20, 8, 30, 45, 750000000, ZoneOffset.UTC),   // 750.000 ms = 750000 microseconds
-                    OffsetDateTime.of(2024, 9, 10, 20, 15, 30, 999999000, ZoneOffset.UTC))) // 999.999 ms = 999999 microseconds
+                    OffsetDateTime.of(2024, 5, 20, 8, 30, 45, 750000000, ZoneOffset.ofHours(2)),   // 750.000 ms = 750000 microseconds
+                    OffsetDateTime.of(2024, 9, 10, 20, 15, 30, 999999000, ZoneOffset.ofHours(2)))) // 999.999 ms = 999999 microseconds
                 .optionalList(Arrays.asList(
-                    OffsetDateTime.of(2024, 2, 14, 12, 0, 25, 111111000, ZoneOffset.UTC),    // 111.111 ms = 111111 microseconds
+                    OffsetDateTime.of(2024, 2, 14, 12, 0, 25, 111111000, ZoneOffset.ofHours(2)),    // 111.111 ms = 111111 microseconds
                     null,
-                    OffsetDateTime.of(2024, 7, 4, 18, 30, 45, 666666000, ZoneOffset.UTC)))  // 666.666 ms = 666666 microseconds
+                    OffsetDateTime.of(2024, 7, 4, 18, 30, 45, 666666000, ZoneOffset.ofHours(2))))  // 666.666 ms = 666666 microseconds
                 .optionalListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 4, 10, 6, 45, 15, 333333000, ZoneOffset.UTC),   // 333.333 ms = 333333 microseconds
-                    OffsetDateTime.of(2024, 10, 25, 22, 0, 10, 888888000, ZoneOffset.UTC)))  // 888.888 ms = 888888 microseconds
+                    OffsetDateTime.of(2024, 4, 10, 6, 45, 15, 333333000, ZoneOffset.ofHours(2)),   // 333.333 ms = 333333 microseconds
+                    OffsetDateTime.of(2024, 10, 25, 22, 0, 10, 888888000, ZoneOffset.ofHours(2))))  // 888.888 ms = 888888 microseconds
                 .microsecondTimestamptz(1705334445123456L) // 2024-01-15T14:30:45.123456Z
                 .timestamptzStringArray(Arrays.asList(
-                    "2024-03-01T10:00:00.500123Z",
-                    "2024-08-15T16:45:12.123456Z",
-                    "2024-05-20T08:30:45.750789Z"))
+                    "2024-03-01T10:00:00.500123+02",
+                    "2024-08-15T16:45:12.123456+02",
+                    "2024-05-20T08:30:45.750789+02"))
                 .build(),
 
             // Record with nanosecond precision (should be truncated to milliseconds)
             // NOTE: Kafka Connect's Timestamp logical type only supports millisecond precision,
             // so any sub-millisecond data (microseconds/nanoseconds) will be truncated to milliseconds
             aValidTestRecord(14)
-                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 15, 14, 30, 45, 123456789, ZoneOffset.UTC))  // Should become 123000000 (123 milliseconds)
-                .optionalTimestamptz(OffsetDateTime.of(2024, 6, 30, 9, 15, 30, 987654321, ZoneOffset.UTC))   // Should become 987000000 (987 milliseconds)
+                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 15, 14, 30, 45, 123456789, ZoneOffset.ofHours(2)))  // Should become 123000000 (123 milliseconds)
+                .optionalTimestamptz(OffsetDateTime.of(2024, 6, 30, 9, 15, 30, 987654321, ZoneOffset.ofHours(2)))   // Should become 987000000 (987 milliseconds)
                 .requiredListWithNullableElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 3, 1, 10, 0, 35, 500000123, ZoneOffset.UTC),     // Should become 500000000 (500 milliseconds)
+                    OffsetDateTime.of(2024, 3, 1, 10, 0, 35, 500000123, ZoneOffset.ofHours(2)),     // Should become 500000000 (500 milliseconds)
                     null,
-                    OffsetDateTime.of(2024, 8, 15, 16, 45, 12, 999999999, ZoneOffset.UTC))) // Should become 999000000 (999 milliseconds)
+                    OffsetDateTime.of(2024, 8, 15, 16, 45, 12, 999999999, ZoneOffset.ofHours(2)))) // Should become 999000000 (999 milliseconds)
                 .requiredListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 5, 20, 8, 30, 45, 750000456, ZoneOffset.UTC),   // Should become 750000000 (750 milliseconds)
-                    OffsetDateTime.of(2024, 9, 10, 20, 15, 30, 111111111, ZoneOffset.UTC))) // Should become 111000000 (111 milliseconds)
+                    OffsetDateTime.of(2024, 5, 20, 8, 30, 45, 750000456, ZoneOffset.ofHours(2)),   // Should become 750000000 (750 milliseconds)
+                    OffsetDateTime.of(2024, 9, 10, 20, 15, 30, 111111111, ZoneOffset.ofHours(2)))) // Should become 111000000 (111 milliseconds)
                 .optionalList(Arrays.asList(
-                    OffsetDateTime.of(2024, 2, 14, 12, 0, 10, 222222222, ZoneOffset.UTC),    // Should become 222000000 (222 milliseconds)
+                    OffsetDateTime.of(2024, 2, 14, 12, 0, 10, 222222222, ZoneOffset.ofHours(2)),    // Should become 222000000 (222 milliseconds)
                     null,
-                    OffsetDateTime.of(2024, 7, 4, 18, 30, 45, 888888888, ZoneOffset.UTC)))  // Should become 888000000 (888 milliseconds)
+                    OffsetDateTime.of(2024, 7, 4, 18, 30, 45, 888888888, ZoneOffset.ofHours(2))))  // Should become 888000000 (888 milliseconds)
                 .optionalListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 4, 10, 6, 45, 15, 444444444, ZoneOffset.UTC),   // Should become 444000000 (444 milliseconds)
-                    OffsetDateTime.of(2024, 10, 25, 22, 0, 10, 777777777, ZoneOffset.UTC)))  // Should become 777000000 (777 milliseconds)
+                    OffsetDateTime.of(2024, 4, 10, 6, 45, 15, 444444444, ZoneOffset.ofHours(2)),   // Should become 444000000 (444 milliseconds)
+                    OffsetDateTime.of(2024, 10, 25, 22, 0, 10, 777777777, ZoneOffset.ofHours(2))))  // Should become 777000000 (777 milliseconds)
                 .microsecondTimestamptz(1719485730987654L) // 2024-06-27T10:55:30.987654Z
                 .timestamptzStringArray(Arrays.asList(
-                    "2024-03-01T10:00:00.500999Z",
-                    "2024-08-15T16:45:12.999999Z",
-                    "2024-02-14T12:00:00.222333Z",
-                    "2024-07-04T18:30:45.888777Z"))
+                    "2024-03-01T10:00:00.500999+02",
+                    "2024-08-15T16:45:12.999999+02",
+                    "2024-02-14T12:00:00.222333+02",
+                    "2024-07-04T18:30:45.888777+02"))
                 .build()
         );
     }
@@ -256,7 +273,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
      */
     private List<OffsetDateTime> createLargeTimestamptzListWithNulls(int size) {
         List<OffsetDateTime> result = new ArrayList<>();
-        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2024, 1, 1, 0, 0, 10, 0, ZoneOffset.UTC);
+        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2024, 1, 1, 0, 0, 10, 0, ZoneOffset.ofHours(2));
         for (int i = 0; i < size; i++) {
             result.add(i % 5 == 0 ? null : baseTimestamptz.plusHours(i));  // Every 5th element is null
         }
@@ -268,7 +285,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
      */
     private List<OffsetDateTime> createLargeTimestamptzListWithoutNulls(int size) {
         List<OffsetDateTime> result = new ArrayList<>();
-        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2023, 1, 1, 0, 0, 10, 0, ZoneOffset.UTC);
+        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2023, 1, 1, 0, 0, 10, 0, ZoneOffset.ofHours(2));
         for (int i = 0; i < size; i++) {
             result.add(baseTimestamptz.plusMinutes(i * 30));  // Every 30 minutes
         }
@@ -281,7 +298,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
      */
     private List<OffsetDateTime> createOptionalLargeTimestamptzList(int size) {
         List<OffsetDateTime> result = new ArrayList<>();
-        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2025, 1, 1, 0, 0, 10, 0, ZoneOffset.UTC);
+        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2025, 1, 1, 0, 0, 10, 0, ZoneOffset.ofHours(2));
         for (int i = 0; i < size; i++) {
             result.add(baseTimestamptz.plusHours(i * 2));  // Every 2 hours
         }
@@ -293,7 +310,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
      */
     private List<OffsetDateTime> createOptionalLargeTimestamptzListWithNulls(int size) {
         List<OffsetDateTime> result = new ArrayList<>();
-        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2025, 1, 1, 0, 0, 9, 0, ZoneOffset.UTC);
+        OffsetDateTime baseTimestamptz = OffsetDateTime.of(2025, 1, 1, 0, 0, 9, 0, ZoneOffset.ofHours(2));
         for (int i = 0; i < size; i++) {
             // Every 7th element is null to test null handling in optional lists
             if (i % 7 == 0) {
@@ -308,21 +325,22 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
     private TimestamptzTestRecord.TimestamptzTestRecordBuilder aValidTestRecord(int recordId) {
         return TimestamptzTestRecord.builder()
                 .recordId(recordId)
-                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 15, 14, 30, 45, 0, ZoneOffset.UTC))
-                .optionalTimestamptz(OffsetDateTime.of(2024, 2, 28, 16, 45, 30, 0, ZoneOffset.UTC))
+                .requiredTimestamptz(OffsetDateTime.of(2024, 1, 15, 14, 30, 45, 0, ZoneOffset.ofHours(2)))
+                .optionalTimestamptz(OffsetDateTime.of(2024, 2, 28, 16, 45, 30, 0, ZoneOffset.ofHours(2)))
                 .requiredListWithNullableElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 3, 1, 9, 0, 5, 0, ZoneOffset.UTC), null, OffsetDateTime.of(2024, 3, 31, 17, 30, 15, 0, ZoneOffset.UTC), null, OffsetDateTime.of(2024, 4, 15, 12, 15, 45, 0, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2024, 3, 1, 9, 0, 5, 0, ZoneOffset.ofHours(2)), null, OffsetDateTime.of(2024, 3, 31, 17, 30, 15, 0, ZoneOffset.ofHours(2)), null, OffsetDateTime.of(2024, 4, 15, 12, 15, 45, 0, ZoneOffset.ofHours(2))))
                 .requiredListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 5, 1, 8, 30, 5, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 6, 15, 13, 45, 30, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 7, 31, 19, 15, 9, 0, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2024, 5, 1, 8, 30, 5, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 6, 15, 13, 45, 30, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 7, 31, 19, 15, 9, 0, ZoneOffset.ofHours(2))))
                 .optionalList(Arrays.asList(
-                    OffsetDateTime.of(2024, 8, 1, 7, 0, 5, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 9, 15, 14, 30, 45, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 10, 31, 20, 45, 15, 0, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2024, 8, 1, 7, 0, 5, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 9, 15, 14, 30, 45, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 10, 31, 20, 45, 15, 0, ZoneOffset.ofHours(2))))
                 .optionalListWithNonNullElements(Arrays.asList(
-                    OffsetDateTime.of(2024, 11, 1, 6, 15, 30, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 11, 15, 15, 0, 7, 0, ZoneOffset.UTC), OffsetDateTime.of(2024, 12, 1, 21, 30, 45, 0, ZoneOffset.UTC)))
+                    OffsetDateTime.of(2024, 11, 1, 6, 15, 30, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 11, 15, 15, 0, 7, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 12, 1, 21, 30, 45, 0, ZoneOffset.ofHours(2))))
                 .microsecondTimestamptz(1705334445123456L) // 2024-01-15T16:00:45.123456Z
+                .timestamptzString("2024-01-15 14:30:45.123456+00")
                 .timestamptzStringArray(Arrays.asList(
-                    "2024-01-15 14:30:45.123456Z",
-                    "2024-02-28 16:45:30.987654Z",
-                    "2024-03-15 12:00:00.500000Z"));
+                    "2024-01-15 14:30:45.123456+02:00",
+                    "2024-02-28 16:45:30.987654+02:00",
+                    "2024-03-15 12:00:00.500000+02:00"));
     }
 
     /**
@@ -337,8 +355,9 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 "\"requiredListWithNonNullElements\" ARRAY(TIMESTAMPTZ NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(TIMESTAMPTZ NULL) NULL, " +
                 "\"optionalListWithNonNullElements\" ARRAY(TIMESTAMPTZ NOT NULL) NULL, " +
-                "\"microsecondTimestamptz\" TIMESTAMPTZ NOT NULL, " +
-                "\"timestamptzStringArray\" ARRAY(TIMESTAMPTZ NOT NULL) NOT NULL" +
+                "\"microsecondTimestamptz\" TIMESTAMPTZ NULL, " +
+                "\"timestamptzString\" TIMESTAMPTZ NULL, " +
+                "\"timestamptzStringArray\" ARRAY(TIMESTAMPTZ NOT NULL) NULL" +
                 ")";
     }
 
@@ -356,20 +375,16 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                         "\"description\": \"Record identification number\"" +
                     "}," +
                     "\"requiredTimestamptz\": {" +
-                        "\"type\": \"integer\"," +
-                        "\"connect.type\": \"int64\"," +
-                        "\"connect.version\": 1," +
-                        "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"," +
+                        "\"type\": \"string\"," +
+                        "\"format\": \"date-time\"," +
                         "\"description\": \"Required timestamptz field\"" +
                     "}," +
                     "\"optionalTimestamptz\": {" +
                         "\"oneOf\": [" +
                             "{\"type\": \"null\"}," +
                             "{" +
-                                "\"type\": \"integer\"," +
-                                "\"connect.type\": \"int64\"," +
-                                "\"connect.version\": 1," +
-                                "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
+                                "\"type\": \"string\"," +
+                                "\"format\": \"date-time\"" +
                             "}" +
                         "]," +
                         "\"description\": \"Optional timestamptz field\"" +
@@ -380,10 +395,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                             "\"oneOf\": [" +
                                 "{\"type\": \"null\"}," +
                                 "{" +
-                                    "\"type\": \"integer\"," +
-                                    "\"connect.type\": \"int64\"," +
-                                    "\"connect.version\": 1," +
-                                    "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
+                                    "\"type\": \"string\"," +
+                                    "\"format\": \"date-time\"" +
                                 "}" +
                             "]" +
                         "}," +
@@ -392,10 +405,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                     "\"requiredListWithNonNullElements\": {" +
                         "\"type\": \"array\"," +
                         "\"items\": {" +
-                            "\"type\": \"integer\"," +
-                            "\"connect.type\": \"int64\"," +
-                            "\"connect.version\": 1," +
-                            "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
+                            "\"type\": \"string\"," +
+                            "\"format\": \"date-time\"" +
                         "}," +
                         "\"description\": \"Required list with non-null elements\"" +
                     "}," +
@@ -408,10 +419,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                                     "\"oneOf\": [" +
                                         "{\"type\": \"null\"}," +
                                         "{" +
-                                            "\"type\": \"integer\"," +
-                                            "\"connect.type\": \"int64\"," +
-                                            "\"connect.version\": 1," +
-                                            "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
+                                            "\"type\": \"string\"," +
+                                            "\"format\": \"date-time\"" +
                                         "}" +
                                     "]" +
                                 "}" +
@@ -425,10 +434,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                             "{" +
                                 "\"type\": \"array\"," +
                                 "\"items\": {" +
-                                    "\"type\": \"integer\"," +
-                                    "\"connect.type\": \"int64\"," +
-                                    "\"connect.version\": 1," +
-                                    "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"" +
+                                    "\"type\": \"string\"," +
+                                    "\"format\": \"date-time\"" +
                                 "}" +
                             "}" +
                         "]," +
@@ -437,9 +444,15 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                     "\"microsecondTimestamptz\": {" +
                         "\"type\": \"integer\"," +
                         "\"connect.type\": \"int64\"," +
-                        "\"connect.version\": 1," +
-                        "\"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"," +
                         "\"description\": \"Required microsecond precision timestamptz field\"" +
+                    "}," +
+                    "\"timestamptzString\": {" +
+                        "\"oneOf\": [" +
+                            "{\"type\": \"null\"}," +
+                            "{" +
+                                "\"type\": \"string\"" +
+                            "}" +
+                        "]" +
                     "}," +
                     "\"timestamptzStringArray\": {" +
                         "\"type\": \"array\"," +
@@ -449,7 +462,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                         "\"description\": \"Required array of timestamptz strings\"" +
                     "}" +
                 "}," +
-                "\"required\": [\"recordId\", \"requiredTimestamptz\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"microsecondTimestamptz\", \"timestamptzStringArray\"]" +
+                "\"required\": [\"recordId\", \"requiredTimestamptz\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]" +
                 "}";
     }
 
@@ -461,24 +474,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         for (TimestamptzTestRecord record : records) {
             String key = "timestamptz-test-key-" + record.getRecordId();
             
-            // Convert LocalDateTime objects to longs (milliseconds since epoch) for Kafka Connect Timestamp logical type
-            Map<String, Object> recordMap = new HashMap<>();
-            recordMap.put("recordId", record.getRecordId());
-            recordMap.put("requiredTimestamptz", offsetDateTimeToEpochMillis(record.getRequiredTimestamptz()));
-            recordMap.put("optionalTimestamptz", record.getOptionalTimestamptz() != null ? offsetDateTimeToEpochMillis(record.getOptionalTimestamptz()) : null);
-            
-            // Convert timestamptz arrays
-            recordMap.put("requiredListWithNullableElements", convertTimestamptzListToLongList(record.getRequiredListWithNullableElements()));
-            recordMap.put("requiredListWithNonNullElements", convertTimestamptzListToLongList(record.getRequiredListWithNonNullElements()));
-            recordMap.put("optionalList", record.getOptionalList() != null ? convertTimestamptzListToLongList(record.getOptionalList()) : null);
-            recordMap.put("optionalListWithNonNullElements", record.getOptionalListWithNonNullElements() != null ? convertTimestamptzListToLongList(record.getOptionalListWithNonNullElements()) : null);
-            
-            // Add microsecond precision fields
-            recordMap.put("microsecondTimestamptz", record.getMicrosecondTimestamptz());
-            recordMap.put("timestamptzStringArray", record.getTimestamptzStringArray());
-
-            ProducerRecord<String, Object> producerRecord = 
-                new ProducerRecord<>(TOPIC_NAME, key, recordMap);
+            ProducerRecord<String, Object> producerRecord =
+                new ProducerRecord<>(TOPIC_NAME, key, record);
             
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
@@ -546,7 +543,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
             // Add the new microsecond precision fields (these should be preserved as-is)
             builder.microsecondTimestamptz(record.getMicrosecondTimestamptz());
             builder.timestamptzStringArray(record.getTimestamptzStringArray());
-            
+            builder.timestamptzString(record.getTimestamptzString());
+
             expectedRecords.add(builder.build());
         }
         
@@ -554,15 +552,28 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
     }
     
     /**
-     * Truncates OffsetDateTime nanoseconds to millisecond precision.
-     * Kafka Connect's Timestamp logical type only supports millisecond granularity.
+     * Truncates OffsetDateTime nanoseconds to microsecond precision.
      */
     private OffsetDateTime truncateToMicroseconds(OffsetDateTime dateTime) {
         if (dateTime == null) {
             return null;
         }
-        // Truncate nanoseconds to milliseconds (keep only the first 3 digits, set last 6 to 0)
-        int truncatedNanos = (dateTime.getNano() / 1_000_000) * 1_000_000;
+        // Round nanoseconds to microseconds. If the 7th digit (hundreds of nanos) > 5, round up.
+        int nanos = dateTime.getNano();
+        int subMicroRemainder = nanos % 1_000; // last 3 digits (nanoseconds below a microsecond)
+        int truncatedNanos = (nanos / 1_000) * 1_000; // drop last 3 digits
+
+        // 7th digit check: hundreds place of the remainder (0-9)
+        int hundredsOfNanos = subMicroRemainder / 100;
+        if (hundredsOfNanos > 5) {
+            int roundedNanos = truncatedNanos + 1_000; // add one microsecond
+            if (roundedNanos == 1_000_000_000) {
+                // carry into next second
+                return dateTime.plusSeconds(1).withNano(0);
+            }
+            return dateTime.withNano(roundedNanos);
+        }
+
         return dateTime.withNano(truncatedNanos);
     }
     
@@ -591,7 +602,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredTimestamptz\", \"optionalTimestamptz\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\", \"microsecondTimestamptz\", \"timestamptzStringArray\" " +
+            "\"optionalListWithNonNullElements\", \"microsecondTimestamptz\", \"timestamptzString\", \"timestamptzStringArray\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -606,35 +617,25 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 // Verify each field
                 Integer actualRecordId = rs.getInt("recordId");
                 OffsetDateTime actualRequiredTimestamptz = rs.getTimestamp("requiredTimestamptz") != null ? 
-                    rs.getTimestamp("requiredTimestamptz").toInstant().atOffset(ZoneOffset.UTC) : null;
+                    rs.getTimestamp("requiredTimestamptz").toInstant().atOffset(ZoneOffset.ofHours(2)) : null;
                 OffsetDateTime actualOptionalTimestamptz = rs.getTimestamp("optionalTimestamptz") != null ? 
-                    rs.getTimestamp("optionalTimestamptz").toInstant().atOffset(ZoneOffset.UTC) : null;
+                    rs.getTimestamp("optionalTimestamptz").toInstant().atOffset(ZoneOffset.ofHours(2)) : null;
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
                 Array actualRequiredListWithNonNullArray = rs.getArray("requiredListWithNonNullElements");
                 Array actualOptionalListArray = rs.getArray("optionalList");
                 Array actualOptionalListWithNonNullElementsArray = rs.getArray("optionalListWithNonNullElements");
-                
+                String timestamptzString = rs.getString("timestamptzString");
                 // Retrieve new microsecond precision fields
-                OffsetDateTime actualMicrosecondTimestamptz = OffsetDateTime.parse(rs.getString("microsecondTimestamptz"), OFFSET_DATE_FORMATTER);
+                OffsetDateTime actualMicrosecondTimestamptz = parseString(rs.getString("microsecondTimestamptz"));
 
-                // this is a hack as we cannot get the timestamptz inside an array
-                FireboltArray actualTimestamptzStringArray = (FireboltArray) rs.getArray("timestamptzStringArray");
-                ResultSet resultSet = actualTimestamptzStringArray.getResultSet();
-                List<OffsetDateTime> actualOffsetDates = new ArrayList<>();
-                while(resultSet.next()) {
-                    LocalDateTime ldt = LocalDateTime.parse(resultSet.getString(2), ARRAY_OFFSET_DATE_FORMATTER);
-                    ZoneId zone = ZoneId.of(java.util.TimeZone.getDefault().getID());
-                    ZoneOffset offset = ldt.atZone(zone).getOffset();
-                    ldt.toInstant(offset);
-                    actualOffsetDates.add(ldt.toInstant(offset).atOffset(ZoneOffset.ofHours(0)));
-                }
+                Array actualTimestamptzStringArray = rs.getArray("timestamptzStringArray");
 
                 // Basic field verification
                 assertEquals(expected.getRecordId(), actualRecordId, 
                     "RecordId mismatch at index " + recordIndex);
-                assertEquals(expected.getRequiredTimestamptz(), actualRequiredTimestamptz, 
+                assertEquals(expected.getRequiredTimestamptz(), actualRequiredTimestamptz,
                     "RequiredTimestamptz mismatch at index " + recordIndex);
                 
                 // Null handling verification for optional timestamptz
@@ -673,8 +674,11 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 
                 // Verify microsecond precision fields (all records should have these fields)
                 verifyMicrosecondTimestamptz(expected.getMicrosecondTimestamptz(), actualMicrosecondTimestamptz, recordIndex);
-                verifyTimestamptzStringArray(expected.getTimestamptzStringArray(), actualOffsetDates, recordIndex);
-                
+                List<OffsetDateTime> expectedTimestamptzArray = expected.getTimestamptzStringArray().stream().map(this::parseString)
+                        .collect(Collectors.toList());
+                verifyTimestamptzArray("timestamptzStringArray",
+                        expectedTimestamptzArray, actualTimestamptzStringArray, recordIndex);
+                assertEquals(expected.getTimestamptzString(), timestamptzString);
                 recordIndex++;
             }
             
@@ -682,10 +686,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
                 "Expected to verify " + expectedRecords.size() + " records, but only found " + recordIndex);
         }
     }
-    
-    /**
-     * Verifies a timestamptz array field, handling Firebolt array format and null elements.
-     */
+
     /**
      * Verifies a timestamptz array field using Array object instead of string parsing.
      */
@@ -707,7 +708,7 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         // Get the array as Timestamp array and convert to List<OffsetDateTime>
         java.sql.Timestamp[] arrayElements = (java.sql.Timestamp[]) actualArray.getArray();
         List<OffsetDateTime> actualList = Arrays.stream(arrayElements)
-            .map(timestamp -> timestamp != null ? timestamp.toInstant().atOffset(ZoneOffset.UTC) : null)
+            .map(timestamp -> timestamp != null ? timestamp.toInstant().atOffset(ZoneOffset.ofHours(2)) : null)
             .collect(Collectors.toList());
 
         // Direct list comparison
@@ -749,51 +750,8 @@ public class TimestamptzSerializerTest extends BaseIntegrationTest {
         return instant.atOffset(ZoneOffset.ofHours(0)); // assume UTC timezon
     }
 
-    /**
-     * Verifies timestamptz string array field with microsecond precision.
-     * Handles Firebolt's array format and fractional seconds normalization.
-     */
-    private void verifyTimestamptzStringArray(List<String> expectedStrings, List<OffsetDateTime> actualArray, int recordIndex) {
-        assertNotNull(expectedStrings, "Expected timestampStringArray should not be null at index " + recordIndex);
-        assertNotNull(actualArray, "Actual timestampStringArray should not be null at index " + recordIndex);
-
-        List<OffsetDateTime> expectedList = expectedStrings.stream().map(this::parseString).collect(Collectors.toList());
-        assertEqualOffsetDateTime(expectedList, actualArray, recordIndex);
-    }
-
     private OffsetDateTime parseString(String timeAsString) {
-        try {
-            return OffsetDateTime.parse(timeAsString, OFFSET_DATE_FORMATTER);
-        } catch (DateTimeParseException e) {
-            // will use next parser
-        }
-
-        try {
-            return OffsetDateTime.parse(timeAsString, OFFSET_DATE_FORMATTER_2);
-        } catch (DateTimeParseException e) {
-            // will use next parser
-        }
-
-         return OffsetDateTime.parse(timeAsString, ARRAY_OFFSET_DATE_FORMATTER);
-
-    }
-
-    private void assertEqualOffsetDateTime(List<OffsetDateTime> expected, List<OffsetDateTime> actual, int recordIndex) {
-        // Direct list comparison
-        assertEquals(expected.size(), actual.size());
-
-        for (int i = 0; i < actual.size(); i++) {
-            OffsetDateTime expectedElement = expected.get(i);
-            OffsetDateTime actualElement = actual.get(i);
-
-            if (expectedElement == null) {
-                assertNull(actualElement,
-                        " element " + i + " should be null at index " + recordIndex);
-            } else {
-                assertEquals(expectedElement.toInstant(), actualElement.toInstant(),
-                        " element " + i + " mismatch at index " + recordIndex);
-            }
-        }
+        return FireboltTimestamptzConverter.parseTimestamptz(timeAsString);
     }
 
 } 
