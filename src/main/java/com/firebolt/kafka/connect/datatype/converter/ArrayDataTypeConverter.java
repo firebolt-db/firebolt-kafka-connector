@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import java.nio.ByteBuffer;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.Date;
@@ -24,6 +25,7 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
     private static final String DATE_ARRAY_TYPE_NAME = "date";
     private static final String TIMESTAMP_ARRAY_TYPE_NAME = "timestamp";
     private static final String TIMESTAMPTZ_ARRAY_TYPE_NAME = "timestamptz";
+    private static final String BYTEA_ARRAY_TYPE_NAME = "bytea";
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
@@ -55,9 +57,8 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.FLOAT32) {
                 return connection.createArrayOf(typeName, elements.stream().map(objectValue -> objectValue == null ? null : String.valueOf(objectValue)).toArray());
             }
-        } else if (typeName.equals("bytea")) {
-            // empty byte array will be serialized as empty string in kafka connect. In firebolt and empty byte is represented by \x
-            return connection.createArrayOf(typeName, elements.stream().map(objectValue -> objectValue == null ? null : "".equals(objectValue) ? "\\x".getBytes() : Base64.getDecoder().decode(String.valueOf(objectValue))).toArray());
+        } else if (typeName.equals(BYTEA_ARRAY_TYPE_NAME)) {
+            return createByteaArray(connection, kafkaMessageColumnValue, fireboltColumn);
         }
 
         return connection.createArrayOf(typeName, elements.toArray());
@@ -83,13 +84,30 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
         } else if (fireboltColumn.getDataType().equals("array(text)")) {
             return "string";
         } else if (fireboltColumn.getDataType().equals("array(bytea)")) {
-            return "bytea";
+            return BYTEA_ARRAY_TYPE_NAME;
         } else if (fireboltColumn.getDataType().equals("array(boolean)")) {
             return "boolean";
         }
 
         // add more data types
         return "string";
+    }
+
+    private Array createByteaArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+
+        // empty byte array will be serialized as empty string in kafka connect. In firebolt and empty byte is represented by \x
+        return connection.createArrayOf(BYTEA_ARRAY_TYPE_NAME, elements.stream().map(objectValue -> objectValue == null ? null :asBytea(objectValue)).toArray());
+
+    }
+
+    private byte[] asBytea(Object o) {
+        if (o instanceof String) {
+            return ((String) o).getBytes();
+        }
+
+        byte[] array = (o instanceof byte[]) ? (byte[]) o : ((ByteBuffer) o).array();
+        return FireboltByteaConverter.convertFireboltBytea(array);
     }
 
     private Array createDateArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
