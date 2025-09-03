@@ -17,7 +17,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 
 /**
  * Insert into a table using prepared statements
@@ -27,6 +30,8 @@ public class InsertPreparedStatement {
 
     private Connection connection;
     private TableSchema tableSchema;
+    @Setter
+    private ErrorReporter errorReporter;
 
     public InsertPreparedStatement(Connection connection, TableSchema tableSchema) {
         this.connection = connection;
@@ -53,7 +58,7 @@ public class InsertPreparedStatement {
                     setStatementParameters(preparedStatement, record, tableSchema, validColumnNames);
                     preparedStatement.addBatch();
                 } catch (RecordConversionFailedException e) {
-                    // send the record to the dead letter queue
+                    errorReporter.report(record.getSinkRecord(), e);
                     log.warn("Record from partition {} at offset {} will be submitted to the deadletter queue ", e.getKafkaPartition(), e.getKafkaOffset());
                 }
             }
@@ -70,8 +75,9 @@ public class InsertPreparedStatement {
                 if (fireboltRecords.size() == 1) {
                     FireboltRecord fireboltRecord = fireboltRecords.get(0);
                     log.warn("Cannot process the firebolt record from partition {} at offset {}, as it is too large and exceeds the Firebolt request entity size", fireboltRecord.getPartition(), fireboltRecord.getOffset());
-
-                    // TODO should add this to the dead letter queue
+                    // report too-large record to DLQ via reporter
+                    // We don't have direct access to the original SinkRecord; construct a minimal synthetic error
+                    errorReporter.report(fireboltRecord.getSinkRecord(), e);
                 } else {
                     // simple strategy for now. Split the rows in two and try each half again
                     int leftSide = fireboltRecords.size() / 2;

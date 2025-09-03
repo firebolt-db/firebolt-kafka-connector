@@ -9,7 +9,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.firebolt.jdbc.exception.FireboltException;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
@@ -78,19 +81,19 @@ public class InsertPreparedStatementTest {
         // 4 records so we expect first executeBatch to fail with 413, then two successful halves
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 1L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 2L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(2L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("b").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 3L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(3L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(3).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("c").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 4L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(4L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(4).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("d").schemaType(Schema.Type.STRING).build()
         )));
 
@@ -119,12 +122,12 @@ public class InsertPreparedStatementTest {
     }
 
     @Test
-    void shouldNotThrowWhenSingleRecordTooLargeHttp413() throws Exception {
+    void shouldReportSingleRecordTooLargeViaErrorReporter() throws Exception {
         List<FireboltRecord> records = new ArrayList<>();
-        records.add(buildRecord(TABLE_NAME, 0, 99L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(123L).schemaType(Schema.Type.INT64).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("big").schemaType(Schema.Type.STRING).build()
-        )));
+        records.add(buildRecord(TABLE_NAME, 1, 1234L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(5L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("huge").schemaType(Schema.Type.STRING).build()
+        ), new SinkRecord("topic", 1, null, null, null, null, 1234L)));
 
         PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
         com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
@@ -132,9 +135,16 @@ public class InsertPreparedStatementTest {
         when(psFail.executeBatch()).thenThrow(http413);
         when(mockConnection.prepareStatement(anyString())).thenReturn(psFail);
 
+        // reporter mock
+        com.firebolt.kafka.connect.reporter.ErrorReporter reporter = Mockito.mock(com.firebolt.kafka.connect.reporter.ErrorReporter.class);
+        insertPreparedStatement.setErrorReporter(reporter);
+
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
-        verify(psFail, times(1)).executeBatch();
+        verify(reporter, times(1)).report(
+                Mockito.argThat(rec -> rec.topic().equals("topic") && rec.kafkaOffset() == 1234L),
+                Mockito.any(FireboltException.class)
+        );
     }
 
     @Test
@@ -283,13 +293,19 @@ public class InsertPreparedStatementTest {
 
     private static FireboltRecord buildRecord(String tableName, int partition, long offset,
                                               Map<String, KafkaMessageColumnValue> values) {
+        return buildRecord(tableName, partition, offset, values, null);
+    }
+
+    private static FireboltRecord buildRecord(String tableName, int partition, long offset,
+                                              Map<String, KafkaMessageColumnValue> values, SinkRecord record) {
         return new FireboltRecord(
                 tableName,
                 values,
                 "topic",
                 partition,
                 offset,
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                record
         );
     }
 

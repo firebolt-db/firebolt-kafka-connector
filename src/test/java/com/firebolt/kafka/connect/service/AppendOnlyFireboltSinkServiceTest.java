@@ -10,6 +10,8 @@ import java.sql.Connection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -69,6 +71,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         tableWriterMap = new HashMap<>();
         service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap);
+        service.setErrorReporter(ErrorReporter.nullErrorReporter());
 
         when(mockSinkConfig.getTableNameForTopic(TOPIC_A)).thenReturn(TABLE_A);
         when(mockSinkConfig.getTableNameForTopic(TOPIC_B)).thenReturn(TABLE_B);
@@ -78,6 +81,52 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         when(mockSchemaTableA.getTableName()).thenReturn(TABLE_A);
         when(mockSchemaTableB.getTableName()).thenReturn(TABLE_B);
+    }
+
+    @Test
+    void shouldReportConversionFailureViaErrorReporter() throws Exception {
+        // arrange
+        SinkRecord badRecord = buildRecord(TOPIC_A, 0, 1L);
+        Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
+
+        TableWriter writerA = mock(TableWriter.class);
+        when(writerA.getProcessedPartitionOffsets()).thenReturn(Map.of());
+        tableWriterMap.put(TABLE_A, writerA);
+
+        when(mockConverterFactory.convert(badRecord)).thenThrow(new com.firebolt.kafka.connect.convert.exception.RecordConversionException("boom"));
+
+        com.firebolt.kafka.connect.reporter.ErrorReporter reporter = org.mockito.Mockito.mock(com.firebolt.kafka.connect.reporter.ErrorReporter.class);
+        service.setErrorReporter(reporter);
+
+        // act
+        assertDoesNotThrow(() -> service.processRecord(java.util.List.of(badRecord), schemas));
+
+        // assert
+        verify(reporter, org.mockito.Mockito.times(1)).report(org.mockito.Mockito.eq(badRecord), org.mockito.Mockito.any(Exception.class));
+    }
+
+    @Test
+    void shouldNotReportWhenConversionSucceeds() throws Exception {
+        // arrange
+        SinkRecord ok = buildRecord(TOPIC_A, 0, 2L);
+        Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
+
+        TableWriter writerA = mock(TableWriter.class);
+        when(writerA.getProcessedPartitionOffsets()).thenReturn(Map.of());
+        tableWriterMap.put(TABLE_A, writerA);
+
+        FireboltRecord converted = mock(FireboltRecord.class);
+        when(mockConverterFactory.convert(ok)).thenReturn(converted);
+
+        com.firebolt.kafka.connect.reporter.ErrorReporter reporter = org.mockito.Mockito.mock(com.firebolt.kafka.connect.reporter.ErrorReporter.class);
+        service.setErrorReporter(reporter);
+
+        // act
+        assertDoesNotThrow(() -> service.processRecord(java.util.List.of(ok), schemas));
+
+        // assert: no report
+        org.mockito.Mockito.verifyNoInteractions(reporter);
+        verify(writerA, times(1)).insertRecords(org.mockito.ArgumentMatchers.anyList());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -8,8 +9,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+
+import static com.firebolt.kafka.connect.reporter.ErrorReporter.nullErrorReporter;
 
 /**
  * A class that knows how to insert into a Firebolt table . It will use prepared statements to do the inserts.
@@ -33,6 +38,8 @@ public class TableWriter {
     private Supplier<Connection> connectionSupplier;
 
     private InsertPreparedStatementProvider insertPreparedStatementProvider;
+    @Setter
+    private ErrorReporter errorReporter;
 
     /**
      * A connection that will be used for pushing the records to firebolt table
@@ -40,15 +47,21 @@ public class TableWriter {
     private Connection connection;
 
     public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier) {
-        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider());
+        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider(), nullErrorReporter());
     }
 
     @VisibleForTesting
     TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider) {
+        this(tableSchema, connectionSupplier, processedPartitionOffsets, insertPreparedStatementProvider, nullErrorReporter());
+    }
+
+    @VisibleForTesting
+    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
+        this.errorReporter = errorReporter;
     }
 
     public void insertRecords(List<FireboltRecord> fireboltRecords) throws SQLException {
@@ -59,6 +72,7 @@ public class TableWriter {
         }
 
         InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema);
+        insertPreparedStatement.setErrorReporter(errorReporter);
         insertPreparedStatement.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node

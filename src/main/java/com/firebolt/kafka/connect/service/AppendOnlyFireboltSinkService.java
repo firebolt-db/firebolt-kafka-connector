@@ -13,11 +13,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.sql.SQLException;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.sink.SinkRecord;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 
 /**
  * Append-only implementation of FireboltSinkService.
@@ -32,6 +35,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
     // a map between a table name and the writer for that map
     private Map<String, TableWriter> tableWriterMap;
+    private ErrorReporter errorReporter;
 
     AppendOnlyFireboltSinkService(SinkConfig sinkConfig) {
         this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>());
@@ -43,6 +47,11 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         this.fireboltDbService = fireboltDbService;
         this.recordConverterFactory = recordConverterFactory;
         this.tableWriterMap = tableWriterMap;
+    }
+
+    @Override
+    public void setErrorReporter(ErrorReporter reporter) {
+        this.errorReporter = reporter;
     }
 
     @Override
@@ -71,6 +80,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
                 }
 
                 TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig())));
+                tableWriter.setErrorReporter(errorReporter);
 
                 List<FireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
                 tableWriter.insertRecords(fireboltRecords);
@@ -102,7 +112,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         } catch (RecordConversionException e) {
             log.error("Error converting record: topic={}, partition={}, offset={}",
                     record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
-            // this should be moved to the dead letter queue or retried. For now ignore it
+            errorReporter.report(record, e);
             return Optional.empty();
         }
     }

@@ -18,6 +18,11 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
+import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
+import org.apache.kafka.connect.sink.ErrantRecordReporter;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
+
+import static com.firebolt.kafka.connect.reporter.ErrorReporter.nullErrorReporter;
 
 /**
  * Firebolt Sink Task that handles the actual data processing.
@@ -34,6 +39,7 @@ public class FireboltSinkTask extends SinkTask {
     private Map<String, String> topicToTableMapping;
     private Map<String, TableSchema> tableSchemas;
     private FireboltDbService fireboltDbService;
+    private ErrorReporter errorReporter;
 
     @Override
     public String version() {
@@ -67,11 +73,34 @@ public class FireboltSinkTask extends SinkTask {
             this.fireboltDbService = new FireboltDbService();
             this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig);
 
+            createAndSetErrorReporter();
+            setErrantRecordReportedInSinkService();
+
             log.info("Firebolt Sink Task started successfully");
 
         } catch (Exception e) {
             log.error("Failed to start Firebolt Sink Task", e);
             throw new RuntimeException("Failed to start Firebolt Sink Task", e);
+        }
+    }
+
+    private void setErrantRecordReportedInSinkService() {
+        this.fireboltSinkService.setErrorReporter(this.errorReporter);
+    }
+
+    private void createAndSetErrorReporter() {
+        this.errorReporter = nullErrorReporter();
+        if (context != null) {
+            try {
+                ErrantRecordReporter errReporter = context.errantRecordReporter();
+                if (errReporter != null) {
+                    this.errorReporter = errReporter::report;
+                } else {
+                    log.info("Errant record reporter not configured.");
+                }
+            } catch (NoClassDefFoundError | NoSuchMethodError e) {
+                log.info("Kafka versions prior to 2.6 do not support the errant record reporter.");
+            }
         }
     }
 
@@ -107,13 +136,31 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
-            // Delegate to the appropriate service
+            // Try batch processing first to keep original behavior/perf
             fireboltSinkService.processRecord(records, tableSchemas);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
-
-        } catch (Exception e) {
-            log.error("Error processing records", e);
-            handleError(e);
+        } catch (Exception batchException) {
+            Throwable root = batchException.getCause() != null ? batchException.getCause() : batchException;
+            if (root instanceof RecordConversionException) {
+                log.warn("Batch processing failed due to conversion error; retrying per-record with errant reporting");
+                for (SinkRecord batchRecord : records) {
+                    try {
+                        fireboltSinkService.processRecord(java.util.Collections.singletonList(batchRecord), tableSchemas);
+                    } catch (Exception e) {
+                        Throwable cause = e.getCause() != null ? e.getCause() : e;
+                        if (cause instanceof RecordConversionException) {
+                            log.warn("Record failed conversion, reporting as errant: topic={}, partition={}, offset={}", batchRecord.topic(), batchRecord.kafkaPartition(), batchRecord.kafkaOffset(), e);
+                            errorReporter.report(batchRecord, e);
+                        } else {
+                            log.error("Non-conversion error while processing record; failing task", e);
+                            handleError(e);
+                        }
+                    }
+                }
+            } else {
+                log.error("Error processing records", batchException);
+                handleError(batchException);
+            }
         }
     }
 
@@ -144,6 +191,7 @@ public class FireboltSinkTask extends SinkTask {
                 // Don't re-throw the exception to ensure graceful shutdown
             }
         }
+        // ErrantRecordReporter is managed by the Connect framework and should not be closed here
     }
 
     /**
@@ -213,5 +261,4 @@ public class FireboltSinkTask extends SinkTask {
         // For now, always throw on error since error tolerance was removed
         throw new RuntimeException("Error processing records", e);
     }
-
 } 

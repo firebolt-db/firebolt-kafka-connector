@@ -3,7 +3,8 @@ package com.firebolt.kafka.connect.service;
 import com.firebolt.kafka.connect.TableSchema;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
+
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
@@ -23,5 +24,12 @@ public interface FireboltSinkService {
      * Closes the resources associated with the firebolt
      */
     void close();
+
+    /**
+     * Supplies the ErrantRecordReporter from the task context. May be null if not configured.
+     */
+    default void setErrorReporter(ErrorReporter reporter) {
+        // optional for implementations
+    }
 
 }
