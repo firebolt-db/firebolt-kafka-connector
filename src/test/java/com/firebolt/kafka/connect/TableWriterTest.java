@@ -116,6 +116,21 @@ public class TableWriterTest {
     }
 
     @Test
+    void shouldPassErrorReporterToInsertPreparedStatement() throws SQLException {
+        // arrange
+        com.firebolt.kafka.connect.reporter.ErrorReporter reporter = (r, e) -> { };
+        tableWriter.setErrorReporter(reporter);
+
+        when(mockConnection.isClosed()).thenReturn(false);
+
+        // act
+        assertDoesNotThrow(() -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+
+        // assert: verify that setErrorReporter was called on InsertPreparedStatement
+        verify(mockInsertPrepareStatement).setErrorReporter(reporter);
+    }
+
+    @Test
     void shouldInsertRecordsSuccessfullyWhenAllRecordsBelongToOnePartition() throws SQLException {
         when(mockFireboltRecord1.getPartition()).thenReturn(0);
         when(mockFireboltRecord1.getOffset()).thenReturn(100L);

@@ -376,6 +376,32 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
+    void shouldUseErrorReporterOnPerRecordFallback() {
+        // Start and open the task
+        startAndOpenTask();
+
+        // Inject an error reporter into the task
+        com.firebolt.kafka.connect.reporter.ErrorReporter reporter = org.mockito.Mockito.mock(com.firebolt.kafka.connect.reporter.ErrorReporter.class);
+        try {
+            java.lang.reflect.Field f = FireboltSinkTask.class.getDeclaredField("errorReporter");
+            f.setAccessible(true);
+            f.set(fireboltSinkTask, reporter);
+        } catch (Exception ignored) { }
+
+        // Mock service to throw conversion error for both batch and per-record processing
+        doThrow(new RuntimeException(new com.firebolt.kafka.connect.convert.exception.RecordConversionException("convert")))
+            .when(mockSinkService).processRecord(anyList(), anyMap());
+
+        // Act
+        org.apache.kafka.connect.sink.SinkRecord badRecord = new org.apache.kafka.connect.sink.SinkRecord("test_topic", 0, null, null, null, "bad-value", 100L);
+        java.util.List<org.apache.kafka.connect.sink.SinkRecord> records = java.util.Collections.singletonList(badRecord);
+        assertDoesNotThrow(() -> fireboltSinkTask.put(records));
+
+        // Assert that reporter was used
+        org.mockito.Mockito.verify(reporter, org.mockito.Mockito.atLeastOnce()).report(org.mockito.Mockito.eq(badRecord), org.mockito.Mockito.any(Exception.class));
+    }
+
+    @Test
     void shouldHandleStopWhenSinkServiceCloseThrowsException() {
         // Start the task first to set up the sink service
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
