@@ -112,8 +112,6 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return connection.createArrayOf(TIMESTAMP_ARRAY_TYPE_NAME, elements.stream().map(this::asStringTimestamp).toArray());
         } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
             return connection.createArrayOf("string", elements.toArray());
-        } else if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
-            return connection.createArrayOf(TIMESTAMP_ARRAY_TYPE_NAME, elements.stream().map(this::asStringTimestamp).toArray());
         }
 
         throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the timestamp array to firebolt column");
