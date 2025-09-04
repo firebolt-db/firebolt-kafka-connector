@@ -162,7 +162,7 @@ public class FireboltSinkConnectorTest {
             doThrow(new ConnectionFailedException(errorMessage)).when(mockFireboltDbService).testConnection(any(JdbcConfig.class));
             
             Map<String, String> configWithBadUrl = new HashMap<>();
-            configWithBadUrl.put(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG, "jdbc:firebolt:bad_database");
+            configWithBadUrl.put(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG, "jdbc:firebolt:bad_database?engine=the_engine&account=the_account");
             configWithBadUrl.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1");
 
             Config result = connectorWithMock.validate(configWithBadUrl);
@@ -185,7 +185,7 @@ public class FireboltSinkConnectorTest {
             doThrow(new RuntimeException(errorMessage)).when(mockFireboltDbService).testConnection(any(JdbcConfig.class));
             
             Map<String, String> config = new HashMap<>();
-            config.put(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG, "jdbc:firebolt:test_database");
+            config.put(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG, "jdbc:firebolt:test_database?engine=the_engine&account=the_account");
             config.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1");
 
             Config result = connectorWithMock.validate(config);
