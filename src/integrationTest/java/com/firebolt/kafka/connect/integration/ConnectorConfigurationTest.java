@@ -2,11 +2,14 @@ package com.firebolt.kafka.connect.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.clients.FireboltClient;
+import com.firebolt.kafka.connect.utils.TestTag;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
 import okhttp3.Request;
@@ -17,6 +20,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -94,7 +98,61 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
                    errorMessage.toLowerCase().contains("invalid"),
                    "Error message should mention invalid JDBC URL format: " + errorMessage);
     }
-    
+
+    @Test
+    @Tag(TestTag.CLOUD)
+    void shouldNotAllowConnectWithoutEngine() throws IOException {
+        Map<String, Object> connectorConfig = createBaseConnectorConfig();
+        String jdbcUrl = (String) connectorConfig.get("jdbc.connection.url");
+
+        // remove the engine from the jdbc url and create the connector with this new jdbc url
+        String jdbcUrlWithoutEngine = removeEngine(jdbcUrl);
+        connectorConfig.put("jdbc.connection.url", jdbcUrlWithoutEngine);
+
+        // Attempt to create connector and expect failure
+        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
+
+        // Verify error message contains information about invalid URL format
+        assertNotNull(errorMessage, "Error message should not be null");
+        assertTrue(errorMessage.contains("The jdbc url does not have the engine parameter. When connecting to Firebolt Cloud this is mandatory."));
+    }
+
+    @Test
+    @Tag(TestTag.CLOUD)
+    void shouldNotAllowConnectWithoutAccount() throws IOException {
+        Map<String, Object> connectorConfig = createBaseConnectorConfig();
+        String jdbcUrl = (String) connectorConfig.get("jdbc.connection.url");
+
+        // remove the engine from the jdbc url and create the connector with this new jdbc url
+        String jdbcUrlWithoutAccount = removeAccount(jdbcUrl);
+        connectorConfig.put("jdbc.connection.url", jdbcUrlWithoutAccount);
+
+        // Attempt to create connector and expect failure
+        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
+
+        // Verify error message contains information about invalid URL format
+        assertNotNull(errorMessage, "Error message should not be null");
+        assertTrue(errorMessage.contains("The jdbc url does not have the account parameter. When connecting to Firebolt Cloud this is mandatory."));
+    }
+
+    @Test
+    @Tag(TestTag.CLOUD)
+    void shouldNotAllowConnectWithoutDatabase() throws IOException {
+        Map<String, Object> connectorConfig = createBaseConnectorConfig();
+        String jdbcUrl = (String) connectorConfig.get("jdbc.connection.url");
+
+        // remove the engine from the jdbc url and create the connector with this new jdbc url
+        String jdbcUrlWithoutDatabase = removeDatabase(jdbcUrl);
+        connectorConfig.put("jdbc.connection.url", jdbcUrlWithoutDatabase);
+
+        // Attempt to create connector and expect failure
+        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
+
+        // Verify error message contains information about invalid URL format
+        assertNotNull(errorMessage, "Error message should not be null");
+        assertTrue(errorMessage.contains("The jdbc url does not have the database parameter. When connecting to Firebolt Cloud this is mandatory."));
+    }
+
     @Test
     void testInvalidDatabaseInJdbcConnectionUrl() throws IOException {
         Map<String, Object> connectorConfig = createBaseConnectorConfig();
@@ -556,4 +614,45 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             assertTrue(success, "Connector creation should succeed with minimal configuration (using defaults for optional properties)");
         }
     }
-} 
+
+    /**
+     * Removes the jdbc url from the cloud connection jdbc url. We can assume that the engine will be passed in, so it exists
+     */
+    private static String removeEngine(String jdbc) {
+        return removeJdbcProperty(jdbc, "engine");
+    }
+
+    /**
+     * Removes the jdbc url from the cloud connection jdbc url. We can assume that the engine will be passed in, so it exists
+     */
+    private static String removeAccount(String jdbc) {
+       return removeJdbcProperty(jdbc, "account");
+    }
+
+    private static String removeDatabase(String jdbc) {
+        String[] jdbcParts = jdbc.split("\\?");
+
+        jdbcParts[0] = "jdbc:firebolt:";
+        return Arrays.stream(jdbcParts).collect(Collectors.joining("?"));
+    }
+
+    /**
+     * Removes the jdbc url from the cloud connection jdbc url. We can assume that the engine will be passed in, so it exists
+     */
+    private static String removeJdbcProperty(String jdbc, String propertyName) {
+        String[] jdbcParts = jdbc.split("\\?");
+
+        String paramString = jdbcParts[1];
+        String[] params = paramString.split("&");
+
+        // remove the engine param
+        String paramStringWithoutEngine = Arrays.stream(params)
+                .filter(param -> !param.toLowerCase().trim().startsWith(propertyName))
+                .collect(Collectors.joining("&"));
+
+        // use this new part on jdbcParts
+        jdbcParts[1] = paramStringWithoutEngine;
+        return Arrays.stream(jdbcParts).collect(Collectors.joining("?"));
+    }
+
+}
