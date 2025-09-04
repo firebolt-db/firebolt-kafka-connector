@@ -66,4 +66,9 @@ public class ByteaTestRecord {
      * Maps to Firebolt ARRAY(BYTEA NOT NULL) NULL.
      */
     private List<byte[]> optionalListWithNonNullElements;
+
+    // New fields: strings mapped to BYTEA in Firebolt
+    private String stringAsBytea;
+
+    private List<String> stringListAsBytea;
 } 

@@ -763,9 +763,9 @@ public class ArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithByteaArrayType() throws SQLException {
         List<String> byteaValues = Arrays.asList(
-            Base64.getEncoder().encodeToString("Hello World".getBytes()),
-            Base64.getEncoder().encodeToString("Test string".getBytes()),
-            Base64.getEncoder().encodeToString("123456789".getBytes())
+            "Hello World",
+            "Test string",
+            "123456789"
         );
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(byteaValues)
@@ -776,7 +776,7 @@ public class ArrayDataTypeConverterTest {
         converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
 
         byte[][] expectedBytes = byteaValues.stream()
-                .map(base64 -> Base64.getDecoder().decode(base64))
+                .map(s -> s == null ? null : s.getBytes())
                 .toArray(byte[][]::new);
 
         verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedBytes));
@@ -785,7 +785,7 @@ public class ArrayDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithByteaArrayTypeEmptyString() throws SQLException {
-        List<String> byteaValues = Arrays.asList("", Base64.getEncoder().encodeToString("Test".getBytes()), "");
+        List<String> byteaValues = Arrays.asList("", "Test", "");
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(byteaValues)
                 .build();
@@ -795,9 +795,9 @@ public class ArrayDataTypeConverterTest {
         converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
 
         Object[] expectedValues = new Object[]{
-            "\\x".getBytes(),
-            Base64.getDecoder().decode(Base64.getEncoder().encodeToString("Test".getBytes())),
-            "\\x".getBytes()
+            new byte[]{},
+            "Test".getBytes(),
+            new byte[]{}
         };
 
         verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
@@ -807,9 +807,9 @@ public class ArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithByteaArrayTypeContainingNulls() throws SQLException {
         List<String> byteaValues = Arrays.asList(
-            Base64.getEncoder().encodeToString("Hello".getBytes()),
+            "Hello",
             null,
-            Base64.getEncoder().encodeToString("World".getBytes())
+            "World"
         );
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(byteaValues)
@@ -820,9 +820,9 @@ public class ArrayDataTypeConverterTest {
         converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
 
         Object[] expectedValues = new Object[]{
-            Base64.getDecoder().decode(Base64.getEncoder().encodeToString("Hello".getBytes())),
+            "Hello".getBytes(),
             null,
-            Base64.getDecoder().decode(Base64.getEncoder().encodeToString("World".getBytes()))
+            "World".getBytes()
         };
 
         verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
@@ -849,7 +849,7 @@ public class ArrayDataTypeConverterTest {
         List<String> largeArray = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
             String testData = "Test data " + i;
-            largeArray.add(Base64.getEncoder().encodeToString(testData.getBytes()));
+            largeArray.add(testData);
         }
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(largeArray)
@@ -860,7 +860,7 @@ public class ArrayDataTypeConverterTest {
         converter.convertAndSet(mockStatement, 1, kafkaValue, byteaArrayColumn);
 
         Object[] expectedValues = largeArray.stream()
-                .map(base64 -> Base64.getDecoder().decode(base64))
+                .map(s -> s.getBytes())
                 .toArray();
 
         verify(mockConnection).createArrayOf(eq("bytea"), eq(expectedValues));
@@ -872,9 +872,9 @@ public class ArrayDataTypeConverterTest {
         byte[] binaryData1 = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
         byte[] binaryData2 = {(byte) 0xFF, (byte) 0xFE, (byte) 0xFD, (byte) 0xFC};
         
-        List<String> byteaValues = Arrays.asList(
-            Base64.getEncoder().encodeToString(binaryData1),
-            Base64.getEncoder().encodeToString(binaryData2)
+        List<Object> byteaValues = Arrays.asList(
+            binaryData1,
+            binaryData2
         );
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(byteaValues)
@@ -896,8 +896,8 @@ public class ArrayDataTypeConverterTest {
         String unicodeText = "Unicode: café, naïve, résumé, Москва";
         
         List<String> byteaValues = Arrays.asList(
-            Base64.getEncoder().encodeToString(specialChars.getBytes()),
-            Base64.getEncoder().encodeToString(unicodeText.getBytes())
+            specialChars,
+            unicodeText
         );
         KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
                 .value(byteaValues)

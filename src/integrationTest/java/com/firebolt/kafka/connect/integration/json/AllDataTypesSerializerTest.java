@@ -380,7 +380,7 @@ public class AllDataTypesSerializerTest extends BaseIntegrationTest {
                 
                 // Verify colBytea field (decode base64 string before comparison)
                 if (actualColBytea != null && expected.getColBytea() != null) {
-                    byte[] expectedColBytea = Base64.getDecoder().decode(expected.getColBytea());
+                    byte[] expectedColBytea = expected.getColBytea().getBytes();
                     assertArrayEquals(expectedColBytea, actualColBytea,
                         "ColBytea mismatch at index " + recordIndex);
                 }

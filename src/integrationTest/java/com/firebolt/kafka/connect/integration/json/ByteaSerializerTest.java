@@ -89,8 +89,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 .build(),
 
             // Record with minimal binary data (single byte)
-            ByteaTestRecord.builder()
-                .recordId(2)
+            aValidTestRecord(2)
                 .requiredBytea(new byte[]{0x01})
                 .optionalBytea(new byte[]{0x02})
                 .requiredListWithNullableElements(Arrays.asList(
@@ -182,6 +181,8 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredBytea\" BYTEA NOT NULL, " +
                 "\"optionalBytea\" BYTEA NULL, " +
+                "\"stringAsBytea\" BYTEA NULL, " +
+                "\"stringListAsBytea\" ARRAY(BYTEA NULL) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(BYTEA NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BYTEA NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BYTEA NULL) NULL, " +
@@ -203,29 +204,46 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 "    },\n" +
                 "    \"requiredBytea\": {\n" +
                 "      \"type\": \"string\",\n" +
-                "      \"format\": \"byte\",\n" +
+                "      \"connect.type\": \"bytes\",\n" +
                 "      \"description\": \"Required binary field - must not be null\"\n" +
                 "    },\n" +
                 "    \"optionalBytea\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"string\", \"format\": \"byte\"}\n" +
+                "        {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional binary field - can be null or omitted\"\n" +
+                "    },\n" +
+                "    \"stringAsBytea\": {\n" +
+                "      \"type\": \"string\"\n" +
+                "    },\n" +
+                "    \"stringListAsBytea\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\"},\n" +
+                "        {\n" +
+                "          \"type\": \"array\",\n" +
+                "          \"items\": {\n" +
+                "            \"oneOf\": [\n" +
+                "              {\"type\": \"null\"},\n" +
+                "              {\"type\": \"string\"}\n" +
+                "            ]\n" +
+                "          }\n" +
+                "        }\n" +
+                "      ]\n" +
                 "    },\n" +
                 "    \"requiredListWithNullableElements\": {\n" +
                 "      \"type\": \"array\",\n" +
                 "      \"items\": {\n" +
                 "        \"oneOf\": [\n" +
                 "          {\"type\": \"null\"},\n" +
-                "          {\"type\": \"string\", \"format\": \"byte\"}\n" +
+                "          {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
                 "        ]\n" +
                 "      },\n" +
                 "      \"description\": \"Required list where individual elements can be null\"\n" +
                 "    },\n" +
                 "    \"requiredListWithNonNullElements\": {\n" +
                 "      \"type\": \"array\",\n" +
-                "      \"items\": {\"type\": \"string\", \"format\": \"byte\"},\n" +
+                "      \"items\": {\"type\": \"string\", \"connect.type\": \"bytes\"},\n" +
                 "      \"description\": \"Required list where individual elements cannot be null\"\n" +
                 "    },\n" +
                 "    \"optionalList\": {\n" +
@@ -236,7 +254,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"string\", \"format\": \"byte\"}\n" +
+                "              {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
@@ -248,7 +266,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
                 "        {\n" +
                 "          \"type\": \"array\",\n" +
-                "          \"items\": {\"type\": \"string\", \"format\": \"byte\"}\n" +
+                "          \"items\": {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
@@ -291,7 +309,7 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
         
         // Verify specific records by recordId
         String selectQuery = String.format(
-            "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", " +
+            "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", \"stringAsBytea\", \"stringListAsBytea\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -310,6 +328,10 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 byte[] actualRequiredBytea = rs.getBytes("requiredBytea");
                 byte[] actualOptionalBytea = rs.getBytes("optionalBytea");
                 
+                // Read new string-mapped BYTEA columns
+                byte[] actualStringAsBytea = rs.getBytes("stringAsBytea");
+                Array actualStringListAsBytea = rs.getArray("stringListAsBytea");
+
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
                 Array actualRequiredListWithNonNullArray = rs.getArray("requiredListWithNonNullElements");
@@ -331,6 +353,31 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                         "OptionalBytea mismatch at index " + recordIndex);
                 }
                 
+                // Verify new string-mapped BYTEA columns
+                if (expected.getStringAsBytea() == null) {
+                    assertNull(actualStringAsBytea);
+                } else {
+                    assertArrayEquals(expected.getStringAsBytea().getBytes(StandardCharsets.UTF_8), actualStringAsBytea);
+                }
+                if (expected.getStringListAsBytea() == null) {
+                    assertNull(actualStringListAsBytea);
+                } else {
+                    // Convert expected strings to bytes
+                    byte[][] expectedBytes = expected.getStringListAsBytea().stream()
+                            .map(s -> s == null ? null : s.getBytes(StandardCharsets.UTF_8))
+                            .toArray(byte[][]::new);
+                    // Compare array contents
+                    byte[][] actualBytes = (byte[][]) actualStringListAsBytea.getArray();
+                    assertEquals(expectedBytes.length, actualBytes.length);
+                    for (int i = 0; i < expectedBytes.length; i++) {
+                        if (expectedBytes[i] == null) {
+                            assertNull(actualBytes[i]);
+                        } else {
+                            assertArrayEquals(expectedBytes[i], actualBytes[i]);
+                        }
+                    }
+                }
+
                 // Array verification using getArray()
                 verifyByteaArray("requiredListWithNullableElements", 
                     expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
@@ -431,6 +478,8 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 .recordId(recordId)
                 .requiredBytea("Default binary content".getBytes(StandardCharsets.UTF_8))
                 .optionalBytea("Default optional value".getBytes(StandardCharsets.UTF_8))
+                .stringAsBytea("Hello as bytea")
+                .stringListAsBytea(Arrays.asList("one", "two", "three"))
                 .requiredListWithNullableElements(Arrays.asList(
                     "item1".getBytes(StandardCharsets.UTF_8), 
                     "item2".getBytes(StandardCharsets.UTF_8)))
@@ -442,4 +491,5 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
                 .optionalListWithNonNullElements(Arrays.asList(
                     "choice1".getBytes(StandardCharsets.UTF_8)));
     }
+
 } 
