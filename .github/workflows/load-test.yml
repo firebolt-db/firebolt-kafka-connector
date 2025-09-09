@@ -6,7 +6,7 @@ on:
       firebolt_jdbc_url:
         description: 'Firebolt JDBC URL (e.g., jdbc:firebolt:db?account=acc&engine=eng&env=staging)'
         required: true
-        default: 'jdbc:firebolt:sink-connector-load-test?account=goprean-us-east&engine=sink_connector_load_test&env=staging'
+        default: 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging'
       connector_plugin_id:
         description: 'Confluent Firebolt Connector Plugin ID (leave empty to use repository default)'
         required: false
