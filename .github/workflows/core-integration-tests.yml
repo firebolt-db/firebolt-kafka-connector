@@ -90,7 +90,7 @@ jobs:
         echo "Kafka Connect is ready!"
         
     - name: Run integration tests (excluding NOT_IMPLEMENTED)
-      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented --no-daemon
+      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud --no-daemon
       env:
         KAFKA_BOOTSTRAP_SERVERS: localhost:9092
         SCHEMA_REGISTRY_URL: http://localhost:8081
