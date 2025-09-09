@@ -637,7 +637,7 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Removes the jdbc url from the cloud connection jdbc url. We can assume that the engine will be passed in, so it exists
+     * Removes a property from the jdbc url
      */
     private static String removeJdbcProperty(String jdbc, String propertyName) {
         String[] jdbcParts = jdbc.split("\\?");
@@ -645,13 +645,12 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         String paramString = jdbcParts[1];
         String[] params = paramString.split("&");
 
-        // remove the engine param
-        String paramStringWithoutEngine = Arrays.stream(params)
-                .filter(param -> !param.toLowerCase().trim().startsWith(propertyName))
+        String paramStringWithoutSpecifiedProperty = Arrays.stream(params)
+                .filter(param -> !param.toLowerCase().trim().split("=")[0].trim().equals(propertyName))
                 .collect(Collectors.joining("&"));
 
         // use this new part on jdbcParts
-        jdbcParts[1] = paramStringWithoutEngine;
+        jdbcParts[1] = paramStringWithoutSpecifiedProperty;
         return Arrays.stream(jdbcParts).collect(Collectors.joining("?"));
     }
 
