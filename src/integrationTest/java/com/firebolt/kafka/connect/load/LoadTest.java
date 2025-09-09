@@ -140,15 +140,15 @@ public class LoadTest {
 
     private static ConfluentCloudSettings confluentCloudSettings() {
         return ConfluentCloudSettings.builder()
-                .environmentId(System.getProperty("confluent.environment.id"))
-                .clusterId(System.getProperty("confluent.cluster.id"))
+                .environmentId(System.getProperty("confluent.environment.id", "env-7kddyw"))
+                .clusterId(System.getProperty("confluent.cluster.id","lkc-92g0z5"))
                 .fireboltConnectorPluginId(System.getProperty("confluent.firebolt.connector.plugin.id"))
-                .kafkaApiKey(System.getProperty("confluent.kafka.api.key"))
-                .kafkaApiSecret(System.getProperty("confluent.kafka.api.secret"))
-                .schemaRegistryApiKey(System.getProperty("confluent.schema.registry.api.key"))
-                .schemaRegistryApiSecret(System.getProperty("confluent.schema.registry.api.secret"))
-                .cloudResourceApiKey(System.getProperty("confluent.cloud.resource.api.key"))
-                .cloudResourceApiSecret(System.getProperty("confluent.cloud.resource.api.secret"))
+                .kafkaApiKey(System.getProperty("confluent.kafka.api.key", "NMBLCRMREIGL6VVZ"))
+                .kafkaApiSecret(System.getProperty("confluent.kafka.api.secret","cfltvzQXBJD4DvbS5AvMtXLkieFMC1kyAaNV2ISfLw+YJq0nppRVTMmp2fPD4VKg"))
+                .schemaRegistryApiKey(System.getProperty("confluent.schema.registry.api.key","HG2ND4LMLGM7CBS6"))
+                .schemaRegistryApiSecret(System.getProperty("confluent.schema.registry.api.secret","cflt1GzYmP8U+gHDSBRLulsTXCn1Qx//RQhfneu9QQrg0vwhW6vJEBV4Erd+roTQ"))
+                .cloudResourceApiKey(System.getProperty("confluent.cloud.resource.api.key","NGGLO2BNZPES2T3D"))
+                .cloudResourceApiSecret(System.getProperty("confluent.cloud.resource.api.secret","cfltmYZVVpQrInvwMkOv4Ul8hAIz1IyBYd9fxXm92sAu25zhf1fT3c35r3WrRePg"))
                 .build();
     }
 

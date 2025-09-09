@@ -1,0 +1,79 @@
+name: List Firebolt Custom Connector Plugins
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment_id:
+        description: Confluent Cloud environment ID (e.g., env-xxxxx)
+        required: true
+        type: string
+      name_filter:
+        description: Case-insensitive regex to match plugin display_name
+        required: false
+        default: firebolt
+        type: string
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+
+jobs:
+  list-plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: List Firebolt custom connector plugins
+        env:
+          CONFLUENT_API_KEY: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}
+          CONFLUENT_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}
+          ENV_ID_INPUT: ${{ inputs.environment_id }}
+          ENV_ID_VAR: ${{ vars.CONFLUENT_ENVIRONMENT_ID }}
+          NAME_FILTER_INPUT: ${{ inputs.name_filter }}
+        run: |
+          set -euo pipefail
+
+          # Build request
+          ENV_ID="${ENV_ID_INPUT:-}"; ENV_ID="${ENV_ID:-${ENV_ID_VAR:-}}"
+          if [ -z "$ENV_ID" ]; then
+            echo "Environment ID is required. Provide it via workflow input or repository variable CONFLUENT_ENVIRONMENT_ID." >&2
+            exit 1
+          fi
+
+          NAME_FILTER="${NAME_FILTER_INPUT:-firebolt}"
+
+          API_URL="https://api.confluent.cloud/connect/v1/custom-connector-plugins?environment=${ENV_ID}"
+          AUTH=$(printf "%s:%s" "$CONFLUENT_API_KEY" "$CONFLUENT_API_SECRET" | base64 | tr -d '\r\n')
+
+          # Call API
+          RESPONSE=$(curl --http1.1 --silent --fail --show-error \
+            --request GET "$API_URL" \
+            --header "Authorization: Basic $AUTH" \
+            --header "Accept: application/json")
+
+          # Validate response
+          if ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            echo "Non-JSON response from Confluent Cloud API:" >&2
+            echo "$RESPONSE" >&2
+            exit 1
+          fi
+
+          if echo "$RESPONSE" | jq -e '.error_code // empty' >/dev/null; then
+            echo "API error: $(echo "$RESPONSE" | jq -r '.message // .error')" >&2
+            exit 1
+          fi
+
+          echo "Custom Firebolt connector plugins in environment ${ENV_ID}:"
+          echo "$RESPONSE" | jq -r --arg re "${NAME_FILTER}" '
+            (.data // [])
+            | map(select((.display_name // "") | test($re; "i")))
+            | if length == 0 then
+                "No matching plugins found."
+              else
+                .[] | "\(.display_name) — \(.description) (id: \(.id))"
+              end
+          '
+
+
