@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
 
           # Build request
-          ENV_ID="${ENV_ID_INPUT:-}"; ENV_ID="${ENV_ID:-${ENV_ID_VAR:-}}"
+          ENV_ID="${ENV_ID_INPUT:-${ENV_ID_VAR:-}}"
           if [ -z "$ENV_ID" ]; then
             echo "Environment ID is required. Provide it via workflow input or repository variable CONFLUENT_ENVIRONMENT_ID." >&2
             exit 1
