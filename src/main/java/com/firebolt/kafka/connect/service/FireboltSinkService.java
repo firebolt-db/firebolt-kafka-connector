@@ -1,6 +1,8 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.TableSchema;
+
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Map;
 
@@ -18,18 +20,11 @@ public interface FireboltSinkService {
      * @param records the collection of sink records to process
      * @param tableSchemas the map of table names to their schemas for context
      */
-    void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas);
+    void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas) throws SQLException;
 
     /**
      * Closes the resources associated with the firebolt
      */
     void close();
-
-    /**
-     * Supplies the ErrantRecordReporter from the task context. May be null if not configured.
-     */
-    default void setErrorReporter(ErrorReporter reporter) {
-        // optional for implementations
-    }
 
 }

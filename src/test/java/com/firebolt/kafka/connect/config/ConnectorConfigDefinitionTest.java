@@ -69,12 +69,13 @@ class ConnectorConfigDefinitionTest {
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG));
+            assertTrue(configDef.names().contains(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG));
         }
 
         @Test
         void shouldHaveCorrectNumberOfConfigProperties() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
-            assertEquals(4, configDef.names().size());
+            assertEquals(5, configDef.names().size());
         }
 
         @Test
@@ -89,6 +90,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG).type);
             assertEquals(ConfigDef.Type.STRING, 
                 configDef.configKeys().get(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG).type);
+            assertEquals(ConfigDef.Type.STRING,
+                configDef.configKeys().get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG).type);
         }
 
         @Test
@@ -103,6 +106,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH, 
                 configDef.configKeys().get(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG).importance);
+            assertEquals(ConfigDef.Importance.MEDIUM,
+                configDef.configKeys().get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG).importance);
         }
     }
 
@@ -112,17 +117,9 @@ class ConnectorConfigDefinitionTest {
         @Test
         void shouldValidateValidConfiguration() {
             Map<String, String> validConfig = createValidConfig();
-            
+
             assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(validConfig));
         }
-
-        @Test
-        void shouldValidateConfigurationWithAllOptionalFields() {
-            Map<String, String> config = createValidConfig();
-            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
-        }
-
-
 
         @Test
         void shouldRejectInvalidJdbcConnectionUrl() {
@@ -175,14 +172,6 @@ class ConnectorConfigDefinitionTest {
             
             assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
         }
-
-        @Test
-        void shouldUseDefaultTableAutoCreateValue() {
-            Map<String, String> config = createValidConfig();
-            // Don't set table.auto.create, should use default false
-            
-            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
-        }
     }
 
     @Nested
@@ -205,6 +194,7 @@ class ConnectorConfigDefinitionTest {
             assertTrue(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_DOC.contains("client id"));
             assertTrue(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_DOC.contains("client secret"));
             assertTrue(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_DOC.contains("Comma-separated"));
+            assertTrue(ConnectorConfigDefinition.ERROR_TOLERANCE_DOC.contains("Error tolerance policy"));
         }
     }
 
@@ -217,6 +207,7 @@ class ConnectorConfigDefinitionTest {
         config.put(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG, "test_client_id");
         config.put(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG, "test_client_secret");
         config.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1");
+        config.put(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG, "all");
         return config;
     }
 } 

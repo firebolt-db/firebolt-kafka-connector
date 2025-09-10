@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
@@ -30,12 +31,14 @@ public class InsertPreparedStatement {
 
     private Connection connection;
     private TableSchema tableSchema;
-    @Setter
     private ErrorReporter errorReporter;
+    private boolean errorToleranceAll;
 
-    public InsertPreparedStatement(Connection connection, TableSchema tableSchema) {
+    public InsertPreparedStatement(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll) {
         this.connection = connection;
         this.tableSchema = tableSchema;
+        this.errorReporter = errorReporter;
+        this.errorToleranceAll = errorToleranceAll;
     }
 
     public void addRecords(List<FireboltRecord> fireboltRecords) throws SQLException {
@@ -58,8 +61,12 @@ public class InsertPreparedStatement {
                     setStatementParameters(preparedStatement, record, tableSchema, validColumnNames);
                     preparedStatement.addBatch();
                 } catch (RecordConversionFailedException e) {
-                    errorReporter.report(record.getSinkRecord(), e);
-                    log.warn("Record from partition {} at offset {} will be submitted to the deadletter queue ", e.getKafkaPartition(), e.getKafkaOffset());
+                    if (errorToleranceAll) {
+                        errorReporter.report(record.getSinkRecord(), e);
+                        log.warn("Record from partition {} at offset {} will be submitted to the deadletter queue ", e.getKafkaPartition(), e.getKafkaOffset());
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -75,9 +82,11 @@ public class InsertPreparedStatement {
                 if (fireboltRecords.size() == 1) {
                     FireboltRecord fireboltRecord = fireboltRecords.get(0);
                     log.warn("Cannot process the firebolt record from partition {} at offset {}, as it is too large and exceeds the Firebolt request entity size", fireboltRecord.getPartition(), fireboltRecord.getOffset());
-                    // report too-large record to DLQ via reporter
-                    // We don't have direct access to the original SinkRecord; construct a minimal synthetic error
-                    errorReporter.report(fireboltRecord.getSinkRecord(), e);
+                    if (errorToleranceAll) {
+                        errorReporter.report(fireboltRecord.getSinkRecord(), e);
+                    } else {
+                        throw e;
+                    }
                 } else {
                     // simple strategy for now. Split the rows in two and try each half again
                     int leftSide = fireboltRecords.size() / 2;

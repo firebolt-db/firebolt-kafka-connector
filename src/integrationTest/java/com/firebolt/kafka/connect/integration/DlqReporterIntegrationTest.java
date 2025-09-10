@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.integration;
 
 import com.firebolt.kafka.connect.integration.json.datatype.SimpleStringRecord;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -39,7 +40,7 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
         generateUniqueConnectorName("dlq-reporter-it");
 
         // Configure connector to use DLQ
-        dlqTopicName = "dlq-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        dlqTopicName = "dlq-" + RandomStringUtils.insecure().nextAlphabetic(5);
         Map<String, String> override = Map.of(
                 "errors.tolerance", "all",
                 "errors.deadletterqueue.topic.name", dlqTopicName,
@@ -86,9 +87,6 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void dlqReceivesErroredRecordsWhenFailuresOccur() throws Exception {
-        // This test is a template; to run locally, publish data known to fail conversion
-        // or exceed HTTP entity limits so that the connector reports via DLQ.
-        // Example publish:
         SimpleStringRecord huge = SimpleStringRecord.builder().id("abc").value("failing").build();
         producer.send(new ProducerRecord<>(TOPIC_NAME, "huge", huge)).get();
         producer.flush();

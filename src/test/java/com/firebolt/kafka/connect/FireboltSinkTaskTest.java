@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;
@@ -10,6 +11,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -21,10 +23,14 @@ import org.mockito.MockitoAnnotations;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
@@ -120,7 +126,7 @@ public class FireboltSinkTaskTest {
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             // Mock the service provider
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             assertDoesNotThrow(() -> {
                 fireboltSinkTask.start(validConfig);
@@ -133,7 +139,7 @@ public class FireboltSinkTaskTest {
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             // Mock the service provider to throw exception
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenThrow(new IllegalArgumentException("Invalid config"));
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenThrow(new IllegalArgumentException("Invalid config"));
             
             RuntimeException exception = assertThrows(RuntimeException.class, () -> {
                 fireboltSinkTask.start(validConfig);
@@ -149,7 +155,7 @@ public class FireboltSinkTaskTest {
         // Set up mocks for start
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             // Start the task first
             fireboltSinkTask.start(validConfig);
@@ -169,7 +175,7 @@ public class FireboltSinkTaskTest {
         // Start the task first
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
@@ -186,7 +192,7 @@ public class FireboltSinkTaskTest {
     void shouldThrowExceptionWhenSchemaDiscoveryFails() {
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
@@ -205,7 +211,7 @@ public class FireboltSinkTaskTest {
     void shouldThrowExceptionWhenTableNotFoundInFirebolt() {
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
@@ -223,7 +229,7 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
-    void shouldProcessRecordsSuccessfully() {
+    void shouldProcessRecordsSuccessfully() throws SQLException {
         // Start and open the task
         startAndOpenTask();
         
@@ -235,7 +241,7 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
-    void shouldHandleNullRecordsInPut() {
+    void shouldHandleNullRecordsInPut() throws SQLException {
         // Start and open the task
         startAndOpenTask();
         
@@ -248,7 +254,7 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
-    void shouldHandleEmptyRecordsInPut() {
+    void shouldHandleEmptyRecordsInPut() throws SQLException {
         // Start and open the task
         startAndOpenTask();
         
@@ -261,7 +267,8 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
-    void shouldThrowExceptionWhenRecordProcessingFails() {
+    void shouldThrowExceptionWhenRecordProcessingFailsWithErrorToleranceNone() throws SQLException {
+        validConfig.put("errors.tolerance", "none");
         // Start and open the task
         startAndOpenTask();
         
@@ -273,7 +280,48 @@ public class FireboltSinkTaskTest {
             fireboltSinkTask.put(testRecords);
         });
         
-        assertTrue(exception.getMessage().contains("Error processing records"));
+        assertTrue(exception.getMessage().contains("Processing failed"));
+    }
+
+    @Test
+    void shouldThrowExceptionWhenRecordProcessingFailsWithErrorToleranceNotSet() throws SQLException {
+        // Start and open the task
+        startAndOpenTask();
+
+        // Mock service to throw exception
+        doThrow(new RuntimeException("Processing failed")).when(mockSinkService)
+            .processRecord(any(), any());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            fireboltSinkTask.put(testRecords);
+        });
+
+        assertTrue(exception.getMessage().contains("Processing failed"));
+    }
+
+    @Test
+    void shouldPushRecordsToDlqWhenRecordProcessingFailsWithErrorToleranceAll() throws SQLException {
+        validConfig.put("errors.tolerance", "all");
+
+        //mocking initialization done by connect framework
+        SinkTaskContext contextMock = mock(SinkTaskContext.class);
+        fireboltSinkTask.initialize(contextMock);
+        ErrantRecordReporter errantRecordReporterMock = mock(ErrantRecordReporter.class);
+        when(contextMock.errantRecordReporter()).thenReturn(errantRecordReporterMock);
+
+        // Start and open the task
+        startAndOpenTask();
+
+        // Mock service to throw exception
+        doThrow(new RuntimeException("Processing failed")).when(mockSinkService)
+            .processRecord(any(), any());
+        when(errantRecordReporterMock.report(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
+
+        assertDoesNotThrow(() -> {
+            fireboltSinkTask.put(testRecords);
+        });
+
+        verify(errantRecordReporterMock, times(1)).report(any(), any());
     }
 
     @Test
@@ -294,7 +342,7 @@ public class FireboltSinkTaskTest {
         // Start the task first to set up the sink service
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
@@ -328,37 +376,11 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
-    void shouldUseErrorReporterOnPerRecordFallback() {
-        // Start and open the task
-        startAndOpenTask();
-
-        // Inject an error reporter into the task
-        com.firebolt.kafka.connect.reporter.ErrorReporter reporter = org.mockito.Mockito.mock(com.firebolt.kafka.connect.reporter.ErrorReporter.class);
-        try {
-            java.lang.reflect.Field f = FireboltSinkTask.class.getDeclaredField("errorReporter");
-            f.setAccessible(true);
-            f.set(fireboltSinkTask, reporter);
-        } catch (Exception ignored) { }
-
-        // Mock service to throw conversion error for both batch and per-record processing
-        doThrow(new RuntimeException(new com.firebolt.kafka.connect.convert.exception.RecordConversionException("convert")))
-            .when(mockSinkService).processRecord(anyList(), anyMap());
-
-        // Act
-        org.apache.kafka.connect.sink.SinkRecord badRecord = new org.apache.kafka.connect.sink.SinkRecord("test_topic", 0, null, null, null, "bad-value", 100L);
-        java.util.List<org.apache.kafka.connect.sink.SinkRecord> records = java.util.Collections.singletonList(badRecord);
-        assertDoesNotThrow(() -> fireboltSinkTask.put(records));
-
-        // Assert that reporter was used
-        org.mockito.Mockito.verify(reporter, org.mockito.Mockito.atLeastOnce()).report(org.mockito.Mockito.eq(badRecord), org.mockito.Mockito.any(Exception.class));
-    }
-
-    @Test
     void shouldHandleStopWhenSinkServiceCloseThrowsException() {
         // Start the task first to set up the sink service
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
@@ -389,7 +411,7 @@ public class FireboltSinkTaskTest {
         // Start the task first to set up the sink service
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
@@ -423,7 +445,7 @@ public class FireboltSinkTaskTest {
     void shouldHandleDifferentTopicToTableMappings(String mappingConfig) {
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             Map<String, String> config = new HashMap<>();
             config.put("jdbc.connection.url", "jdbc:firebolt:test_db");
@@ -440,7 +462,7 @@ public class FireboltSinkTaskTest {
         // Start the task
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
@@ -463,7 +485,7 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
-    void shouldHandleMultipleRecords() {
+    void shouldHandleMultipleRecords() throws SQLException {
         // Start and open the task
         startAndOpenTask();
         
@@ -602,7 +624,7 @@ public class FireboltSinkTaskTest {
         // Just start the task, which is sufficient for testing put/flush operations
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class))).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             

@@ -30,6 +30,13 @@ public class ConnectorConfigDefinition {
     public static final String TOPIC_TO_TABLE_MAPPING_DEFAULT = null;
 
     // =========================
+    // ERROR HANDLING CONFIGURATION (delegated from Kafka Connect worker)
+    // =========================
+    public static final String ERROR_TOLERANCE_CONFIG = "errors.tolerance";
+    public static final String ERROR_TOLERANCE_DOC = "Error tolerance policy. Supported values: 'none' (default) or 'all'. When 'all', errant records are reported to DLQ if configured.";
+    public static final String ERROR_TOLERANCE_DEFAULT = "none";
+
+    // =========================
     // CONFIG DEFINITION
     // =========================
     public static ConfigDef CONFIG_DEF = createConfigDef();
@@ -65,6 +72,13 @@ public class ConnectorConfigDefinition {
                         TOPIC_TO_TABLE_MAPPING_DEFAULT,
                         new TopicToTableValidator(),
                         ConfigDef.Importance.HIGH,
-                        TOPIC_TO_TABLE_MAPPING_DOC);
+                        TOPIC_TO_TABLE_MAPPING_DOC)
+                // Error handling configuration (optional; typically set at worker level but surfaced here for clarity/testing)
+                .define(ERROR_TOLERANCE_CONFIG,
+                        ConfigDef.Type.STRING,
+                        ERROR_TOLERANCE_DEFAULT,
+                        ConfigDef.ValidString.in("none", "all"),
+                        ConfigDef.Importance.MEDIUM,
+                        ERROR_TOLERANCE_DOC);
     }
 } 

@@ -9,8 +9,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import com.firebolt.jdbc.exception.FireboltException;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +23,7 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.Mockito;
 import org.mockito.MockedStatic;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
@@ -45,6 +48,9 @@ public class InsertPreparedStatementTest {
 
     @Mock
     private PreparedStatement mockPreparedStatement;
+
+    @Mock
+    private ErrorReporter errorReporter;
 
     @Mock
     private TableSchema mockTableSchema;
@@ -72,8 +78,9 @@ public class InsertPreparedStatementTest {
         
         when(mockTableSchema.getTableName()).thenReturn(TABLE_NAME);
         when(mockTableSchema.getColumns()).thenReturn(List.of(mockColumn1, mockColumn2));
+        doNothing().when(errorReporter).report(any(), any());
 
-        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema);
+        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, false);
     }
 
     @Test
@@ -123,6 +130,9 @@ public class InsertPreparedStatementTest {
 
     @Test
     void shouldReportSingleRecordTooLargeViaErrorReporter() throws Exception {
+        // Use a new InsertPreparedStatement with error tolerance enabled
+        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, true);
+
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 1, 1234L, mapOf(
                 "id", KafkaMessageColumnValue.builder().value(5L).schemaType(Schema.Type.INT64).build(),
@@ -135,13 +145,9 @@ public class InsertPreparedStatementTest {
         when(psFail.executeBatch()).thenThrow(http413);
         when(mockConnection.prepareStatement(anyString())).thenReturn(psFail);
 
-        // reporter mock
-        com.firebolt.kafka.connect.reporter.ErrorReporter reporter = Mockito.mock(com.firebolt.kafka.connect.reporter.ErrorReporter.class);
-        insertPreparedStatement.setErrorReporter(reporter);
-
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
-        verify(reporter, times(1)).report(
+        verify(errorReporter, times(1)).report(
                 Mockito.argThat(rec -> rec.topic().equals("topic") && rec.kafkaOffset() == 1234L),
                 Mockito.any(FireboltException.class)
         );

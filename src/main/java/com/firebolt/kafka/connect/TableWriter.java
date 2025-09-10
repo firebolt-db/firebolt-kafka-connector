@@ -38,30 +38,26 @@ public class TableWriter {
     private Supplier<Connection> connectionSupplier;
 
     private InsertPreparedStatementProvider insertPreparedStatementProvider;
-    @Setter
     private ErrorReporter errorReporter;
+    private boolean errorToleranceAll;
 
     /**
      * A connection that will be used for pushing the records to firebolt table
      */
     private Connection connection;
 
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier) {
-        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider(), nullErrorReporter());
+    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, ErrorReporter errorReporter, boolean errorToleranceAll) {
+        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll);
     }
 
     @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider) {
-        this(tableSchema, connectionSupplier, processedPartitionOffsets, insertPreparedStatementProvider, nullErrorReporter());
-    }
-
-    @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter) {
+    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
         this.errorReporter = errorReporter;
+        this.errorToleranceAll = errorToleranceAll;
     }
 
     public void insertRecords(List<FireboltRecord> fireboltRecords) throws SQLException {
@@ -71,8 +67,7 @@ public class TableWriter {
             return;
         }
 
-        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema);
-        insertPreparedStatement.setErrorReporter(errorReporter);
+        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll);
         insertPreparedStatement.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
@@ -120,8 +115,8 @@ public class TableWriter {
      * For easier testing
      */
     static class InsertPreparedStatementProvider {
-        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema) {
-            return new InsertPreparedStatement(connection, tableSchema);
+        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll) {
+            return new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll);
         }
     }
 }

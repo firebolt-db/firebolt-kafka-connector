@@ -18,7 +18,6 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
-import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 
@@ -40,6 +39,7 @@ public class FireboltSinkTask extends SinkTask {
     private Map<String, TableSchema> tableSchemas;
     private FireboltDbService fireboltDbService;
     private ErrorReporter errorReporter;
+    private boolean errorToleranceAll;
 
     @Override
     public String version() {
@@ -69,12 +69,13 @@ public class FireboltSinkTask extends SinkTask {
             this.topicToTableMapping = new HashMap<>();
             this.tableSchemas = new HashMap<>();
 
+            this.errorToleranceAll = this.sinkConfig.isErrorToleranceAll();
+            createAndSetErrorReporter();
+
             // Initialize services
             this.fireboltDbService = new FireboltDbService();
-            this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig);
-
-            createAndSetErrorReporter();
-            setErrantRecordReportedInSinkService();
+            // construct service with error tolerance
+            this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig, this.errorReporter, this.errorToleranceAll);
 
             log.info("Firebolt Sink Task started successfully");
 
@@ -82,10 +83,6 @@ public class FireboltSinkTask extends SinkTask {
             log.error("Failed to start Firebolt Sink Task", e);
             throw new RuntimeException("Failed to start Firebolt Sink Task", e);
         }
-    }
-
-    private void setErrantRecordReportedInSinkService() {
-        this.fireboltSinkService.setErrorReporter(this.errorReporter);
     }
 
     private void createAndSetErrorReporter() {
@@ -140,27 +137,8 @@ public class FireboltSinkTask extends SinkTask {
             fireboltSinkService.processRecord(records, tableSchemas);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
         } catch (Exception batchException) {
-            Throwable root = batchException.getCause() != null ? batchException.getCause() : batchException;
-            if (root instanceof RecordConversionException) {
-                log.warn("Batch processing failed due to conversion error; retrying per-record with errant reporting");
-                for (SinkRecord batchRecord : records) {
-                    try {
-                        fireboltSinkService.processRecord(java.util.Collections.singletonList(batchRecord), tableSchemas);
-                    } catch (Exception e) {
-                        Throwable cause = e.getCause() != null ? e.getCause() : e;
-                        if (cause instanceof RecordConversionException) {
-                            log.warn("Record failed conversion, reporting as errant: topic={}, partition={}, offset={}", batchRecord.topic(), batchRecord.kafkaPartition(), batchRecord.kafkaOffset(), e);
-                            errorReporter.report(batchRecord, e);
-                        } else {
-                            log.error("Non-conversion error while processing record; failing task", e);
-                            handleError(e);
-                        }
-                    }
-                }
-            } else {
-                log.error("Error processing records", batchException);
-                handleError(batchException);
-            }
+            log.error("Error processing records", batchException);
+            handleError(batchException, records);
         }
     }
 
@@ -257,8 +235,10 @@ public class FireboltSinkTask extends SinkTask {
         }
     }
 
-    private void handleError(Exception e) {
-        // For now, always throw on error since error tolerance was removed
-        throw new RuntimeException("Error processing records", e);
+    private void handleError(Exception batchException, Collection<SinkRecord> records) {
+        if (!errorToleranceAll) {
+            throw new RuntimeException(batchException.getMessage(), batchException);
+        }
+        records.forEach(batchRecord -> errorReporter.report(batchRecord, batchException));
     }
 } 

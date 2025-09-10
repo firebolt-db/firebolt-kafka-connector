@@ -17,6 +17,7 @@ import java.sql.SQLException;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -36,60 +37,50 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     // a map between a table name and the writer for that map
     private Map<String, TableWriter> tableWriterMap;
     private ErrorReporter errorReporter;
+    private boolean errorToleranceAll;
 
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig) {
-        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>());
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, ErrorReporter errorReporter, boolean errorToleranceAll) {
+        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), errorReporter, errorToleranceAll);
     }
 
     @VisibleForTesting
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap) {
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, ErrorReporter errorReporter, boolean errorToleranceAll) {
         this.config = sinkConfig;
         this.fireboltDbService = fireboltDbService;
         this.recordConverterFactory = recordConverterFactory;
         this.tableWriterMap = tableWriterMap;
+        this.errorReporter = errorReporter;
+        this.errorToleranceAll = errorToleranceAll;
     }
 
     @Override
-    public void setErrorReporter(ErrorReporter reporter) {
-        this.errorReporter = reporter;
-    }
-
-    @Override
-    public void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas) {
+    public void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas) throws SQLException {
         if (CollectionUtils.isEmpty(records)) {
             log.debug("No records to process");
             return;
         }
 
-        try {
-            // Group records by topic/partition combination
-            Map<String, List<SinkRecord>> recordsByTopic = groupRecordsByTopic(records);
+        // Group records by topic/partition combination
+        Map<String, List<SinkRecord>> recordsByTopic = groupRecordsByTopic(records);
 
-            log.debug("Grouped {} records into {} topic combinations", records.size(), recordsByTopic.size());
+        log.debug("Grouped {} records into {} topic combinations", records.size(), recordsByTopic.size());
 
-            // Process each topic/partition group separately
-            for (Map.Entry<String, List<SinkRecord>> entry : recordsByTopic.entrySet()) {
-                String topic = entry.getKey();
-                List<SinkRecord> groupedRecords = entry.getValue();
+        // Process each topic/partition group separately
+        for (Map.Entry<String, List<SinkRecord>> entry : recordsByTopic.entrySet()) {
+            String topic = entry.getKey();
+            List<SinkRecord> groupedRecords = entry.getValue();
 
-                String tableName = config.getTableNameForTopic(topic);
-                TableSchema tableSchema = tableSchemas.get(tableName);
-                if (tableSchema == null) {
-                    log.warn("Did not find table schema for topic {}. Ignoring the record", topic);
-                    continue;
-                }
-
-                TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig())));
-                tableWriter.setErrorReporter(errorReporter);
-
-                List<FireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
-                tableWriter.insertRecords(fireboltRecords);
-
+            String tableName = config.getTableNameForTopic(topic);
+            TableSchema tableSchema = tableSchemas.get(tableName);
+            if (tableSchema == null) {
+                log.warn("Did not find table schema for topic {}. Ignoring the record", topic);
+                continue;
             }
 
-        } catch (Exception e) {
-            log.error("Error processing records in AppendOnlyFireboltSinkService", e);
-            throw new RuntimeException("Error processing records", e);
+            TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig()), errorReporter, errorToleranceAll));
+
+            List<FireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
+            tableWriter.insertRecords(fireboltRecords);
         }
     }
 
@@ -105,6 +96,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         log.info("AppendOnlyFireboltSinkService closed");
     }
 
+    @SneakyThrows
     private Optional<FireboltRecord> processIndividualRecord(SinkRecord record) {
         try {
             // Convert the record to a format suitable for Firebolt
@@ -112,8 +104,11 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         } catch (RecordConversionException e) {
             log.error("Error converting record: topic={}, partition={}, offset={}",
                     record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
-            errorReporter.report(record, e);
-            return Optional.empty();
+            if (errorToleranceAll) {
+                errorReporter.report(record, e);
+                return Optional.empty();
+            }
+            throw e;
         }
     }
 
