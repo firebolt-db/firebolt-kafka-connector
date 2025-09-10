@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
 import com.firebolt.kafka.connect.integration.json.datatype.SimpleStringRecord;
+import com.firebolt.kafka.connect.utils.TestTag;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -10,6 +11,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 
@@ -41,7 +43,7 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
 
         // Configure connector to use DLQ
         dlqTopicName = "dlq-" + RandomStringUtils.insecure().nextAlphabetic(5);
-        Map<String, String> override = Map.of(
+        Map<String, String> connectorPropertiesOverride = Map.of(
                 "errors.tolerance", "all",
                 "errors.deadletterqueue.topic.name", dlqTopicName,
                 "errors.deadletterqueue.context.headers.enable", "true"
@@ -51,7 +53,7 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
 
         // Use local schema suppliers to guarantee table/schema alignment
         setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                tableSchemaSupplier(), jsonSchemaSupplier(), override);
+                tableSchemaSupplier(), jsonSchemaSupplier(), connectorPropertiesOverride);
 
         producer = initializeJsonProducer();
         dlqConsumer = createDlqConsumer();
@@ -86,8 +88,21 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void dlqReceivesErroredRecordsWhenFailuresOccur() throws Exception {
-        SimpleStringRecord huge = SimpleStringRecord.builder().id("abc").value("failing").build();
+    void dlqReceivesMessagesWhenFireboleColumnConversionErrorHappens() throws Exception {
+        SimpleStringRecord invalidRecord = SimpleStringRecord.builder().id("abc").value("failing").build();
+        SimpleStringRecord validRecord = SimpleStringRecord.builder().id("abc").build();
+        producer.send(new ProducerRecord<>(TOPIC_NAME, "invalidRecord", invalidRecord)).get();
+        producer.send(new ProducerRecord<>(TOPIC_NAME, "validRecord", validRecord)).get();
+        producer.flush();
+
+        ConsumerRecords<String, String> polled = dlqConsumer.poll(Duration.ofSeconds(10));
+        assertEquals(1, polled.count(), "Expected 1 DLQ message");
+    }
+
+    @Test
+    @Tag(TestTag.CLOUD)
+    void dlqReceivesErroredRecordsWhenPayloadTooBig() throws Exception {
+        SimpleStringRecord huge = SimpleStringRecord.builder().id("Ā".repeat(2100000)).build();
         producer.send(new ProducerRecord<>(TOPIC_NAME, "huge", huge)).get();
         producer.flush();
 

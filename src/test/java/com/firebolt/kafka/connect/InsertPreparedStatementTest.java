@@ -22,6 +22,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Mockito;
 import org.mockito.MockedStatic;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -88,19 +91,19 @@ public class InsertPreparedStatementTest {
         // 4 records so we expect first executeBatch to fail with 413, then two successful halves
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 1L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 2L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(2L).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("b").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 3L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(3).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(3L).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("c").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 4L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(4).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(4L).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("d").schemaType(Schema.Type.STRING).build()
         )));
 
@@ -182,7 +185,7 @@ public class InsertPreparedStatementTest {
                     "setStatementParameters", PreparedStatement.class, FireboltRecord.class, TableSchema.class, Map.class);
             method.setAccessible(true);
 
-            RecordConversionFailedException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            RecordConversionFailedException thrown = assertThrows(
                     RecordConversionFailedException.class,
                     () -> {
                         try {
@@ -202,10 +205,10 @@ public class InsertPreparedStatementTest {
             );
 
             // Assert details propagated to record-level exception
-            org.junit.jupiter.api.Assertions.assertEquals(TABLE_NAME, thrown.getTableName());
-            org.junit.jupiter.api.Assertions.assertEquals("topic", thrown.getTopicName());
-            org.junit.jupiter.api.Assertions.assertEquals(7, thrown.getKafkaPartition());
-            org.junit.jupiter.api.Assertions.assertEquals(123L, thrown.getKafkaOffset());
+            assertEquals(TABLE_NAME, thrown.getTableName());
+            assertEquals("topic", thrown.getTopicName());
+            assertEquals(7, thrown.getKafkaPartition());
+            assertEquals(123L, thrown.getKafkaOffset());
         }
     }
 

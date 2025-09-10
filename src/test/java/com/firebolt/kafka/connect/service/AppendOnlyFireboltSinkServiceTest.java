@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -121,7 +122,7 @@ public class AppendOnlyFireboltSinkServiceTest {
         assertDoesNotThrow(() -> service.processRecord(java.util.List.of(ok), schemas));
 
         verifyNoInteractions(errorReporter);
-        verify(writerA, times(1)).insertRecords(org.mockito.ArgumentMatchers.anyList());
+        verify(writerA, times(1)).insertRecords(anyList());
     }
 
     @Test
