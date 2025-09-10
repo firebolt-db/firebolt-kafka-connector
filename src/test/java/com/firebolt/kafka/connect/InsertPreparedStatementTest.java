@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import com.firebolt.jdbc.exception.FireboltException;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
@@ -91,19 +90,19 @@ public class InsertPreparedStatementTest {
         // 4 records so we expect first executeBatch to fail with 413, then two successful halves
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 1L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 2L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(2L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("b").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 3L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(3L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(3).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("c").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 4L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(4L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(4).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("d").schemaType(Schema.Type.STRING).build()
         )));
 
@@ -113,7 +112,7 @@ public class InsertPreparedStatementTest {
         PreparedStatement psRight = Mockito.mock(PreparedStatement.class);
 
         // FireboltException simulating HTTP 413 (payload too large)
-        com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
+        FireboltException http413 = Mockito.mock(FireboltException.class);
         when(http413.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
 
         when(psFail.executeBatch()).thenThrow(http413);
@@ -143,7 +142,7 @@ public class InsertPreparedStatementTest {
         ), new SinkRecord("topic", 1, null, null, null, null, 1234L)));
 
         PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
-        com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
+        FireboltException http413 = Mockito.mock(FireboltException.class);
         when(http413.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
         when(psFail.executeBatch()).thenThrow(http413);
         when(mockConnection.prepareStatement(anyString())).thenReturn(psFail);
