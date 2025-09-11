@@ -6,6 +6,9 @@ import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import lombok.extern.slf4j.Slf4j;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -17,11 +20,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
 
 /**
  * Insert into a table using prepared statements

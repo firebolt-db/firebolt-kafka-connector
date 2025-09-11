@@ -1,7 +1,10 @@
 package com.firebolt.kafka.connect;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import com.google.common.annotations.VisibleForTesting;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -9,12 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.CollectionUtils;
-
-import static com.firebolt.kafka.connect.reporter.ErrorReporter.nullErrorReporter;
 
 /**
  * A class that knows how to insert into a Firebolt table . It will use prepared statements to do the inserts.

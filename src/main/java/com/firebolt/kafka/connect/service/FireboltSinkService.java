@@ -1,13 +1,11 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.TableSchema;
+import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Map;
-
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
-import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
  * We will have a different implementation for append-only (insert) and CDC sink tasks service

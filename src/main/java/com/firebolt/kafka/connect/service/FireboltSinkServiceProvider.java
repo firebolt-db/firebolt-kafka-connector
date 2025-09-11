@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
-import com.google.common.annotations.VisibleForTesting;
 import lombok.extern.slf4j.Slf4j;
 
 /**

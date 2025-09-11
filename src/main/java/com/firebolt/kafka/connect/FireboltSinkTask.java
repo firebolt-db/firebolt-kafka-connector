@@ -74,7 +74,7 @@ public class FireboltSinkTask extends SinkTask {
 
             // Initialize services
             this.fireboltDbService = new FireboltDbService();
-            // construct service with error tolerance
+
             this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig, this.errorReporter, this.errorToleranceAll);
 
             log.info("Firebolt Sink Task started successfully");
@@ -133,7 +133,7 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
-            // Try batch processing first to keep original behavior/perf
+            // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
         } catch (Exception batchException) {
@@ -169,7 +169,6 @@ public class FireboltSinkTask extends SinkTask {
                 // Don't re-throw the exception to ensure graceful shutdown
             }
         }
-        // ErrantRecordReporter is managed by the Connect framework and should not be closed here
     }
 
     /**

@@ -83,7 +83,7 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
         waitForDataInFirebolt(TABLE_NAME, 3);
 
         // poll DLQ briefly; should be empty
-        ConsumerRecords<String, String> polled = dlqConsumer.poll(Duration.ofSeconds(3));
+        ConsumerRecords<String, String> polled = dlqConsumer.poll(Duration.ofSeconds(5));
         assertEquals(0, polled.count(), "DLQ should be empty for valid records");
     }
 
