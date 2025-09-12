@@ -39,14 +39,18 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
         super.setUp(testInfo);
+        String methodName = testInfo.getTestMethod().get().getName();
         generateUniqueConnectorName("dlq-reporter-it");
 
         // Configure connector to use DLQ
-        dlqTopicName = "dlq-" + RandomStringUtils.insecure().nextAlphabetic(5);
+        dlqTopicName = methodName + "-dlq";
         Map<String, String> connectorPropertiesOverride = Map.of(
                 "errors.tolerance", "all",
                 "errors.deadletterqueue.topic.name", dlqTopicName,
-                "errors.deadletterqueue.context.headers.enable", "true"
+                "errors.deadletterqueue.context.headers.enable", "true",
+                "consumer.override.max.poll.records", "100",
+                "consumer.override.max.partition.fetch.bytes", "500000000",
+                "consumer.override.fetch.max.bytes", "500000000"
         );
         // Ensure DLQ topic exists to avoid broker auto-creation dependencies
         createKafkaTopic(dlqTopicName);
@@ -90,10 +94,12 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
     @Test
     void dlqReceivesMessagesWhenFireboleColumnConversionErrorHappens() throws Exception {
         SimpleStringRecord invalidRecord = SimpleStringRecord.builder().id("abc").value("failing").build();
-        SimpleStringRecord validRecord = SimpleStringRecord.builder().id("abc").build();
+        SimpleStringRecord validRecord = SimpleStringRecord.builder().id("1").value("ok").build();
         producer.send(new ProducerRecord<>(TOPIC_NAME, "invalidRecord", invalidRecord)).get();
         producer.send(new ProducerRecord<>(TOPIC_NAME, "validRecord", validRecord)).get();
         producer.flush();
+
+        waitForDataInFirebolt(TABLE_NAME, 1);
 
         ConsumerRecords<String, String> polled = dlqConsumer.poll(Duration.ofSeconds(10));
         assertEquals(1, polled.count(), "Expected 1 DLQ message");
@@ -102,12 +108,14 @@ public class DlqReporterIntegrationTest extends BaseIntegrationTest {
     @Test
     @Tag(TestTag.CLOUD)
     void dlqReceivesErroredRecordsWhenPayloadTooBig() throws Exception {
-        SimpleStringRecord huge = SimpleStringRecord.builder().id("Ā".repeat(2100000)).build();
+        SimpleStringRecord huge = SimpleStringRecord.builder().id("Ā".repeat(18000)).build();
         producer.send(new ProducerRecord<>(TOPIC_NAME, "huge", huge)).get();
         producer.flush();
 
+        waitForDataInFirebolt(TABLE_NAME, 0);
+
         ConsumerRecords<String, String> polled = dlqConsumer.poll(Duration.ofSeconds(10));
-        assertTrue(polled.count() > 0, "Expected some DLQ messages when failures occur");
+        assertEquals(1, polled.count(), "Expected some DLQ messages when failures occur");
     }
 
     private KafkaConsumer<String, String> createDlqConsumer() {
