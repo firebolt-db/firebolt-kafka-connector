@@ -32,8 +32,11 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
+import com.firebolt.jdbc.exception.ExceptionType;
+import com.firebolt.jdbc.exception.FireboltException;
+import org.apache.kafka.connect.errors.RetriableException;
+import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
 
 public class FireboltSinkTaskTest {
 
@@ -267,6 +270,53 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
+    void shouldThrowRetriableWhenFireboltTooManyRequests() throws SQLException {
+        // Start and open the task
+        startAndOpenTask();
+
+        // Mock service to throw a retriable FireboltException
+        FireboltException fireboltException = mock(FireboltException.class);
+        when(fireboltException.getType()).thenReturn(ExceptionType.TOO_MANY_REQUESTS);
+        doThrow(fireboltException).when(mockSinkService).processRecord(any(), any());
+
+        assertThrows(RetriableException.class, () -> fireboltSinkTask.put(testRecords));
+    }
+
+    @Test
+    void shouldThrowRuntimeWhenFireboltRequestBodyTooLarge() throws SQLException {
+        // Start and open the task
+        startAndOpenTask();
+
+        // Mock service to throw a non-retriable FireboltException (HTTP 413)
+        FireboltException fireboltException = mock(FireboltException.class);
+        when(fireboltException.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
+        doThrow(fireboltException).when(mockSinkService).processRecord(any(), any());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> fireboltSinkTask.put(testRecords));
+        assertTrue(exception.getMessage().contains("Number of records that failed: 1"));
+        assertInstanceOf(FireboltException.class, exception.getCause());
+    }
+
+    @Test
+    void shouldThrowRuntimeWhenRecordConversionFails() throws SQLException {
+        // Start and open the task
+        startAndOpenTask();
+
+        // Mock service to throw a non-retriable conversion exception
+        RecordConversionFailedException conversionFailed = RecordConversionFailedException.builder()
+                .tableName("test_table")
+                .topicName("test_topic")
+                .kafkaPartition(0)
+                .kafkaOffset(100L)
+                .build();
+        doThrow(conversionFailed).when(mockSinkService).processRecord(any(), any());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> fireboltSinkTask.put(testRecords));
+        assertTrue(exception.getMessage().contains("Number of records that failed: 1"));
+        assertInstanceOf(RecordConversionFailedException.class, exception.getCause());
+    }
+
+    @Test
     void shouldThrowExceptionWhenRecordProcessingFailsWithErrorToleranceNone() throws SQLException {
         validConfig.put("errors.tolerance", "none");
         // Start and open the task
@@ -280,7 +330,8 @@ public class FireboltSinkTaskTest {
             fireboltSinkTask.put(testRecords);
         });
         
-        assertTrue(exception.getMessage().contains("Processing failed"));
+        assertTrue(exception.getMessage().contains("Number of records that failed: 1"));
+        assertTrue(exception.getCause().getMessage().contains("Processing failed"));
     }
 
     @Test
@@ -296,7 +347,8 @@ public class FireboltSinkTaskTest {
             fireboltSinkTask.put(testRecords);
         });
 
-        assertTrue(exception.getMessage().contains("Processing failed"));
+        assertTrue(exception.getMessage().contains("Number of records that failed: 1"));
+        assertTrue(exception.getCause().getMessage().contains("Processing failed"));
     }
 
     @Test

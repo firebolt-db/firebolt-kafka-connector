@@ -1,14 +1,20 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
+import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;
 import com.google.common.collect.Sets;
+import com.firebolt.jdbc.exception.ExceptionType;
+import com.firebolt.jdbc.exception.FireboltException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -20,7 +26,9 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import org.apache.kafka.connect.errors.RetriableException;
 
+import static com.firebolt.jdbc.exception.ExceptionType.*;
 import static com.firebolt.kafka.connect.reporter.ErrorReporter.nullErrorReporter;
 
 /**
@@ -235,9 +243,49 @@ public class FireboltSinkTask extends SinkTask {
     }
 
     private void handleError(Exception batchException, Collection<SinkRecord> records) {
-        if (!errorToleranceAll) {
-            throw new RuntimeException(batchException.getMessage(), batchException);
+        if (errorToleranceAll) {
+            log.info("Errors tolerance is enabled, reporting to DLQ and continuing: {}", batchException.getLocalizedMessage());
+            records.forEach(batchRecord -> errorReporter.report(batchRecord, batchException));
+            return;
         }
-        records.forEach(batchRecord -> errorReporter.report(batchRecord, batchException));
+
+        if (isRetriable(batchException)) {
+            throw new RetriableException(batchException);
+        }
+
+        log.error("Non-retriable error encountered; failing the task: {}", batchException.getLocalizedMessage());
+        if (records != null) {
+            throw new RuntimeException(String.format("Number of records that failed: %d", records.size()), batchException);
+        } else {
+            throw new RuntimeException("Records were null", batchException);
+        }
+    }
+
+    /**
+     * Determines whether an exception is likely transient and thus retriable by Kafka Connect.
+     */
+    private boolean isRetriable(Throwable throwable) {
+        if (throwable == null) {
+            return false;
+        }
+
+        if (throwable instanceof RecordConversionException || throwable instanceof RecordConversionFailedException) {
+            return false;
+        }
+
+        if (throwable instanceof FireboltException) {
+            FireboltException fe = (FireboltException) throwable;
+            ExceptionType type = fe.getType();
+            final List<ExceptionType> retriableExceptions = List.of(TOO_MANY_REQUESTS, CANCELED, ERROR);
+            final List<ExceptionType> nonRetriableExceptions = List.of(UNAUTHORIZED, TYPE_NOT_SUPPORTED, TYPE_TRANSFORMATION_ERROR, REQUEST_BODY_TOO_LARGE, INVALID_REQUEST, RESOURCE_NOT_FOUND);
+            if (nonRetriableExceptions.contains(type)) {
+                return false;
+            }
+            if (retriableExceptions.contains(type)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 } 
