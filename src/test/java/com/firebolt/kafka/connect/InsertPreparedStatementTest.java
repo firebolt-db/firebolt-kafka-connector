@@ -139,7 +139,7 @@ public class InsertPreparedStatementTest {
         records.add(buildRecord(TABLE_NAME, 1, 1234L, mapOf(
                 "id", KafkaMessageColumnValue.builder().value(5L).schemaType(Schema.Type.INT64).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("huge").schemaType(Schema.Type.STRING).build()
-        ), new SinkRecord("topic", 1, null, null, null, null, 1234L)));
+        )));
 
         PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
         FireboltException http413 = Mockito.mock(FireboltException.class);
@@ -301,19 +301,11 @@ public class InsertPreparedStatementTest {
 
     private static FireboltRecord buildRecord(String tableName, int partition, long offset,
                                               Map<String, KafkaMessageColumnValue> values) {
-        return buildRecord(tableName, partition, offset, values, null);
-    }
-
-    private static FireboltRecord buildRecord(String tableName, int partition, long offset,
-                                              Map<String, KafkaMessageColumnValue> values, SinkRecord record) {
+        new SinkRecord("topic", 1, null, null, null, null, 1234L);
         return new FireboltRecord(
                 tableName,
                 values,
-                "topic",
-                partition,
-                offset,
-                System.currentTimeMillis(),
-                record
+                new SinkRecord("topic", partition, null, null, null, null, offset)
         );
     }
 

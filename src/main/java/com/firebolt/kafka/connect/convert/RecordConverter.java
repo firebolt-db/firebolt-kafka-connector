@@ -51,10 +51,6 @@ public abstract class RecordConverter {
         return new FireboltRecord(
                 tableName,
                 columnValues,
-                record.topic(),
-                record.kafkaPartition() != null ? record.kafkaPartition() : -1,
-                record.kafkaOffset(),
-                record.timestamp() != null ? record.timestamp() : System.currentTimeMillis(),
                 record
         );
     }
