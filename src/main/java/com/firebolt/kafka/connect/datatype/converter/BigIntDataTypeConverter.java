@@ -25,13 +25,15 @@ public class BigIntDataTypeConverter extends NumericDataTypeConverter {
                 statement.setLong(paramIndex, parsed);
                 return;
             } catch (NumberFormatException e) {
-                // fall through to throw column conversion failed
+                throw new ColumnConversionFailedException(
+                        fireboltColumn.getName(), fireboltColumn.getDataType(),
+                        "Cannot convert kafka message attribute to a bigint due to NumberFormatException: " + e.getMessage());
             }
         }
 
         throw new ColumnConversionFailedException(
                 fireboltColumn.getName(), fireboltColumn.getDataType(),
-                "Cannot convert kafka message attribute to a bigint value in firebolt");
+                "Cannot convert kafka message attribute to a bigint due to incompatible type: " + (value != null ? value.getClass().getName() : "null"));
     }
 
 }

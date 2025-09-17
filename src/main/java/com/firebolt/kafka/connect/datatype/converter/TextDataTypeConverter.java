@@ -8,6 +8,11 @@ import java.sql.SQLException;
 public class TextDataTypeConverter implements ColumnDataTypeConverter {
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        statement.setString(paramIndex, String.valueOf(kafkaMessageColumnValue.getValue()));
+        Object value = kafkaMessageColumnValue.getValue();
+        if (value == null) {
+            statement.setString(paramIndex, null);
+            return;
+        }
+        statement.setString(paramIndex, String.valueOf(value));
     }
 }

@@ -32,13 +32,15 @@ public class RealDataTypeConverter extends NumericDataTypeConverter {
                 statement.setString(paramIndex, String.valueOf(f));
                 return;
             } catch (NumberFormatException e) {
-                // fall through
+                throw new ColumnConversionFailedException(
+                        fireboltColumn.getName(), fireboltColumn.getDataType(),
+                        "Cannot convert kafka message attribute to a real due to NumberFormatException: " + e.getMessage());
             }
         }
 
         throw new ColumnConversionFailedException(
                 fireboltColumn.getName(), fireboltColumn.getDataType(),
-                "Cannot convert kafka message attribute to a real value in firebolt");
+                "Cannot convert kafka message attribute to a real due to incompatible type: " + (value != null ? value.getClass().getName() : "null"));
     }
 
 }

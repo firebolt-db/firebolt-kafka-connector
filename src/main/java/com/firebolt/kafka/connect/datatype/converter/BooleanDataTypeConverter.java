@@ -31,7 +31,7 @@ public class BooleanDataTypeConverter implements ColumnDataTypeConverter {
             }
         }
 
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert kafka message attribute to a boolean value in firebolt");
+        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert kafka message attribute to a boolean due to incompatible type: " + (kafkaMessageColumnValue.getValue() != null ? kafkaMessageColumnValue.getValue().getClass().getName() : "null"));
     }
 
     private boolean isValidBooleanValueAsString(String valueFromKafkaMessage) {

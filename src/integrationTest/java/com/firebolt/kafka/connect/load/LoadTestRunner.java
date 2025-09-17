@@ -226,6 +226,7 @@ public class LoadTestRunner {
         connectorConfig.put("firebolt.clientSecret", fireboltClientSecret);
         connectorConfig.put("errors.tolerance", "all");
         connectorConfig.put("errors.deadletterqueue.topic.name", "dlq-topic-firebolt");
+        connectorConfig.put("errors.deadletterqueue.context.headers.enable", "true");
 
         return connectorConfig;
     }
