@@ -32,7 +32,7 @@
     "colReal": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field"
     },

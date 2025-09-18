@@ -275,70 +275,70 @@
     "colReal": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field"
     },
     "colReal2": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 2"
     },
     "colReal3": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 3"
     },
     "colReal4": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 4"
     },
     "colReal5": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 5"
     },
     "colReal6": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 6"
     },
     "colReal7": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 7"
     },
     "colReal8": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 8"
     },
     "colReal9": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 9"
     },
     "colReal10": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float"}
       ],
       "description": "Real field 10"
     },
