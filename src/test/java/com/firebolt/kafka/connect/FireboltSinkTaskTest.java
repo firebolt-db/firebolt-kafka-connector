@@ -304,6 +304,7 @@ public class FireboltSinkTaskTest {
 
         // Mock service to throw a non-retriable conversion exception
         RecordConversionFailedException conversionFailed = RecordConversionFailedException.builder()
+                .message("conversion failed")
                 .tableName("test_table")
                 .topicName("test_topic")
                 .kafkaPartition(0)

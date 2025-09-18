@@ -158,6 +158,7 @@ public class InsertPreparedStatement {
 
                         // as of now we are failing at the first column conversion failure. We could try to convert all the columns so we give all the data in one record convertion exception.
                         throw RecordConversionFailedException.builder()
+                                .message(e.getMessage())
                                 .tableName(schema.getTableName())
                                 .kafkaPartition(record.getPartition())
                                 .kafkaOffset(record.getOffset())
