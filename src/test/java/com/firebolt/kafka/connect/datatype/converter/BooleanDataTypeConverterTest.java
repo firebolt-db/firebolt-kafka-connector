@@ -119,6 +119,6 @@ public class BooleanDataTypeConverterTest {
         verify(mockStatement, never()).setString(anyInt(), anyString());
         assertEquals("boolean", exception.getColumnType());
         assertEquals("test_column", exception.getColumnName());
-        assertEquals("Cannot convert kafka message attribute to a boolean value in firebolt", exception.getMessage());
+        assertEquals("Cannot convert kafka message attribute to a boolean due to incompatible type: java.lang.String", exception.getMessage());
     }
 }
