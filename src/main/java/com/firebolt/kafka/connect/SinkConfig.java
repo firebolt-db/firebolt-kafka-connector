@@ -57,4 +57,9 @@ public class SinkConfig {
     public Map<String, String> getConfig() {
         return config;
     }
+
+    public boolean isErrorToleranceAll() {
+        String tol = config.get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG);
+        return tol != null && tol.equalsIgnoreCase("all");
+    }
 }

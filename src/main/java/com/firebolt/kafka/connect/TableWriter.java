@@ -1,6 +1,10 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.google.common.annotations.VisibleForTesting;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -8,8 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.CollectionUtils;
 
 /**
  * A class that knows how to insert into a Firebolt table . It will use prepared statements to do the inserts.
@@ -33,22 +35,26 @@ public class TableWriter {
     private Supplier<Connection> connectionSupplier;
 
     private InsertPreparedStatementProvider insertPreparedStatementProvider;
+    private ErrorReporter errorReporter;
+    private boolean errorToleranceAll;
 
     /**
      * A connection that will be used for pushing the records to firebolt table
      */
     private Connection connection;
 
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier) {
-        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider());
+    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, ErrorReporter errorReporter, boolean errorToleranceAll) {
+        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll);
     }
 
     @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider) {
+    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
+        this.errorReporter = errorReporter;
+        this.errorToleranceAll = errorToleranceAll;
     }
 
     public void insertRecords(List<FireboltRecord> fireboltRecords) throws SQLException {
@@ -58,7 +64,7 @@ public class TableWriter {
             return;
         }
 
-        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema);
+        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll);
         insertPreparedStatement.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
@@ -106,8 +112,8 @@ public class TableWriter {
      * For easier testing
      */
     static class InsertPreparedStatementProvider {
-        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema) {
-            return new InsertPreparedStatement(connection, tableSchema);
+        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll) {
+            return new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll);
         }
     }
 }

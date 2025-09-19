@@ -11,8 +11,11 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.data.Schema;
@@ -61,7 +64,20 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
             return createByteaArray(connection, kafkaMessageColumnValue, fireboltColumn);
         }
 
-        return connection.createArrayOf(typeName, elements.toArray());
+        return connection.createArrayOf(typeName, toObjectArray(elements));
+    }
+
+    private Object[] toObjectArray(List<Object> elements) {
+        Optional<Object> maybeFirst = elements.stream().filter(Objects::nonNull).findFirst();
+        if (maybeFirst.isPresent() && maybeFirst.get().getClass() == ArrayList.class) {
+            return elements.stream().map(element -> {
+                if (element == null) {
+                    return null;
+                }
+                return toObjectArray((List<Object>) element);
+            }).toArray();
+        }
+        return elements.toArray();
     }
 
     private String detectTypeName(TableSchema.Column fireboltColumn) {

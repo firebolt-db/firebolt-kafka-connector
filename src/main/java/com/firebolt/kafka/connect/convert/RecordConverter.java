@@ -54,7 +54,8 @@ public abstract class RecordConverter {
                 record.topic(),
                 record.kafkaPartition() != null ? record.kafkaPartition() : -1,
                 record.kafkaOffset(),
-                record.timestamp() != null ? record.timestamp() : System.currentTimeMillis()
+                record.timestamp() != null ? record.timestamp() : System.currentTimeMillis(),
+                record
         );
     }
 

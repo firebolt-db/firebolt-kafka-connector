@@ -275,6 +275,9 @@ public abstract class BaseIntegrationTest {
 
         // JSON Schema converter configuration
         connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
+
+        // Error handling configuration
+        connectorConfig.put("errors.tolerance", "all"); //to be able to test all error scenarios
         
         // Firebolt connector specific properties
         connectorConfig.put("jdbc.connection.url", getJdbcConnectionUrl());

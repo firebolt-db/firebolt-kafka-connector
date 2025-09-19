@@ -6,6 +6,9 @@ import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import lombok.extern.slf4j.Slf4j;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -17,7 +20,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Insert into a table using prepared statements
@@ -27,10 +29,14 @@ public class InsertPreparedStatement {
 
     private Connection connection;
     private TableSchema tableSchema;
+    private ErrorReporter errorReporter;
+    private boolean errorToleranceAll;
 
-    public InsertPreparedStatement(Connection connection, TableSchema tableSchema) {
+    public InsertPreparedStatement(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll) {
         this.connection = connection;
         this.tableSchema = tableSchema;
+        this.errorReporter = errorReporter;
+        this.errorToleranceAll = errorToleranceAll;
     }
 
     public void addRecords(List<FireboltRecord> fireboltRecords) throws SQLException {
@@ -53,8 +59,12 @@ public class InsertPreparedStatement {
                     setStatementParameters(preparedStatement, record, tableSchema, validColumnNames);
                     preparedStatement.addBatch();
                 } catch (RecordConversionFailedException e) {
-                    // send the record to the dead letter queue
-                    log.warn("Record from partition {} at offset {} will be submitted to the deadletter queue ", e.getKafkaPartition(), e.getKafkaOffset());
+                    if (errorToleranceAll) {
+                        errorReporter.report(record.getSinkRecord(), e);
+                        log.warn("Record from partition {} at offset {} will be submitted to the deadletter queue ", e.getKafkaPartition(), e.getKafkaOffset());
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -70,8 +80,11 @@ public class InsertPreparedStatement {
                 if (fireboltRecords.size() == 1) {
                     FireboltRecord fireboltRecord = fireboltRecords.get(0);
                     log.warn("Cannot process the firebolt record from partition {} at offset {}, as it is too large and exceeds the Firebolt request entity size", fireboltRecord.getPartition(), fireboltRecord.getOffset());
-
-                    // TODO should add this to the dead letter queue
+                    if (errorToleranceAll) {
+                        errorReporter.report(fireboltRecord.getSinkRecord(), e);
+                    } else {
+                        throw e;
+                    }
                 } else {
                     // simple strategy for now. Split the rows in two and try each half again
                     int leftSide = fireboltRecords.size() / 2;

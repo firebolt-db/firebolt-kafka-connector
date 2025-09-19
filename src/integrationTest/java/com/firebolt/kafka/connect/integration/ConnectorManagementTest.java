@@ -291,6 +291,7 @@ public class ConnectorManagementTest extends BaseIntegrationTest {
 
         // restart the connector
         kafkaConnectClient.restartConnector(testConnectorName);
+        sleepForMillis(TimeUnit.SECONDS.toMillis(1));
         kafkaConnectClient.waitForConnectorRunning(testConnectorName, Duration.ofSeconds(30));
 
         List<SimpleRecord> topic1NewRecords = List.of(

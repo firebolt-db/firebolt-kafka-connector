@@ -9,7 +9,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.firebolt.jdbc.exception.FireboltException;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
@@ -17,7 +21,11 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Mockito;
 import org.mockito.MockedStatic;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
@@ -42,6 +50,9 @@ public class InsertPreparedStatementTest {
 
     @Mock
     private PreparedStatement mockPreparedStatement;
+
+    @Mock
+    private ErrorReporter errorReporter;
 
     @Mock
     private TableSchema mockTableSchema;
@@ -69,8 +80,9 @@ public class InsertPreparedStatementTest {
         
         when(mockTableSchema.getTableName()).thenReturn(TABLE_NAME);
         when(mockTableSchema.getColumns()).thenReturn(List.of(mockColumn1, mockColumn2));
+        doNothing().when(errorReporter).report(any(), any());
 
-        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema);
+        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, false);
     }
 
     @Test
@@ -78,19 +90,19 @@ public class InsertPreparedStatementTest {
         // 4 records so we expect first executeBatch to fail with 413, then two successful halves
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 1L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 2L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(2L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("b").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 3L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(3L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(3).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("c").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 4L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(4L).schemaType(Schema.Type.INT64).build(),
+                "id", KafkaMessageColumnValue.builder().value(4).schemaType(Schema.Type.INT32).build(),
                 "NAME", KafkaMessageColumnValue.builder().value("d").schemaType(Schema.Type.STRING).build()
         )));
 
@@ -100,7 +112,7 @@ public class InsertPreparedStatementTest {
         PreparedStatement psRight = Mockito.mock(PreparedStatement.class);
 
         // FireboltException simulating HTTP 413 (payload too large)
-        com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
+        FireboltException http413 = Mockito.mock(FireboltException.class);
         when(http413.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
 
         when(psFail.executeBatch()).thenThrow(http413);
@@ -119,22 +131,28 @@ public class InsertPreparedStatementTest {
     }
 
     @Test
-    void shouldNotThrowWhenSingleRecordTooLargeHttp413() throws Exception {
+    void shouldReportSingleRecordTooLargeViaErrorReporter() throws Exception {
+        // Use a new InsertPreparedStatement with error tolerance enabled
+        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, true);
+
         List<FireboltRecord> records = new ArrayList<>();
-        records.add(buildRecord(TABLE_NAME, 0, 99L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(123L).schemaType(Schema.Type.INT64).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("big").schemaType(Schema.Type.STRING).build()
-        )));
+        records.add(buildRecord(TABLE_NAME, 1, 1234L, mapOf(
+                "id", KafkaMessageColumnValue.builder().value(5L).schemaType(Schema.Type.INT64).build(),
+                "NAME", KafkaMessageColumnValue.builder().value("huge").schemaType(Schema.Type.STRING).build()
+        ), new SinkRecord("topic", 1, null, null, null, null, 1234L)));
 
         PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
-        com.firebolt.jdbc.exception.FireboltException http413 = Mockito.mock(com.firebolt.jdbc.exception.FireboltException.class);
+        FireboltException http413 = Mockito.mock(FireboltException.class);
         when(http413.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
         when(psFail.executeBatch()).thenThrow(http413);
         when(mockConnection.prepareStatement(anyString())).thenReturn(psFail);
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
-        verify(psFail, times(1)).executeBatch();
+        verify(errorReporter, times(1)).report(
+                Mockito.argThat(rec -> rec.topic().equals("topic") && rec.kafkaOffset() == 1234L),
+                Mockito.any(FireboltException.class)
+        );
     }
 
     @Test
@@ -166,7 +184,7 @@ public class InsertPreparedStatementTest {
                     "setStatementParameters", PreparedStatement.class, FireboltRecord.class, TableSchema.class, Map.class);
             method.setAccessible(true);
 
-            RecordConversionFailedException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            RecordConversionFailedException thrown = assertThrows(
                     RecordConversionFailedException.class,
                     () -> {
                         try {
@@ -186,10 +204,10 @@ public class InsertPreparedStatementTest {
             );
 
             // Assert details propagated to record-level exception
-            org.junit.jupiter.api.Assertions.assertEquals(TABLE_NAME, thrown.getTableName());
-            org.junit.jupiter.api.Assertions.assertEquals("topic", thrown.getTopicName());
-            org.junit.jupiter.api.Assertions.assertEquals(7, thrown.getKafkaPartition());
-            org.junit.jupiter.api.Assertions.assertEquals(123L, thrown.getKafkaOffset());
+            assertEquals(TABLE_NAME, thrown.getTableName());
+            assertEquals("topic", thrown.getTopicName());
+            assertEquals(7, thrown.getKafkaPartition());
+            assertEquals(123L, thrown.getKafkaOffset());
         }
     }
 
@@ -283,13 +301,19 @@ public class InsertPreparedStatementTest {
 
     private static FireboltRecord buildRecord(String tableName, int partition, long offset,
                                               Map<String, KafkaMessageColumnValue> values) {
+        return buildRecord(tableName, partition, offset, values, null);
+    }
+
+    private static FireboltRecord buildRecord(String tableName, int partition, long offset,
+                                              Map<String, KafkaMessageColumnValue> values, SinkRecord record) {
         return new FireboltRecord(
                 tableName,
                 values,
                 "topic",
                 partition,
                 offset,
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                record
         );
     }
 

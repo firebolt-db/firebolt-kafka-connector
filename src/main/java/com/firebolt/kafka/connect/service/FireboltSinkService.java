@@ -1,10 +1,11 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.TableSchema;
+import org.apache.kafka.connect.sink.SinkRecord;
+
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
-import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
  * We will have a different implementation for append-only (insert) and CDC sink tasks service
@@ -17,7 +18,7 @@ public interface FireboltSinkService {
      * @param records the collection of sink records to process
      * @param tableSchemas the map of table names to their schemas for context
      */
-    void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas);
+    void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas) throws SQLException;
 
     /**
      * Closes the resources associated with the firebolt

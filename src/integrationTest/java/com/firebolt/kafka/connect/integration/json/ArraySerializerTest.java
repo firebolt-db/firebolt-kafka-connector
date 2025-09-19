@@ -16,6 +16,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -320,6 +321,24 @@ public class ArraySerializerTest extends BaseIntegrationTest {
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional array of arrays - entire array can be null or omitted, and both outer and inner elements can be null\"\n" +
+                "    },\n" +
+                "    \"optionalArrayOfArraysWithNonNullElements\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\n" +
+                "          \"type\": \"array\",\n" +
+                "          \"items\": {\n" +
+                "            \"oneOf\": [\n" +
+                "              {\"type\": \"null\"},\n" +
+                "              {\n" +
+                "                \"type\": \"array\",\n" +
+                "                \"items\": {\"type\": \"integer\"}\n" +
+                "              }\n" +
+                "            ]\n" +
+                "          }\n" +
+                "        }\n" +
+                "      ],\n" +
+                "      \"description\": \"Optional array of arrays - entire array can be null or omitted, and both outer and inner elements can be null\"\n" +
                 "    }\n" +
                 "  },\n" +
                 "  \"required\": [\"recordId\", \"requiredArrayWithNullableElements\", \"requiredArrayWithNonNullElements\", \"requiredArrayOfArraysWithNullableElements\", \"requiredArrayOfArraysWithNonNullElements\"]\n" +
@@ -504,19 +523,18 @@ public class ArraySerializerTest extends BaseIntegrationTest {
         
         // Check that the array base type is ARRAY (Types.ARRAY = 2003)
         int baseType = actualArray.getBaseType();
-        assertEquals(Types.ARRAY, baseType,
-            fieldName + " should have base type ARRAY (2003) at index " + recordIndex);
+        assertEquals(Types.INTEGER, baseType,
+            fieldName + " should have base type INTEGER (4) at index " + recordIndex);
 
         // Get the array as Array array and convert to List<List<Integer>>
-        Array[] arrayElements = (Array[]) actualArray.getArray();
+        Integer[][] arrayElements = (Integer[][]) actualArray.getArray();
         List<List<Integer>> actualList = new ArrayList<>();
         
-        for (Array innerArray : arrayElements) {
+        for (Integer[] innerArray : arrayElements) {
             if (innerArray == null) {
                 actualList.add(null);
             } else {
-                Integer[] innerElements = (Integer[]) innerArray.getArray();
-                actualList.add(Arrays.asList(innerElements));
+                actualList.add(Arrays.asList(innerArray));
             }
         }
 

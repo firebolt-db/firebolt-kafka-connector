@@ -18,6 +18,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -463,16 +464,16 @@ public class StructSerializerTest extends BaseIntegrationTest {
                 }
                 
                 // Array verification
-                verifyStructArray("requiredStructArray", 
+                verifyStructArray("requiredStructArray",
                     expected.getRequiredStructArray(), actualRequiredStructArray, recordIndex, false);
                     
-                verifyStructArray("optionalStructArray", 
+                verifyStructArray("optionalStructArray",
                     expected.getOptionalStructArray(), actualOptionalStructArray, recordIndex, true);
                 
-                verifyStructArray("requiredStructArrayWithNullableElements", 
+                verifyStructArray("requiredStructArrayWithNullableElements",
                     expected.getRequiredStructArrayWithNullableElements(), actualRequiredStructArrayWithNullableElements, recordIndex, true);
                 
-                verifyStructArray("optionalStructArrayWithNullableElements", 
+                verifyStructArray("optionalStructArrayWithNullableElements",
                     expected.getOptionalStructArrayWithNullableElements(), actualOptionalStructArrayWithNullableElements, recordIndex, true);
                 
                 log.debug("Verified struct record {}: recordId={}", recordIndex, actualRecordId);
