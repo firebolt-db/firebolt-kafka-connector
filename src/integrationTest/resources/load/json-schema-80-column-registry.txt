@@ -6,68 +6,69 @@
   "properties": {
     "colInteger": {
       "type": "integer",
+      "connect.type": "int32",
       "description": "Integer field (NOT NULL)"
     },
     "colInteger2": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 2"
     },
     "colInteger3": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 3"
     },
     "colInteger4": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 4"
     },
     "colInteger5": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 5"
     },
     "colInteger6": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 6"
     },
     "colInteger7": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 7"
     },
     "colInteger8": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 8"
     },
     "colInteger9": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 9"
     },
     "colInteger10": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "integer"}
+        {"type": "integer", "connect.type": "int32"}
       ],
       "description": "Integer field 10"
     },
@@ -274,70 +275,70 @@
     "colReal": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field"
     },
     "colReal2": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 2"
     },
     "colReal3": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 3"
     },
     "colReal4": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 4"
     },
     "colReal5": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 5"
     },
     "colReal6": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 6"
     },
     "colReal7": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 7"
     },
     "colReal8": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 8"
     },
     "colReal9": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 9"
     },
     "colReal10": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field 10"
     },

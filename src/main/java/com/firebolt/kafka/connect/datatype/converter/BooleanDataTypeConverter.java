@@ -9,7 +9,7 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class BooleanDataTypeConverter implements ColumnDataTypeConverter {
+public class BooleanDataTypeConverter extends AbstractColumnTypeConverter {
 
     // keep them as lowercase
     private static Set<String> ALLOWED_STRING_VALUES_AS_BOOLEAN = Set.of("t", "f", "true", "false", "0", "1");
@@ -31,7 +31,7 @@ public class BooleanDataTypeConverter implements ColumnDataTypeConverter {
             }
         }
 
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert kafka message attribute to a boolean value in firebolt");
+        throw aColumnConversionFailedException(fireboltColumn, kafkaMessageColumnValue.getValue());
     }
 
     private boolean isValidBooleanValueAsString(String valueFromKafkaMessage) {

@@ -8,7 +8,7 @@ import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import org.apache.kafka.connect.data.Schema;
 
-public class TimestamptzDataTypeConverter extends CompositeDataTypeConverter {
+public class TimestamptzDataTypeConverter extends AbstractColumnTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -26,6 +26,6 @@ public class TimestamptzDataTypeConverter extends CompositeDataTypeConverter {
             }
         }
 
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert value to valid timestamptz column");
+        throw aColumnConversionFailedException(fireboltColumn, kafkaMessageColumnValue.getValue());
     }
 }

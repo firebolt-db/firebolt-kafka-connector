@@ -26,7 +26,7 @@ public class TimestampDataTypeConverter extends AbstractColumnTypeConverter {
                 statement.setString(paramIndex, dateTimeAsString);
                 return;
             }
-            throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "String value cannot be converted to a timestamp column in firebolt");
+            throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "String value cannot be converted to a timestamp column in firebolt as it is not an ISO local ");
         }
 
         if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.INT64) {
@@ -35,7 +35,7 @@ public class TimestampDataTypeConverter extends AbstractColumnTypeConverter {
             return;
         }
 
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert to valid timestamp in firebolt");
+        throw aColumnConversionFailedException(fireboltColumn, value);
 
     }
 }

@@ -6,6 +6,7 @@
   "properties": {
     "colInteger": {
       "type": "integer",
+      "connect.type": "int32",
       "description": "Integer field (NOT NULL)"
     },
     "colBigint": {
@@ -31,7 +32,7 @@
     "colReal": {
       "oneOf": [
         {"type": "null", "title": "Not included"},
-        {"type": "number"}
+        {"type": "number", "connect.type": "float32"}
       ],
       "description": "Real field"
     },

@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.nio.ByteBuffer;
 import java.sql.Array;
