@@ -49,7 +49,7 @@ public class FireboltSinkConnectorTest {
     
     @Test
     void testVersion() {
-        assertEquals("0.1", connector.version());
+        assertEquals("0.2", connector.version());
     }
     
     @Test
