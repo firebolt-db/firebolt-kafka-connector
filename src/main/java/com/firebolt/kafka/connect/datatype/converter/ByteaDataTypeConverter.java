@@ -8,7 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Base64;
 
-public class ByteaDataTypeConverter implements ColumnDataTypeConverter {
+public class ByteaDataTypeConverter extends AbstractColumnTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -28,6 +28,6 @@ public class ByteaDataTypeConverter implements ColumnDataTypeConverter {
             return;
         }
 
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert value to bytea column in firebolt");
+        throw aColumnConversionFailedException(fireboltColumn, value);
     }
 }

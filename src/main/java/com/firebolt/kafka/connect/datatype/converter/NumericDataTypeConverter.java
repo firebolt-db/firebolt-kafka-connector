@@ -1,5 +1,5 @@
 package com.firebolt.kafka.connect.datatype.converter;
 
-public abstract class NumericDataTypeConverter implements ColumnDataTypeConverter {
+public abstract class NumericDataTypeConverter extends AbstractColumnTypeConverter {
 
 }

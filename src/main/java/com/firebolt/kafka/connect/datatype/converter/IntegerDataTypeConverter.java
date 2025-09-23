@@ -28,11 +28,11 @@ public class IntegerDataTypeConverter extends NumericDataTypeConverter {
                 statement.setInt(paramIndex, parsed);
                 return;
             } catch (NumberFormatException e) {
-                // fall through
+                throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert kafka message attribute to a integer due to NumberFormatException: " + e.getMessage());
             }
         }
 
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert kafka message attribute to a integer value in firebolt");
+        throw aColumnConversionFailedException(fireboltColumn, value);
     }
 
 

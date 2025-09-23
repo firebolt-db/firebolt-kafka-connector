@@ -47,7 +47,6 @@ public class DecimalDataTypeConverter extends NumericDataTypeConverter {
         }
 
         // If no matching type case, throw conversion failure
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(),
-                "Cannot convert kafka message attribute to a decimal value in firebolt");
+        throw aColumnConversionFailedException(fireboltColumn, value);
     }
 }

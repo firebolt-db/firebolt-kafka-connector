@@ -27,7 +27,7 @@ public class DateDataTypeConverter extends AbstractColumnTypeConverter {
             }
         }
 
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Cannot convert to valid date in firebolt");
+        throw aColumnConversionFailedException(fireboltColumn, value);
     }
 
 }

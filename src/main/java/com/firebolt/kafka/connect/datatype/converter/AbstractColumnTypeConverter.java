@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.datatype.converter;
 
+import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -19,6 +21,11 @@ public abstract class AbstractColumnTypeConverter implements ColumnDataTypeConve
         } catch (DateTimeParseException e) {
             return false;
         }
+    }
+
+    protected ColumnConversionFailedException aColumnConversionFailedException(TableSchema.Column fireboltColumn, Object kafkaMessageValue) {
+        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(),
+                "Cannot convert kafka message attribute to a " + fireboltColumn.getDataType() + " due to incompatible type: " + (kafkaMessageValue != null ? kafkaMessageValue.getClass().getName() : "null"));
     }
 
 }
