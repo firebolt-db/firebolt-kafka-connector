@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.exception;
 
 import java.util.List;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,9 +8,8 @@ import lombok.NoArgsConstructor;
 /**
  * Should be raised when cannot convert the kafka message to a firebolt row for data conversion reasons. It can be treated as a non recoverable exception
  */
-@Builder
 @Getter
-@AllArgsConstructor
+@NoArgsConstructor
 public class RecordConversionFailedException extends RuntimeException {
 
     /**
@@ -38,4 +36,19 @@ public class RecordConversionFailedException extends RuntimeException {
      * In case there is a conversion problem for more than one column
      */
     private List<ColumnConversionFailedException> columnConversionExceptions;
+
+    @Builder
+    public RecordConversionFailedException(String message,
+                                              String tableName,
+                                              String topicName,
+                                              int kafkaPartition,
+                                              long kafkaOffset,
+                                              List<ColumnConversionFailedException> columnConversionExceptions) {
+        super(message);
+        this.tableName = tableName;
+        this.topicName = topicName;
+        this.kafkaPartition = kafkaPartition;
+        this.kafkaOffset = kafkaOffset;
+        this.columnConversionExceptions = columnConversionExceptions;
+    }
 }
