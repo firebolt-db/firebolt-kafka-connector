@@ -534,7 +534,7 @@ tasks.register('confluentJar', Jar) {
 
 // Confluent Archive preparation
 def releaseDate = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE.format(java.time.LocalDateTime.now())
-def archiveFilename = "firebolt-kafka-connect"
+def archiveFilename = "firebolt-db-firebolt-kafka-connect"
 
 tasks.register('prepareConfluentArchive', Copy) {
     group = "Confluent"
