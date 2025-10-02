@@ -34,6 +34,12 @@ public class TableWriterTest {
 
     private static final String TABLE_NAME = "test_table";
 
+    private static final Integer PARTITION_0 = 0;
+    private static final Integer PARTITION_1 = 1;
+    private static final Integer PARTITION_2 = 2;
+
+    private Map<Integer, Long> lastPartitionOffset;
+
     @Mock
     private TableSchema mockTableSchema;
 
@@ -78,7 +84,11 @@ public class TableWriterTest {
         // by default connection is not closed
         when(mockConnection.isClosed()).thenReturn(false);
 
-        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, new HashMap<>(), mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false);
+        lastPartitionOffset = new HashMap<>();
+        lastPartitionOffset.put(PARTITION_0,  -1l);
+        lastPartitionOffset.put(PARTITION_1,  -1l);
+        lastPartitionOffset.put(PARTITION_2,  -1l);
+        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false);
         when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false)).thenReturn(mockInsertPrepareStatement);
 
         doNothing().when(mockInsertPrepareStatement).addRecords(anyList());

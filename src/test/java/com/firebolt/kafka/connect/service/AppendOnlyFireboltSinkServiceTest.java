@@ -77,7 +77,7 @@ public class AppendOnlyFireboltSinkServiceTest {
         MockitoAnnotations.openMocks(this);
 
         tableWriterMap = new HashMap<>();
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, errorReporter, false);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, new HashMap<>(), errorReporter, false);
 
         when(mockSinkConfig.getTableNameForTopic(TOPIC_A)).thenReturn(TABLE_A);
         when(mockSinkConfig.getTableNameForTopic(TOPIC_B)).thenReturn(TABLE_B);
@@ -92,7 +92,7 @@ public class AppendOnlyFireboltSinkServiceTest {
     @Test
     void shouldReportConversionFailureViaErrorReporter() throws Exception {
         //rebuild service with error tolerance enabled
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, errorReporter, true);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, new HashMap<>(), errorReporter, true);
         SinkRecord badRecord = buildRecord(TOPIC_A, 0, 1L);
         Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
 
@@ -212,7 +212,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
     @Test
     void shouldFilterOutRecordsThatCannotBeConvertedWhenErrorToleranceIsAll() throws Exception {
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, errorReporter, true);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, new HashMap<>(), errorReporter, true);
         // two topics
         SinkRecord recA1 = buildRecord(TOPIC_A, 0, 1L);
         SinkRecord recA2 = buildRecord(TOPIC_A, 0, 2L);

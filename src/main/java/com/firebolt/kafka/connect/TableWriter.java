@@ -20,7 +20,6 @@ import java.util.function.Supplier;
 @Slf4j
 public class TableWriter {
 
-    private static final Long START_OFFSET = -1L;
     /**
      * For which table this write is for
      */
@@ -43,8 +42,8 @@ public class TableWriter {
      */
     private Connection connection;
 
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, ErrorReporter errorReporter, boolean errorToleranceAll) {
-        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll);
+    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll) {
+        this(tableSchema, connectionSupplier, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll);
     }
 
     @VisibleForTesting
@@ -89,7 +88,7 @@ public class TableWriter {
         fireboltRecords.forEach(fireboltRecord -> {
             Integer partition = fireboltRecord.getPartition();
             Long offset = fireboltRecord.getOffset();
-            if (processedPartitionOffsets.getOrDefault(partition, START_OFFSET) < offset) {
+            if (processedPartitionOffsets.get(partition) < offset) {
                 processedPartitionOffsets.put(partition, offset);
             }
         });

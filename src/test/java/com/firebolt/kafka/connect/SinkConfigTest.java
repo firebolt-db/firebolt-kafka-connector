@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class SinkConfigTest {
 
@@ -322,4 +323,30 @@ public class SinkConfigTest {
         
         assertNull(result);
     }
+
+    @ParameterizedTest
+    @CsvSource({
+        "true, true",
+        "false, false"
+    })
+    void testIsExactlyOnceWithBooleanValues(String value, boolean expected) {
+        configMap.put(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG, value);
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        boolean result = testConfig.isExactlyOnce();
+
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void testIsExactlyOnceWhenOmittedDefaultsToFalse() {
+        configMap.remove(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG);
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        boolean result = testConfig.isExactlyOnce();
+
+        assertFalse(result);
+    }
+
+    
 } 

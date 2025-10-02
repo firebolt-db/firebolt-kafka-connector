@@ -10,7 +10,6 @@ import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,6 +44,7 @@ public class FireboltSinkTask extends SinkTask {
     private Set<String> assignedTopics;
     private Map<String, String> topicToTableMapping;
     private Map<String, TableSchema> tableSchemas;
+    private Map<String, Set<Integer>> assignedTopicPartitions;
     private FireboltDbService fireboltDbService;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
@@ -76,14 +76,13 @@ public class FireboltSinkTask extends SinkTask {
             this.assignedTopics = new HashSet<>();
             this.topicToTableMapping = new HashMap<>();
             this.tableSchemas = new HashMap<>();
+            this.assignedTopicPartitions = new HashMap<>();
 
             this.errorToleranceAll = this.sinkConfig.isErrorToleranceAll();
             createAndSetErrorReporter();
 
             // Initialize services
             this.fireboltDbService = new FireboltDbService();
-
-            this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig, this.errorReporter, this.errorToleranceAll);
 
             log.info("Firebolt Sink Task started successfully");
 
@@ -122,6 +121,14 @@ public class FireboltSinkTask extends SinkTask {
 
             // Discover table schemas from Firebolt
             discoverTableSchemas();
+
+            // open method might get called on partition rebalancing. It might be that start method does not get called.
+            // We need to move the firebolSinkService creation here, since we need to know which partitions will the service handle
+            if (fireboltSinkService != null) {
+                fireboltSinkService.close();
+            }
+
+            this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig, this.assignedTopicPartitions, this.errorReporter, this.errorToleranceAll);
 
             log.info("Successfully opened Firebolt Sink Task for topics: {} mapped to tables: {}",
                     assignedTopics, topicToTableMapping.values());
@@ -186,9 +193,14 @@ public class FireboltSinkTask extends SinkTask {
      */
     private void extractAssignedTopics(Collection<TopicPartition> partitions) {
         assignedTopics.clear();
+        assignedTopicPartitions.clear();
 
         for (TopicPartition partition : partitions) {
             assignedTopics.add(partition.topic());
+            assignedTopicPartitions
+                    .computeIfAbsent(partition.topic(), t -> new HashSet<>())
+                    .add(partition.partition());
+
         }
 
         log.info("Extracted {} unique topics from {} partitions: {}",
