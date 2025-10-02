@@ -2,6 +2,8 @@ package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -39,10 +41,10 @@ public class FireboltSinkServiceProvider {
      * @return a new FireboltSinkService implementation
      * @throws IllegalArgumentException if the sink connector type is not supported
      */
-    public FireboltSinkService getService(SinkConfig sinkConfig, ErrorReporter errorReporter, boolean errorToleranceAll) {
+    public FireboltSinkService getService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
         if (sinkConfig == null) {
             throw new IllegalArgumentException("Configuration properties cannot be null");
         }
-        return new AppendOnlyFireboltSinkService(sinkConfig, errorReporter, errorToleranceAll);
+        return new AppendOnlyFireboltSinkService(sinkConfig, topicPartitions, errorReporter, errorToleranceAll);
     }
 }
