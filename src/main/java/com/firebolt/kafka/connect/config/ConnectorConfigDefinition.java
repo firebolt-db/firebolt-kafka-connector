@@ -30,6 +30,13 @@ public class ConnectorConfigDefinition {
     public static final String TOPIC_TO_TABLE_MAPPING_DEFAULT = null;
 
     // =========================
+    // CONNECTOR BEHAVIOR
+    // =========================
+    public static final String EXACTLY_ONCE_MAPPING_CONFIG = "exactlyOnce";
+    public static final String EXACTLY_ONCE_MAPPING_DOC = "By default this will be set to false. When set to true, then the kafka message will be ingested exactly-once in Firebolt. When the flag is false, the kafka message will be ingested at least once";
+    public static final Boolean EXACTLY_ONCE_MAPPING_DEFAULT = Boolean.FALSE;
+
+    // =========================
     // ERROR HANDLING CONFIGURATION (delegated from Kafka Connect worker)
     // =========================
     public static final String ERROR_TOLERANCE_CONFIG = "errors.tolerance";
@@ -65,7 +72,13 @@ public class ConnectorConfigDefinition {
                         FIREBOLT_CLIENT_SECRET_DEFAULT,
                         ConfigDef.Importance.HIGH,
                         FIREBOLT_CLIENT_SECRET_DOC)
-                
+                // Connector behavior
+                .define(EXACTLY_ONCE_MAPPING_CONFIG,
+                        ConfigDef.Type.BOOLEAN,
+                        EXACTLY_ONCE_MAPPING_DEFAULT,
+                        ConfigDef.Importance.HIGH,
+                        EXACTLY_ONCE_MAPPING_DOC)
+
                 // Table Configuration
                 .define(TOPIC_TO_TABLE_MAPPING_CONFIG,
                         ConfigDef.Type.STRING,
