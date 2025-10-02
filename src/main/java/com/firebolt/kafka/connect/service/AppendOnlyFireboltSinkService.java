@@ -19,7 +19,6 @@ import java.util.Map;
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import lombok.SneakyThrows;
@@ -59,7 +58,6 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         this.fireboltDbService = fireboltDbService;
         this.recordConverterFactory = recordConverterFactory;
         this.tableWriterMap = tableWriterMap;
-        this.assignedTopicPartitions = topicPartitions;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
         try {
