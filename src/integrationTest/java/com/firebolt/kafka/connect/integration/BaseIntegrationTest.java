@@ -427,6 +427,12 @@ public abstract class BaseIntegrationTest {
         return defaultUrl;
     }
 
+    protected static String getJdbcConnectionUrl(String url) {
+        String connectionUrl = "jdbc:firebolt:" + DEFAULT_DATABASE_NAME + "?url=" + url;
+        log.info("Using JDBC connection URL from parameter: {}", connectionUrl);
+        return connectionUrl;
+    }
+
     protected String getClientId() {
         String clientId = System.getProperty("clientId");
         if (clientId != null && !clientId.trim().isEmpty()) {
