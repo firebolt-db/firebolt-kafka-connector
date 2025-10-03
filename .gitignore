@@ -48,6 +48,9 @@ logs
 *.tar.gz
 *.rar
 
+.vscode
+.DS_Store
+
 #Firebolt Core
 src/integrationTest/docker/kafka-connect-3.9.1/firebolt-core
 src/integrationTest/docker/kafka-connect-4.0/firebolt-core
