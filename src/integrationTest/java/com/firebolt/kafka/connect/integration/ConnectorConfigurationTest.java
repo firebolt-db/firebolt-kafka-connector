@@ -307,9 +307,7 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
 
         assertNotNull(errorMessage, "Error message should not be null");
-        assertTrue(errorMessage.toLowerCase().contains("exactlyonce") ||
-                   errorMessage.toLowerCase().contains("boolean") ||
-                   errorMessage.toLowerCase().contains("invalid"),
+        assertTrue(errorMessage.contains("Invalid value unknown for configuration exactlyOnce: Expected value to be either true or false"),
                    "Error message should indicate invalid boolean for exactlyOnce: " + errorMessage);
     }
     
