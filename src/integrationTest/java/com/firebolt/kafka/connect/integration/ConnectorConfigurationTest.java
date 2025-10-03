@@ -298,6 +298,18 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
                    errorMessage.toLowerCase().contains("greater than 0"),
                    "Error message should mention invalid tasks.max value: " + errorMessage);
     }
+
+    @Test
+    void testInvalidExactlyOnceValue() throws IOException {
+        Map<String, Object> connectorConfig = createBaseConnectorConfig();
+        connectorConfig.put("exactlyOnce", "unknown");
+
+        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
+
+        assertNotNull(errorMessage, "Error message should not be null");
+        assertTrue(errorMessage.contains("Invalid value unknown for configuration exactlyOnce: Expected value to be either true or false"),
+                   "Error message should indicate invalid boolean for exactlyOnce: " + errorMessage);
+    }
     
     @Test
     void testInvalidConnectorClass() throws IOException {
@@ -612,6 +624,26 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             
             // Verify that the connector was created successfully
             assertTrue(success, "Connector creation should succeed with minimal configuration (using defaults for optional properties)");
+        }
+
+        @Test
+        void testExactlyOnceTrueStartsConnector() throws IOException {
+            Map<String, Object> config = createBaseConnectorConfig();
+            config.put("exactlyOnce", "true");
+
+            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, config);
+
+            assertTrue(success, "Connector creation should succeed when exactlyOnce is true");
+        }
+
+        @Test
+        void testExactlyOnceOmittedDefaultsToFalseAndStartsConnector() throws IOException {
+            Map<String, Object> config = createBaseConnectorConfig();
+            // do not set exactlyOnce, should default to false
+
+            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, config);
+
+            assertTrue(success, "Connector creation should succeed when exactlyOnce is omitted (defaults to false)");
         }
     }
 

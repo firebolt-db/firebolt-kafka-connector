@@ -68,6 +68,7 @@ class ConnectorConfigDefinitionTest {
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG));
+            assertTrue(configDef.names().contains(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG));
         }
@@ -75,7 +76,7 @@ class ConnectorConfigDefinitionTest {
         @Test
         void shouldHaveCorrectNumberOfConfigProperties() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
-            assertEquals(5, configDef.names().size());
+            assertEquals(6, configDef.names().size());
         }
 
         @Test
@@ -88,6 +89,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG).type);
             assertEquals(ConfigDef.Type.PASSWORD, 
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG).type);
+            assertEquals(ConfigDef.Type.BOOLEAN,
+                configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).type);
             assertEquals(ConfigDef.Type.STRING, 
                 configDef.configKeys().get(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG).type);
             assertEquals(ConfigDef.Type.STRING,
@@ -104,6 +107,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH, 
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG).importance);
+            assertEquals(ConfigDef.Importance.HIGH,
+                configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH, 
                 configDef.configKeys().get(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG).importance);
             assertEquals(ConfigDef.Importance.MEDIUM,
@@ -158,6 +163,34 @@ class ConnectorConfigDefinitionTest {
             boolean hasErrors = result.stream().anyMatch(v -> !v.errorMessages().isEmpty());
             assertTrue(hasErrors, "Expected validation errors for whitespace-only JDBC connection URL");
         }
+
+        @Test
+        void shouldAcceptExactlyOnceTrue() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG, "true");
+
+            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+        }
+
+        @Test
+        void shouldAcceptExactlyOnceFalse() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG, "false");
+
+            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+        }
+
+        @Test
+        void shouldRejectUnknownExactlyOnceValue() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG, "unknown");
+
+            var result = ConnectorConfigDefinition.CONFIG_DEF.validate(config);
+            boolean hasExactlyOnceErrors = result.stream()
+                .filter(v -> ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG.equals(v.name()))
+                .anyMatch(v -> !v.errorMessages().isEmpty());
+            assertTrue(hasExactlyOnceErrors, "Expected validation errors for invalid exactlyOnce value");
+        }
     }
 
     @Nested
@@ -168,9 +201,15 @@ class ConnectorConfigDefinitionTest {
             Map<String, String> config = new HashMap<>();
             config.put(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG, "jdbc:firebolt:my_database?engine=my_engine&account=my_account");
             config.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1");
-            // Don't set sink.connector.type, should use default "append"
             
             assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+        }
+
+        @Test
+        void shouldDefaultExactlyOnceToFalseWhenNotProvided() {
+            ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
+            Object defaultValue = configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).defaultValue;
+            assertEquals(Boolean.FALSE, defaultValue);
         }
     }
 
@@ -194,6 +233,7 @@ class ConnectorConfigDefinitionTest {
             assertTrue(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_DOC.contains("client id"));
             assertTrue(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_DOC.contains("client secret"));
             assertTrue(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_DOC.contains("Comma-separated"));
+            assertTrue(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_DOC.toLowerCase().contains("exactly-once"));
             assertTrue(ConnectorConfigDefinition.ERROR_TOLERANCE_DOC.contains("Error tolerance policy"));
         }
     }
