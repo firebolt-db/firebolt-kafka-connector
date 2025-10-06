@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -52,9 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith({ServiceHealthExtension.class, TestSetupExtension.class})
+@Slf4j
 public abstract class BaseIntegrationTest {
-    
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BaseIntegrationTest.class);
     
     protected static final String KAFKA_CONNECT_HOST = System.getenv().getOrDefault("KAFKA_CONNECT_URL", "http://localhost:8083");
     protected static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
@@ -247,6 +247,7 @@ public abstract class BaseIntegrationTest {
     protected void registerJsonConnector(String connectorName, String topics, String topicToTableMappings) throws Exception {
         registerJsonConnector(connectorName, topics, topicToTableMappings, Collections.emptyMap());
     }
+
     /**
      * Registers a Kafka Connect connector for JSON Schema processing with Firebolt.
      * This method creates a standard JSON Schema connector configuration suitable for most tests.
@@ -301,13 +302,19 @@ public abstract class BaseIntegrationTest {
         }
 
         // Create the connector
+        createConnectorAndWaitForItToStart(connectorName, topicToTableMappings, connectorConfig);
+    }
+
+    protected void createConnectorAndWaitForItToStart(String connectorName, String topicToTableMappings, Map<String, Object> connectorConfig) throws IOException {
+        // Create the connector
         createConnector(connectorName, connectorConfig);
         kafkaConnectClient.waitForConnectorRunning(connectorName, DEFAULT_TIMEOUT);
-        
-        log.info("✅ Connector '{}' registered and running with topic-to-table mapping: {}", 
+
+        log.info("✅ Connector '{}' registered and running with topic-to-table mapping: {}",
                 connectorName, topicToTableMappings);
     }
-    
+
+
     /**
      * Initializes a Kafka producer for JSON Schema serialization with default null handling (nulls included).
      * This method creates a producer configured for JSON Schema with proper schema registry integration.
@@ -364,7 +371,7 @@ public abstract class BaseIntegrationTest {
         log.info("Kafka JSON Schema producer initialized successfully with null handling: includeNulls={}", includeNulls);
         return producer;
     }
-    
+
     /**
      * Safely deletes a Kafka topic to ensure clean state.
      * This method is useful for test cleanup to avoid topic state conflicts
@@ -459,9 +466,7 @@ public abstract class BaseIntegrationTest {
             }
         }
     }
-    
-    
-    
+
     protected void waitForDataInFirebolt(String tableName, int expectedRowCount) throws SQLException {
         waitForDataInFirebolt(tableName, expectedRowCount, DEFAULT_TIMEOUT);
     }
