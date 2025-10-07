@@ -143,7 +143,7 @@ dependencies {
     testImplementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
     testImplementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
     testImplementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
-    
+    testImplementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}"
     // Logging for testing
     testImplementation "org.slf4j:slf4j-api:${slf4jVersion}"
     testImplementation "org.apache.logging.log4j:log4j-core:${log4jVersion}"
@@ -274,10 +274,10 @@ sourceSets {
         java {
             compileClasspath += main.output + test.output
             runtimeClasspath += main.output + test.output
-                srcDir 'src/integrationTest/java'
-}
-resources {
-    srcDir 'src/integrationTest/resources'
+            srcDir 'src/integrationTest/java'
+        }
+        resources {
+            srcDir 'src/integrationTest/resources'
         }
     }
 }
