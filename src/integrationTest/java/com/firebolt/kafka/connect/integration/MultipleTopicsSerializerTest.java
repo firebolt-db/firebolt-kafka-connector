@@ -1,13 +1,11 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration;
 
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.Record1TestRecord;
 import com.firebolt.kafka.connect.integration.json.datatype.Record2TestRecord;
 import com.firebolt.kafka.connect.integration.json.datatype.Record3TestRecord;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
