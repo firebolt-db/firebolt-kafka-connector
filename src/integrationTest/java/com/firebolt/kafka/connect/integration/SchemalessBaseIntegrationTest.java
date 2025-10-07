@@ -18,8 +18,7 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
     protected static ObjectMapper mapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
-            // optional: write ISO-8601 strings instead of numeric timestamps
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            .enable(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN); // no scientific notation
 
     /**
      * Centralized setup method for test resources.

@@ -1,3 +1,4 @@
+
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
@@ -28,14 +29,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(value = TestTag.NOT_IMPLEMENTED)
 public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
     private static final String TABLE_NAME = "bytea_test_table";
     private static final String TOPIC_NAME = "bytea-test-topic";
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
-    private Producer<String, ByteaTestRecord> producer;
+    private Producer<String, String> producer;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -45,8 +44,7 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
         generateUniqueConnectorName("bytea-serializer-test");
         
         // Setup test resources using centralized method
-        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT, 
-                         byteaTableSchema(), jsonByteaSchema());
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, byteaTableSchema());
     }
     
     @AfterEach
@@ -57,7 +55,7 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
         }
         
         // Clean up test resources
-        cleanupTestResources(TABLE_NAME, TOPIC_NAME, SCHEMA_SUBJECT);
+        cleanupSchemalessTestResources(TABLE_NAME, TOPIC_NAME);
         
         super.tearDown();
     }
@@ -190,92 +188,6 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
                 "\"optionalListWithNonNullElements\" ARRAY(BYTEA NOT NULL) NULL" +
                 ")";
     }
-    
-    private Supplier<String> jsonByteaSchema() {
-        return () -> "{\n" +
-                "  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n" +
-                "  \"title\": \"Bytea Test Record\",\n" +
-                "  \"type\": \"object\",\n" +
-                "  \"additionalProperties\": false,\n" +
-                "  \"properties\": {\n" +
-                "    \"recordId\": {\n" +
-                "      \"type\": \"integer\",\n" +
-                "      \"connect.type\": \"int32\",\n" +
-                "      \"description\": \"Record identification number\"\n" +
-                "    },\n" +
-                "    \"requiredBytea\": {\n" +
-                "      \"type\": \"string\",\n" +
-                "      \"connect.type\": \"bytes\",\n" +
-                "      \"description\": \"Required binary field - must not be null\"\n" +
-                "    },\n" +
-                "    \"optionalBytea\": {\n" +
-                "      \"oneOf\": [\n" +
-                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
-                "      ],\n" +
-                "      \"description\": \"Optional binary field - can be null or omitted\"\n" +
-                "    },\n" +
-                "    \"stringAsBytea\": {\n" +
-                "      \"type\": \"string\"\n" +
-                "    },\n" +
-                "    \"stringListAsBytea\": {\n" +
-                "      \"oneOf\": [\n" +
-                "        {\"type\": \"null\"},\n" +
-                "        {\n" +
-                "          \"type\": \"array\",\n" +
-                "          \"items\": {\n" +
-                "            \"oneOf\": [\n" +
-                "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"string\"}\n" +
-                "            ]\n" +
-                "          }\n" +
-                "        }\n" +
-                "      ]\n" +
-                "    },\n" +
-                "    \"requiredListWithNullableElements\": {\n" +
-                "      \"type\": \"array\",\n" +
-                "      \"items\": {\n" +
-                "        \"oneOf\": [\n" +
-                "          {\"type\": \"null\"},\n" +
-                "          {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
-                "        ]\n" +
-                "      },\n" +
-                "      \"description\": \"Required list where individual elements can be null\"\n" +
-                "    },\n" +
-                "    \"requiredListWithNonNullElements\": {\n" +
-                "      \"type\": \"array\",\n" +
-                "      \"items\": {\"type\": \"string\", \"connect.type\": \"bytes\"},\n" +
-                "      \"description\": \"Required list where individual elements cannot be null\"\n" +
-                "    },\n" +
-                "    \"optionalList\": {\n" +
-                "      \"oneOf\": [\n" +
-                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\n" +
-                "          \"type\": \"array\",\n" +
-                "          \"items\": {\n" +
-                "            \"oneOf\": [\n" +
-                "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
-                "            ]\n" +
-                "          }\n" +
-                "        }\n" +
-                "      ],\n" +
-                "      \"description\": \"Optional list - entire list can be null or omitted, and elements can be null\"\n" +
-                "    },\n" +
-                "    \"optionalListWithNonNullElements\": {\n" +
-                "      \"oneOf\": [\n" +
-                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\n" +
-                "          \"type\": \"array\",\n" +
-                "          \"items\": {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
-                "        }\n" +
-                "      ],\n" +
-                "      \"description\": \"Optional list where individual elements cannot be null\"\n" +
-                "    }\n" +
-                "  },\n" +
-                "  \"required\": [\"recordId\", \"requiredBytea\", \"requiredListWithNullableElements\", \"requiredListWithNonNullElements\"]\n" +
-                "}";
-    }
 
     /**
      * Publishes ByteaTestRecord messages to Kafka using JSON Schema serialization.
@@ -283,8 +195,8 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
     private void publishMessages(List<ByteaTestRecord> records) throws Exception {
         for (ByteaTestRecord record : records) {
             String key = "bytea-test-key-" + record.getRecordId();
-            ProducerRecord<String, ByteaTestRecord> producerRecord = 
-                new ProducerRecord<>(TOPIC_NAME, key, record);
+            ProducerRecord<String, String> producerRecord =
+                new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
             
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {

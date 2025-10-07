@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(value = TestTag.NOT_IMPLEMENTED)
 public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
     private static final String TABLE_NAME = "integer_test_table";

@@ -178,7 +178,7 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaPartition()).thenReturn(1);
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
 
-        Map<String, KafkaMessageColumnValue> result = converter.testHandleNullValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.testHandleNullValue(mockSinkRecord);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -286,7 +286,7 @@ public class RecordConverterTest {
             return convertRecordValueCalled;
         }
 
-        public Map<String, KafkaMessageColumnValue> testHandleNullValue(SinkRecord record) {
+        public Map<String, ? extends KafkaMessageColumnValue> testHandleNullValue(SinkRecord record) {
             return handleNullValue(record);
         }
 

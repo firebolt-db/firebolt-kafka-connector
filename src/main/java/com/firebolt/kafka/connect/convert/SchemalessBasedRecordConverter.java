@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect.convert;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import java.nio.ByteBuffer;
@@ -33,7 +34,7 @@ public class SchemalessBasedRecordConverter extends RecordConverter {
     }
 
     @Override
-    protected Map<String, KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
+    protected Map<String, ? extends KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
         Object value = record.value();
         if (value == null) {
             return handleNullValue(record);
@@ -46,7 +47,7 @@ public class SchemalessBasedRecordConverter extends RecordConverter {
         }
 
         Map<?, ?> source = (Map<?, ?>) value;
-        Map<String, KafkaMessageColumnValue> columnValues = new HashMap<>();
+        Map<String, SchemalessKafkaMessageColumnValue> columnValues = new HashMap<>();
 
         for (Map.Entry<?, ?> entry : source.entrySet()) {
             Object rawKey = entry.getKey();
@@ -57,64 +58,14 @@ public class SchemalessBasedRecordConverter extends RecordConverter {
             String fieldName = (String) rawKey;
             Object fieldValue = entry.getValue();
 
-            KafkaMessageColumnValue.KafkaMessageColumnValueBuilder builder = KafkaMessageColumnValue.builder()
-                    .value(fieldValue)
-                    .schemaType(inferSchemaType(fieldValue));
+            SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue = new SchemalessKafkaMessageColumnValue(fieldValue);
 
-            if (fieldValue instanceof List) {
-                builder.schemaSubType(inferArrayElementSchemaType((List<?>) fieldValue));
-            }
-
-            columnValues.put(fieldName, builder.build());
+            columnValues.put(fieldName, schemalessKafkaMessageColumnValue);
         }
 
         return columnValues;
     }
 
-    private Schema.Type inferSchemaType(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof String) {
-            return Schema.Type.STRING;
-        }
-        if (value instanceof Boolean) {
-            return Schema.Type.BOOLEAN;
-        }
-        if (value instanceof Integer) {
-            return Schema.Type.INT32;
-        }
-        if (value instanceof Long) {
-            return Schema.Type.INT64;
-        }
-        if (value instanceof Float) {
-            return Schema.Type.FLOAT32;
-        }
-        if (value instanceof Double) {
-            return Schema.Type.FLOAT64;
-        }
-        if (value instanceof byte[] || value instanceof ByteBuffer) {
-            return Schema.Type.BYTES;
-        }
-        if (value instanceof List) {
-            return Schema.Type.ARRAY;
-        }
-        if (value instanceof Map) {
-            return Schema.Type.MAP;
-        }
-        // Fallback: represent as string
-        return Schema.Type.STRING;
-    }
-
-    private Schema.Type inferArrayElementSchemaType(List<?> elements) {
-        for (Object e : elements) {
-            if (e == null) {
-                continue;
-            }
-            return inferSchemaType(e);
-        }
-        return null;
-    }
 }
 
 
