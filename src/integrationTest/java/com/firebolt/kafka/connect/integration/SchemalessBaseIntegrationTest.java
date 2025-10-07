@@ -23,7 +23,7 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
     /**
      * Centralized setup method for test resources.
-     * This method handles setup of Firebolt table, Kafka topic, schema registry, and Kafka Connect connector.
+     * This method handles setup of Firebolt table, Kafka topic, and Kafka Connect connector.
      *
      * @param topicName The name of the Kafka topic to create
      * @param tableName The name of the Firebolt table to create
@@ -38,7 +38,7 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
     /**
      * Centralized setup method for test resources.
-     * This method handles setup of Firebolt table, Kafka topic, schema registry, and Kafka Connect connector.
+     * This method handles setup of Firebolt table, Kafka topic, and Kafka Connect connector.
      *
      * @param topicName The name of the Kafka topic to create
      * @param tableName The name of the Firebolt table to create
@@ -76,7 +76,7 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
     /**
      * Centralized cleanup method for test resources.
-     * This method handles cleanup of connector, Firebolt table, Kafka topic, and schema registry.
+     * This method handles cleanup of connector, Firebolt table and Kafka topic
      *
      * @param tableName The name of the Firebolt table to drop
      * @param topicName The name of the Kafka topic to delete
@@ -146,7 +146,7 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
     /**
      * Initializes a Kafka producer for JSON Schema serialization with default null handling (nulls included).
-     * This method creates a producer configured for JSON Schema with proper schema registry integration.
+     * This method creates a producer configured to produce plain json
      *
      * @param <T> the type of the record values to be produced
      * @return a new KafkaProducer configured for JSON Schema serialization
@@ -157,7 +157,6 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
     /**
      * Initializes a Kafka producer for JSON Schema serialization with configurable null handling.
-     * This method creates a producer configured for JSON Schema with proper schema registry integration.
      *
      * @param <T> the type of the record values to be produced
      * @param includeNulls true to include null values in JSON serialization, false to omit them
