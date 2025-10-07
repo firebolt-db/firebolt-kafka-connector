@@ -1,7 +1,6 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
