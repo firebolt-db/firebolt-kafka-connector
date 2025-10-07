@@ -37,7 +37,7 @@ public abstract class RecordConverter {
      */
     public final FireboltRecord convert(SinkRecord record) throws RecordConversionException {
         // Delegate to specific implementation
-        Map<String, KafkaMessageColumnValue> columnValues = convertRecordValue(record);
+        Map<String, ? extends KafkaMessageColumnValue> columnValues = convertRecordValue(record);
 
         String tableName = config.getTableNameForTopic(record.topic());
 
@@ -63,7 +63,7 @@ public abstract class RecordConverter {
      * @return map of column names to values
      * @throws RecordConversionException if conversion fails
      */
-    protected abstract Map<String, KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException;
+    protected abstract Map<String, ? extends KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException;
 
     /**
      * Determines if this converter can handle the given record.
@@ -87,7 +87,7 @@ public abstract class RecordConverter {
      * @param record the SinkRecord with null value
      * @return empty map for null values
      */
-    protected final Map<String, KafkaMessageColumnValue> handleNullValue(SinkRecord record) {
+    protected final Map<String, ? extends KafkaMessageColumnValue> handleNullValue(SinkRecord record) {
         log.debug("Record value is null for topic={}, partition={}, offset={}",
                 record.topic(), record.kafkaPartition(), record.kafkaOffset());
         return new HashMap<>();

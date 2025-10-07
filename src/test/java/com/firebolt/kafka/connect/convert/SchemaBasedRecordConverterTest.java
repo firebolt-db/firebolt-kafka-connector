@@ -134,7 +134,7 @@ SchemaBasedRecordConverterTest {
         Object value = convertStringToType(fieldValue, schemaType);
         when(mockStruct.get("testField")).thenReturn(value);
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(1, result.size());
@@ -152,7 +152,7 @@ SchemaBasedRecordConverterTest {
         when(mockSinkRecord.valueSchema()).thenReturn(mockSchema);
         when(mockSchema.fields()).thenReturn(Collections.emptyList());
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -193,7 +193,7 @@ SchemaBasedRecordConverterTest {
         when(mockStruct.get("field2")).thenReturn(123);
         when(mockStruct.get("field3")).thenReturn(true);
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(3, result.size());
@@ -218,7 +218,7 @@ SchemaBasedRecordConverterTest {
         when(mockSchema.fields()).thenReturn(Collections.singletonList(mockField));
         when(mockStruct.get("nullField")).thenReturn(null);
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(1, result.size());
@@ -233,7 +233,7 @@ SchemaBasedRecordConverterTest {
         when(mockSinkRecord.kafkaPartition()).thenReturn(0);
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         assertTrue(result.isEmpty()); // handleNullValue returns empty map
@@ -267,7 +267,7 @@ SchemaBasedRecordConverterTest {
         when(mockSchema.fields()).thenReturn(Collections.singletonList(mockField));
         when(mockStruct.get("decimalField")).thenReturn(new byte[]{1, 2, 3});
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         KafkaMessageColumnValue columnValue = result.get("decimalField");
@@ -295,7 +295,7 @@ SchemaBasedRecordConverterTest {
         when(mockSchema.fields()).thenReturn(Collections.singletonList(mockField));
         when(mockStruct.get(fieldName)).thenReturn("test_value");
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         assertTrue(result.containsKey(fieldName));
@@ -321,7 +321,7 @@ SchemaBasedRecordConverterTest {
         when(mockSchema.fields()).thenReturn(Collections.singletonList(mockField));
         when(mockStruct.get("arrayField")).thenReturn(arrayValue);
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         KafkaMessageColumnValue columnValue = result.get("arrayField");
@@ -350,7 +350,7 @@ SchemaBasedRecordConverterTest {
         when(mockSchema.fields()).thenReturn(Collections.singletonList(mockField));
         when(mockStruct.get("timestampArrayField")).thenReturn(timestampArrayValue);
 
-        Map<String, KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
+        Map<String, ? extends KafkaMessageColumnValue> result = converter.convertRecordValue(mockSinkRecord);
 
         assertNotNull(result);
         KafkaMessageColumnValue columnValue = result.get("timestampArrayField");

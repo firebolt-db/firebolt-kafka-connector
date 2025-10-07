@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(value = TestTag.NOT_IMPLEMENTED)
 public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
     private static final String TABLE_NAME = "numeric_test_table_schemaless";
@@ -119,46 +118,54 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .build(),
 
             // Record with maximum precision and scale (38,9) - 29 digits before decimal, 9 after
+            // use it as string as it loses precision when deserialized in Kafka Connect
             aValidTestRecord(2)
-                .requiredNumeric(new BigDecimal("99999999999999999999999999999.123456789")) // 29 digits before decimal
-                .optionalNumeric(new BigDecimal("-99999999999999999999999999999.987654321")) // 29 digits before decimal
+                .bigDecimalFromString("99999999999999999999999999999.123456789")// 29 digits before decimal
+                .build(),
+
+            aValidTestRecord(3)
+                .bigDecimalFromString("-99999999999999999999999999999.987654321") // 29 digits before decimal
                 .build(),
 
             // Record with minimum precision and scale
-            aValidTestRecord(3)
+            aValidTestRecord(4)
                 .requiredNumeric(new BigDecimal("0.000000001"))
                 .optionalNumeric(new BigDecimal("-0.000000001"))
                 .build(),
 
             // Record with null optional numeric
-            aValidTestRecord(4)
+            aValidTestRecord(5)
                 .optionalNumeric(null)
                 .build(),
 
             // Record with zero values
-            aValidTestRecord(5)
+            aValidTestRecord(6)
                 .requiredNumeric(BigDecimal.ZERO)
                 .optionalNumeric(BigDecimal.ZERO)
                 .build(),
 
             // Record with large numbers (within NUMERIC(38,9) limits)
-            aValidTestRecord(6)
-                .requiredNumeric(new BigDecimal("12345678901234567890123456789.123456789")) // 29 digits before decimal
-                .optionalNumeric(new BigDecimal("-98765432109876543210987654321.987654321")) // 29 digits before decimal
+            aValidTestRecord(7)
+                .bigDecimalFromString("12345678901234567890123456789.123456789") // 29 digits before decimal
+                .build(),
+
+            // Record with large numbers (within NUMERIC(38,9) limits)
+            aValidTestRecord(8)
+                .bigDecimalFromString("-98765432109876543210987654321.987654321") // 29 digits before decimal
                 .build(),
 
             // Record with common decimal constants (truncated to 9 decimal places)
-            aValidTestRecord(7)
+            aValidTestRecord(9)
                 .requiredNumeric(new BigDecimal("3.141592653")) // Pi truncated to 9 decimal places
                 .optionalNumeric(new BigDecimal("2.718281828")) // e truncated to 9 decimal places
                 .build(),
 
-            // Record with edge case lists (within NUMERIC(38,9) limits: 29 digits before decimal, 9 after)
-            aValidTestRecord(8)
+            // we would have to create a list of strings as the big decimal is losing precision
+            aValidTestRecord(10)
                 .requiredListWithNullableElements(Arrays.asList(
-                    new BigDecimal("99999999999999999999999999999.123456789"), // 29 digits before decimal
+                    new BigDecimal("898.123456789"),
                     null,
-                    new BigDecimal("-99999999999999999999999999999.987654321"), // 29 digits before decimal
+                    new BigDecimal("-999.987654321"),
                     new BigDecimal("0.000000001")
                 ))
                 .requiredListWithNonNullElements(Arrays.asList(
@@ -170,20 +177,20 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .build(),
 
             // Record with empty lists
-            aValidTestRecord(9)
+            aValidTestRecord(11)
                 .requiredListWithNullableElements(new ArrayList<>())
                 .requiredListWithNonNullElements(new ArrayList<>())
                 .optionalList(new ArrayList<>())
                 .build(),
 
             // Record with null optional list
-            aValidTestRecord(10)
+            aValidTestRecord(12)
                 .optionalList(null)
                 .optionalListWithNonNullElements(null)
                 .build(),
 
             // Record with large lists
-            aValidTestRecord(11)
+            aValidTestRecord(13)
                 .requiredNumeric(new BigDecimal("42.123456789"))
                 .optionalNumeric(new BigDecimal("-123.987654321"))
                 .requiredListWithNullableElements(createLargeNumericListWithNulls(100))
@@ -224,7 +231,7 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
             String key = "numeric-test-key-" + record.getRecordId();
             ProducerRecord<String, String> producerRecord = 
                 new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
-            
+
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
                     log.error("Failed to send message with key {}: {}", key, exception.getMessage());

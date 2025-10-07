@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect;
 
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
+import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeColumnFactoryProvider;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
@@ -150,7 +151,8 @@ public class InsertPreparedStatement {
                 if (value == null || value.getValue() == null) {
                     stmt.setNull(parameterIndex, column.getSqlType());
                 } else {
-                    ColumnDataTypeConverter columnDataTypeConverter = ColumnDataTypeConverterFactory.getInstance().getConverter(column);
+                    boolean isSchemaless = value instanceof SchemalessKafkaMessageColumnValue;
+                    ColumnDataTypeConverter columnDataTypeConverter = ColumnDataTypeColumnFactoryProvider.getInstance(isSchemaless).getConverter(column);
                     try {
                         columnDataTypeConverter.convertAndSet(stmt, parameterIndex, value, column);
                     } catch (ColumnConversionFailedException e) {

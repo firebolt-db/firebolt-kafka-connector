@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(value = TestTag.NOT_IMPLEMENTED)
 public class TextSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
     private static final String TABLE_NAME = "text_test_table_schemaless";
@@ -210,7 +209,6 @@ public class TextSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
             String key = "text-test-key-" + record.getRecordId();
             ProducerRecord<String, String> producerRecord = 
                 new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
-            
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
                     log.error("Failed to send message with key {}: {}", key, exception.getMessage());
