@@ -27,6 +27,7 @@ public class RecordConverterFactory {
 
         // Register converters in order of preference
         converters.add(new SchemaBasedRecordConverter(config));
+        converters.add(new SchemalessBasedRecordConverter(config));
 
         log.info("Initialized RecordConverterFactory with {} converters", converters.size());
         for (RecordConverter converter : converters) {
