@@ -310,7 +310,7 @@ public class TextSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
             String key = "text-test-key-" + record.getRecordId();
             ProducerRecord<String, String> producerRecord = 
                 new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
-            
+            System.out.println(mapper.writeValueAsString(record));
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
                     log.error("Failed to send message with key {}: {}", key, exception.getMessage());

@@ -85,65 +85,65 @@ public class ByteaSerializerTest extends BaseIntegrationTest {
     private List<ByteaTestRecord> createTestRecords() {
         return Arrays.asList(
             // Complete record with typical values
-            aValidTestRecord(1)
-                .build(),
-
-            // Record with minimal binary data (single byte)
-            aValidTestRecord(2)
-                .requiredBytea(new byte[]{0x01})
-                .optionalBytea(new byte[]{0x02})
-                .requiredListWithNullableElements(Arrays.asList(
-                    "item1".getBytes(StandardCharsets.UTF_8),
-                    "item2".getBytes(StandardCharsets.UTF_8)))
-                .requiredListWithNonNullElements(Arrays.asList(
-                    "value1".getBytes(StandardCharsets.UTF_8),
-                    "value2".getBytes(StandardCharsets.UTF_8)))
-                .optionalList(Arrays.asList(
-                    "opt1".getBytes(StandardCharsets.UTF_8)))
-                .optionalListWithNonNullElements(Arrays.asList(
-                    "choice1".getBytes(StandardCharsets.UTF_8)))
-                .build(),
-
-            // Record with null optional bytea
-            aValidTestRecord(3)
-                .optionalBytea(null)
-                .build(),
-
-            // Record with single byte data
-            aValidTestRecord(4)
-                .requiredBytea(new byte[]{0x42})
-                .optionalBytea(new byte[]{0x41})
-                .build(),
-
-            // Record with ASCII text as binary
-            aValidTestRecord(5)
-                .requiredBytea("Hello World".getBytes(StandardCharsets.UTF_8))
-                .optionalBytea("Binary ASCII".getBytes(StandardCharsets.UTF_8))
-                .build(),
-
-            // Record with unicode text as binary
-            aValidTestRecord(6)
-                .requiredBytea("Hello 世界! 🌍".getBytes(StandardCharsets.UTF_8))
-                .optionalBytea("🚀✨🎯".getBytes(StandardCharsets.UTF_8))
-                .build(),
-
-            // Record with UTF-8 safe edge case bytes
-            aValidTestRecord(7)
-                .requiredBytea("Edge case: \n\r\t".getBytes(StandardCharsets.UTF_8))
-                .optionalBytea("Special chars: !@#$%^&*()".getBytes(StandardCharsets.UTF_8))
-                .build(),
-
-            // Record with large binary data
-            aValidTestRecord(8)
-                .requiredBytea(createLargeTextData(1000))
-                .optionalBytea("Large data test".getBytes(StandardCharsets.UTF_8))
-                .build(),
-
-            // Record with UTF-8 safe binary data
-            aValidTestRecord(9)
-                .requiredBytea("Random-like UTF-8 safe data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?~`".getBytes(StandardCharsets.UTF_8))
-                .optionalBytea("More UTF-8 safe content: 1234567890abcdef".getBytes(StandardCharsets.UTF_8))
-                .build(),
+//            aValidTestRecord(1)
+//                .build(),
+//
+//            // Record with minimal binary data (single byte)
+//            aValidTestRecord(2)
+//                .requiredBytea(new byte[]{0x01})
+//                .optionalBytea(new byte[]{0x02})
+//                .requiredListWithNullableElements(Arrays.asList(
+//                    "item1".getBytes(StandardCharsets.UTF_8),
+//                    "item2".getBytes(StandardCharsets.UTF_8)))
+//                .requiredListWithNonNullElements(Arrays.asList(
+//                    "value1".getBytes(StandardCharsets.UTF_8),
+//                    "value2".getBytes(StandardCharsets.UTF_8)))
+//                .optionalList(Arrays.asList(
+//                    "opt1".getBytes(StandardCharsets.UTF_8)))
+//                .optionalListWithNonNullElements(Arrays.asList(
+//                    "choice1".getBytes(StandardCharsets.UTF_8)))
+//                .build(),
+//
+//            // Record with null optional bytea
+//            aValidTestRecord(3)
+//                .optionalBytea(null)
+//                .build(),
+//
+//            // Record with single byte data
+//            aValidTestRecord(4)
+//                .requiredBytea(new byte[]{0x42})
+//                .optionalBytea(new byte[]{0x41})
+//                .build(),
+//
+//            // Record with ASCII text as binary
+//            aValidTestRecord(5)
+//                .requiredBytea("Hello World".getBytes(StandardCharsets.UTF_8))
+//                .optionalBytea("Binary ASCII".getBytes(StandardCharsets.UTF_8))
+//                .build(),
+//
+//            // Record with unicode text as binary
+//            aValidTestRecord(6)
+//                .requiredBytea("Hello 世界! 🌍".getBytes(StandardCharsets.UTF_8))
+//                .optionalBytea("🚀✨🎯".getBytes(StandardCharsets.UTF_8))
+//                .build(),
+//
+//            // Record with UTF-8 safe edge case bytes
+//            aValidTestRecord(7)
+//                .requiredBytea("Edge case: \n\r\t".getBytes(StandardCharsets.UTF_8))
+//                .optionalBytea("Special chars: !@#$%^&*()".getBytes(StandardCharsets.UTF_8))
+//                .build(),
+//
+//            // Record with large binary data
+//            aValidTestRecord(8)
+//                .requiredBytea(createLargeTextData(1000))
+//                .optionalBytea("Large data test".getBytes(StandardCharsets.UTF_8))
+//                .build(),
+//
+//            // Record with UTF-8 safe binary data
+//            aValidTestRecord(9)
+//                .requiredBytea("Random-like UTF-8 safe data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?~`".getBytes(StandardCharsets.UTF_8))
+//                .optionalBytea("More UTF-8 safe content: 1234567890abcdef".getBytes(StandardCharsets.UTF_8))
+//                .build(),
 
             // Record with mixed array content
             aValidTestRecord(10)

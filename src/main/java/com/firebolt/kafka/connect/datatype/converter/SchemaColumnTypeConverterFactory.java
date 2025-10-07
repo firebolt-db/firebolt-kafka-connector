@@ -33,18 +33,18 @@ public class SchemaColumnTypeConverterFactory implements ColumnDataTypeConverter
 
     public SchemaColumnTypeConverterFactory() {
         this(
-                new SchemalessIntegerDataTypeConverter(),
-                new SchemalessArrayDataTypeConverter(),
-                new SchemalessTimestampDataTypeConverter(),
-                new SchemalessTimestamptzDataTypeConverter(),
-                new SchemalessDecimalDataTypeConverter(),
-                new SchemalessBigIntDataTypeConverter(),
-                new SchemalessRealDataTypeConverter(),
-                new SchemalessDoubleDataTypeConverter(),
-                new SchemalessTextDataTypeConverter(),
-                new SchemalessDateDataTypeConverter(),
-                new SchemalessByteaDataTypeConverter(),
-                new SchemalessBooleanDataTypeConverter()
+                new IntegerDataTypeConverter(),
+                new ArrayDataTypeConverter(),
+                new TimestampDataTypeConverter(),
+                new TimestamptzDataTypeConverter(),
+                new DecimalDataTypeConverter(),
+                new BigIntDataTypeConverter(),
+                new RealDataTypeConverter(),
+                new DoubleDataTypeConverter(),
+                new TextDataTypeConverter(),
+                new DateDataTypeConverter(),
+                new ByteaDataTypeConverter(),
+                new BooleanDataTypeConverter()
         );
     }
 

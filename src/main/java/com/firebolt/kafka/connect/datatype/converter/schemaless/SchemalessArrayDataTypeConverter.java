@@ -146,7 +146,8 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
 
     private byte[] asBytea(Object o) {
         if (o instanceof String) {
-            return ((String) o).getBytes();
+            // empty array will be desrialized as ""
+            return "".equals(o) ? "\\x".getBytes() : ((String) o).getBytes();
         }
 
         byte[] array = (o instanceof byte[]) ? (byte[]) o : ((ByteBuffer) o).array();
