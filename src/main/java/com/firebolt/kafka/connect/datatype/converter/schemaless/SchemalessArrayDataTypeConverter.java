@@ -15,6 +15,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -166,14 +167,7 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
 
     private Array createTimestamptzArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         List<Object> elements = (List) kafkaMessageColumnValue.getValue();
-
-        if (kafkaMessageColumnValue.getValue() instanceof Long) {
-            return connection.createArrayOf(TIMESTAMPTZ_ARRAY_TYPE_NAME, elements.stream().map(objectValue -> TimestampUtil.asOffsetDateTime((Long) objectValue)).toArray());
-        } else if (kafkaMessageColumnValue.getValue() instanceof String) {
-            return connection.createArrayOf("string", elements.stream().map(this::asStringTimestamptz).toArray());
-        }
-
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the timestamptz array to firebolt column");
+        return connection.createArrayOf("string", elements.stream().map(this::asStringTimestamptz).toArray());
     }
 
     private String asStringTimestamp(Object arrayElement) {
@@ -192,13 +186,19 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
         throw new ColumnConversionFailedException("","", "failed to convert string as timestamp");
     }
 
-    private Object asStringTimestamptz(Object arrayElement) {
+    private String asStringTimestamptz(Object arrayElement) {
         if (arrayElement == null) {
             return null;
         }
 
         if (arrayElement instanceof String && FireboltTimestamptzConverter.isValidTimestamptz((String) arrayElement)) {
-            return arrayElement;
+            return (String) arrayElement;
+        }
+
+        if (arrayElement instanceof Number) {
+            long millisFromEpoch = ((Number) arrayElement).longValue();
+            OffsetDateTime offsetDateTime = TimestampUtil.asOffsetDateTime(millisFromEpoch);
+            return offsetDateTime.toInstant().toString();
         }
 
         throw new ColumnConversionFailedException("","", "failed to convert string as timestamptz");

@@ -25,8 +25,9 @@ public class SchemalessTimestamptzDataTypeConverter extends TimestamptzDataTypeC
             }
         }
 
-        if (value instanceof Long) {
-            OffsetDateTime offsetDateTime = TimestampUtil.asOffsetDateTime((Long) kafkaMessageColumnValue.getValue());
+        if (value instanceof Number) {
+            long millisFromEpoch = ((Number) kafkaMessageColumnValue.getValue()).longValue();
+            OffsetDateTime offsetDateTime = TimestampUtil.asOffsetDateTime(millisFromEpoch);
             statement.setObject(paramIndex, offsetDateTime);
             return;
         }
