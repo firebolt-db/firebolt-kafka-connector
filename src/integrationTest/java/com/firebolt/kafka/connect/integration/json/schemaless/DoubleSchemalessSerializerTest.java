@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(value = TestTag.NOT_IMPLEMENTED)
 public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "double_test_table";
-    private static final String TOPIC_NAME = "double-test-topic";
+    private static final String TABLE_NAME = "double_test_table_schemaless";
+    private static final String TOPIC_NAME = "double-test-topic-schemaless";
 
     private Producer<String, String> producer;
 

@@ -35,8 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(value = TestTag.NOT_IMPLEMENTED)
 public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TOPIC_NAME = "timestamptz-test-topic";
-    private static final String TABLE_NAME = "timestamptz_test_table";
+    private static final String TOPIC_NAME = "timestamptz-test-topic-schemaless";
+    private static final String TABLE_NAME = "timestamptz_test_table_schemaless";
     private Producer<String, String> producer;
 
     @BeforeEach

@@ -37,8 +37,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DateSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
-    private static final String TOPIC_NAME = "date-test-topic";
-    private static final String TABLE_NAME = "date_test_table";
+    private static final String TOPIC_NAME = "date-test-topic-schemaless";
+    private static final String TABLE_NAME = "date_test_table_schemaless";
     private Producer<String, String> producer;
 
     @BeforeEach

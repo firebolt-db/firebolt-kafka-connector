@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(value = TestTag.NOT_IMPLEMENTED)
 public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "boolean_test_table";
-    private static final String TOPIC_NAME = "boolean-test-topic";
+    private static final String TABLE_NAME = "boolean_test_table_schemaless";
+    private static final String TOPIC_NAME = "boolean-test-topic-schemaless";
 
     private Producer<String, String> producer;
 
