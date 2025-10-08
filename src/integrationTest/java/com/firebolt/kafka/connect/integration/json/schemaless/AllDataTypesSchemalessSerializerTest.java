@@ -36,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for json schema less connector
  */
 @Slf4j
-//@Tag(value = TestTag.NOT_IMPLEMENTED)
 public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
     // All data types test constants
