@@ -161,14 +161,7 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
 
     private Array createTimestampArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         List<Object> elements = (List) kafkaMessageColumnValue.getValue();
-
-        if (kafkaMessageColumnValue.getValue() instanceof Long) {
-            return connection.createArrayOf(TIMESTAMP_ARRAY_TYPE_NAME, elements.stream().map(this::asStringTimestamp).toArray());
-        } else if (kafkaMessageColumnValue.getValue() instanceof String) {
-            return connection.createArrayOf("string", elements.toArray());
-        }
-
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the timestamp array to firebolt column");
+        return connection.createArrayOf("string", elements.stream().map(this::asStringTimestamp).toArray());
     }
 
     private Array createTimestamptzArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -183,15 +176,16 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
         throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the timestamptz array to firebolt column");
     }
 
-    private Object asStringTimestamp(Object arrayElement) {
+    private String asStringTimestamp(Object arrayElement) {
         if (arrayElement == null) {
             return null;
         }
 
-        if (arrayElement instanceof java.util.Date) {
-            return new Timestamp(((java.util.Date) arrayElement).getTime());
-        } else if (arrayElement instanceof Long) {
-            return TimestampUtil.asTimestamp((Long) arrayElement);
+        if (arrayElement instanceof String) {
+            return (String) arrayElement;
+        } else if (arrayElement instanceof Number) {
+            long millisFromEpoch =((Number) arrayElement).longValue();
+            return TimestampUtil.asTimestamp(millisFromEpoch).toInstant().toString();
         }
 
 

@@ -17,12 +17,6 @@ public class SchemalessTimestampDataTypeConverter extends TimestampDataTypeConve
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         Object value = kafkaMessageColumnValue.getValue();
-        if (value instanceof Date) {
-            Date date = (Date) kafkaMessageColumnValue.getValue();
-            statement.setTimestamp(paramIndex, new Timestamp(date.getTime()));
-            return;
-        }
-
         if (value instanceof String) {
             String dateTimeAsString = (String) kafkaMessageColumnValue.getValue();
             if (FireboltTimestampConverter.isIsoLocalDateTime(dateTimeAsString)) {
@@ -32,8 +26,9 @@ public class SchemalessTimestampDataTypeConverter extends TimestampDataTypeConve
             throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "String value cannot be converted to a timestamp column in firebolt as it is not an ISO local ");
         }
 
-        if (value instanceof Long) {
-            Timestamp timestamp = TimestampUtil.asTimestamp((Long) kafkaMessageColumnValue.getValue());
+        if (value instanceof Number) {
+            long millisFromEpoch = ((Number) kafkaMessageColumnValue.getValue()).longValue();
+            Timestamp timestamp = TimestampUtil.asTimestamp(millisFromEpoch);
             statement.setTimestamp(paramIndex, timestamp);
             return;
         }
