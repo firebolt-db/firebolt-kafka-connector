@@ -14,6 +14,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -141,7 +142,6 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
 
         // empty byte array will be serialized as empty string in kafka connect. In firebolt and empty byte is represented by \x
         return connection.createArrayOf(BYTEA_ARRAY_TYPE_NAME, elements.stream().map(objectValue -> objectValue == null ? null :asBytea(objectValue)).toArray());
-
     }
 
     private byte[] asBytea(Object o) {
@@ -156,12 +156,7 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
 
     private Array createDateArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         List<Object> elements = (List) kafkaMessageColumnValue.getValue();
-
-        if (kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING || kafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT32) {
-            return connection.createArrayOf(DATE_ARRAY_TYPE_NAME, elements.stream().map(this::asStringDate).toArray());
-        }
-
-        throw new ColumnConversionFailedException(fireboltColumn.getName(), fireboltColumn.getDataType(), "Failed to convert the date array to firebolt column");
+        return connection.createArrayOf(DATE_ARRAY_TYPE_NAME, elements.stream().map(this::asStringDate).toArray());
     }
 
     private Array createTimestampArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -220,8 +215,10 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
             return null;
         }
 
-        if (arrayElement instanceof java.util.Date) {
-            return new Date(((java.util.Date) arrayElement).getTime());
+        if (arrayElement instanceof Number) {
+            int numberOfDaysFromEpoch = ((Number) arrayElement).intValue();
+            LocalDate localDate = LocalDate.ofEpochDay(numberOfDaysFromEpoch);
+            return Date.valueOf(localDate);
         }
 
         if (arrayElement instanceof String && isIsoLocalDate((String) arrayElement)) {
