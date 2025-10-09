@@ -178,6 +178,12 @@ processResources {
     }
 }
 
+// Publish sources jar for releases
+tasks.register('sourcesJar', Jar) {
+    archiveClassifier.set('sources')
+    from sourceSets.main.allSource
+}
+
 // Configure test suites explicitly to avoid deprecation warnings
 testing {
     suites {

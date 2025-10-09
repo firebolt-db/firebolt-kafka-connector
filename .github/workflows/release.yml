@@ -1,0 +1,142 @@
+name: Release new version
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to publish'
+        type: string
+        required: true
+        
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag_name}}
+
+jobs:
+  pre-release-testing:
+     uses: ./.github/workflows/pre-release-test.yml
+     secrets: inherit
+
+  bump-version:
+    needs: pre-release-testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Bump version in gradle.properties
+        run: |
+          newVersion=$(echo $newVersion | sed 's/^v//')
+          sed -i.bak "s/^version=.*/version=$newVersion/" gradle.properties
+          rm gradle.properties.bak
+
+      - name: Setup git config
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+
+      - name: Commit version bump
+        run: |
+          git add gradle.properties
+          git commit -m "chore: Bump version to $newVersion"
+
+      - name: Tag version
+        run: |
+          tag="${RELEASE_TAG}"
+          git tag "$tag"
+          git push origin "$tag"
+
+      - name: Push changes
+        run: |
+          git push origin master
+
+  build:
+    needs: bump-version
+    uses: ./.github/workflows/build.yml
+    with:
+      buildArtifacts: true
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+        with:
+          branch: ${{ github.event.inputs.tag_name }}
+
+      - name: Download uber-jar
+        uses: actions/download-artifact@v4.1.7
+        with:
+          name: ${{ needs.build.outputs.uber-jar }}
+          path: uber-jar
+      - name: Download sources-jar
+        uses: actions/download-artifact@v4.1.7
+        with:
+          name: ${{ needs.build.outputs.sources-jar }}
+          path: sources-jar
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Workspace contents:"
+          ls -la
+          echo "uber-jar contents:"
+          ls -la uber-jar || true
+          echo "sources-jar contents:"
+          ls -la sources-jar || true
+
+      # e6ac9c2ff1018fca4464bf2480155faeb66f9bdb == v1.6.1
+      - uses: xresloader/upload-to-github-release@e6ac9c2ff1018fca4464bf2480155faeb66f9bdb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          file: "uber-jar/**/*.jar;sources-jar/**/*.jar"
+          tags: true
+          draft: false
+          tag_name: ${{ env.RELEASE_TAG }}
+
+      - name: Generate and update GitHub release notes
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const tag = `${{ env.RELEASE_TAG }}`;
+            const { owner, repo } = context.repo;
+            // Fetch existing release by tag (created earlier by upload step)
+            const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+            // Generate notes based on PRs/commits between last release and this tag
+            const notes = await github.rest.repos.generateReleaseNotes({ owner, repo, tag_name: tag });
+            // Sanitize internal JIRA links: [FIR-1234](...) -> `FIR-1234`, and wrap bare FIR-1234 in backticks
+            let body = notes.data.body || '';
+            body = body.replace(/\[(FIR-\d+)\]\([^)]*\)/g, '`$1`');
+            body = body.replace(/(?<!`)\bFIR-\d+\b(?!`)/g, (m) => `\`${m}\``);
+            // Update the release body with sanitized notes
+            await github.rest.repos.updateRelease({ owner, repo, release_id: release.data.id, body });
+
+      - name: Derive release version
+        id: release_version
+        run: |
+          ver=$(echo "${RELEASE_TAG}" | sed 's/^v//')
+          echo "value=$ver" >> $GITHUB_OUTPUT
+
+  notify:
+    needs: publish
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # convert the comma separated values into a json
+        channel: ${{ fromJson(vars.RELEASE_NOTES_SLACK_CHANNELS) }}
+    steps:
+      - run: test -n "${{ secrets.SLACK_BOT_TOKEN }}" || (echo "SLACK_BOT_TOKEN is empty" && exit 1)
+
+      - name: Notify Slack of Kafka Sink Connector
+        # 91efab103c0de0a537f72a35f6b8cda0ee76bf0a is v2.1.1
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            channel: ${{ matrix.channel }}
+            text: "Firebolt Sink Connector ${{ steps.release_version.outputs.value }} has been released: <https://github.com/${{ github.repository }}/releases/tag/${{ env.RELEASE_TAG }}|Release notes>"
