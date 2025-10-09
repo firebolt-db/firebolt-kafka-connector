@@ -20,12 +20,25 @@ public class SchemalessRealDataTypeConverter extends RealDataTypeConverter {
             return;
         }
 
-        if (value instanceof Number) {
-            float f = ((Number) value).floatValue();
-            statement.setFloat(paramIndex, f);
-            return;
+        // integers are deserialized as longs
+        if (value instanceof Long) {
+            Long longValue = (Long) value;
+            if (longValue >= Integer.MIN_VALUE || longValue <= Integer.MAX_VALUE) {
+                float f = (longValue).floatValue();
+                statement.setFloat(paramIndex, f);
+                return;
+            }
         }
 
+        // floating numbers are deserialized as Double
+        if (value instanceof Double) {
+            Double doubleValue = (Double) value;
+            if (doubleValue >= Integer.MIN_VALUE || doubleValue <= Integer.MAX_VALUE) {
+                float f = (doubleValue).floatValue();
+                statement.setFloat(paramIndex, f);
+                return;
+            }
+        }
 
         if (value instanceof String) {
             String s = (String) value;

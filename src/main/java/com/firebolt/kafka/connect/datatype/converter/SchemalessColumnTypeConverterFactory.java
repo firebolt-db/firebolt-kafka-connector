@@ -3,7 +3,6 @@ package com.firebolt.kafka.connect.datatype.converter;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessArrayDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBigIntDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBooleanDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessByteaDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDateDataTypeConverter;
@@ -27,7 +26,7 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
     private SchemalessTimestamptzDataTypeConverter timestamptzDataTypeConverter;
     private SchemalessDateDataTypeConverter dateDataTypeConverter;
     private SchemalessDecimalDataTypeConverter decimalDataTypeConverter;
-    private SchemalessBigIntDataTypeConverter bigIntDataTypeConverter;
+    private BigIntDataTypeConverter bigIntDataTypeConverter;
     private SchemalessRealDataTypeConverter realDataTypeConverter;
     private SchemalessDoubleDataTypeConverter doubleDataTypeConverter;
     private SchemalessTextDataTypeConverter textDataTypeConverter;
@@ -42,7 +41,7 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                 new SchemalessTimestamptzDataTypeConverter(),
                 new SchemalessDateDataTypeConverter(),
                 new SchemalessDecimalDataTypeConverter(),
-                new SchemalessBigIntDataTypeConverter(),
+                new BigIntDataTypeConverter(),
                 new SchemalessRealDataTypeConverter(),
                 new SchemalessDoubleDataTypeConverter(),
                 new SchemalessTextDataTypeConverter(),
@@ -58,7 +57,7 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                                          SchemalessTimestamptzDataTypeConverter timestamptzDataTypeConverter,
                                          SchemalessDateDataTypeConverter dateDataTypeConverter,
                                          SchemalessDecimalDataTypeConverter decimalDataTypeConverter,
-                                         SchemalessBigIntDataTypeConverter bigIntDataTypeConverter,
+                                         BigIntDataTypeConverter bigIntDataTypeConverter,
                                          SchemalessRealDataTypeConverter realDataTypeConverter,
                                          SchemalessDoubleDataTypeConverter doubleDataTypeConverter,
                                          SchemalessTextDataTypeConverter textDataTypeConverter,

@@ -48,6 +48,34 @@ public class SchemalessIntegerDataTypeConverterTest {
         assertThrows(ColumnConversionFailedException.class,
             () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
     }
+
+    @Test
+    void convertsMinBoundaryLong() throws SQLException {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value((long) Integer.MIN_VALUE).build();
+        converter.convertAndSet(mockStatement, 1, value, testColumn);
+        verify(mockStatement).setInt(1, Integer.MIN_VALUE);
+    }
+
+    @Test
+    void convertsMaxBoundaryLong() throws SQLException {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value((long) Integer.MAX_VALUE).build();
+        converter.convertAndSet(mockStatement, 1, value, testColumn);
+        verify(mockStatement).setInt(1, Integer.MAX_VALUE);
+    }
+
+    @Test
+    void nonNumericTypeThrows() {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(12.34d).build();
+        assertThrows(ColumnConversionFailedException.class,
+            () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
+    }
+
+    @Test
+    void nullValueThrows() {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(null).build();
+        assertThrows(ColumnConversionFailedException.class,
+            () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
+    }
 }
 
 

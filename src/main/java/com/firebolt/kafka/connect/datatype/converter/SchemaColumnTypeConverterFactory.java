@@ -3,18 +3,6 @@ package com.firebolt.kafka.connect.datatype.converter;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.google.common.annotations.VisibleForTesting;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessArrayDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBigIntDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBooleanDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessByteaDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDateDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDecimalDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDoubleDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessIntegerDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessRealDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTextDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTimestampDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTimestamptzDataTypeConverter;
 
 public class SchemaColumnTypeConverterFactory implements ColumnDataTypeConverterFactory {
 

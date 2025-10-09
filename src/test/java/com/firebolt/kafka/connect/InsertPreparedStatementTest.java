@@ -1,7 +1,7 @@
 package com.firebolt.kafka.connect;
 
 import com.firebolt.jdbc.exception.ExceptionType;
-import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeColumnFactoryProvider;
+import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeFactoryProvider;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -177,8 +177,8 @@ public class InsertPreparedStatementTest {
         validColumnNames.put(COLUMN_NAME_1, "id");
         validColumnNames.put(COLUMN_NAME_2, "NAME");
 
-        try (MockedStatic<ColumnDataTypeColumnFactoryProvider> factoryStatic = Mockito.mockStatic(ColumnDataTypeColumnFactoryProvider.class)) {
-            factoryStatic.when(() -> ColumnDataTypeColumnFactoryProvider.getInstance(false)).thenReturn(mockFactory);
+        try (MockedStatic<ColumnDataTypeFactoryProvider> factoryStatic = Mockito.mockStatic(ColumnDataTypeFactoryProvider.class)) {
+            factoryStatic.when(() -> ColumnDataTypeFactoryProvider.getInstance(false)).thenReturn(mockFactory);
 
             // Use reflection to invoke private setStatementParameters and verify it throws RecordConversionFailedException
             java.lang.reflect.Method method = InsertPreparedStatement.class.getDeclaredMethod(

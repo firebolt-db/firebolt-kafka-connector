@@ -13,10 +13,14 @@ public class SchemalessIntegerDataTypeConverter extends IntegerDataTypeConverter
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         Object value = kafkaMessageColumnValue.getValue();
 
-        if (value instanceof Number) {
-            int intValue = ((Number) value).intValue();
-            statement.setInt(paramIndex, intValue);
-            return;
+        // all ints are converted to long
+        if (value instanceof Long) {
+            Long longValue = (Long) value;
+            if (longValue >= Integer.MIN_VALUE || longValue<= Integer.MAX_VALUE) {
+                // then we can convert to int
+                statement.setInt(paramIndex, longValue.intValue());
+                return;
+            }
         }
 
         if (value instanceof String) {

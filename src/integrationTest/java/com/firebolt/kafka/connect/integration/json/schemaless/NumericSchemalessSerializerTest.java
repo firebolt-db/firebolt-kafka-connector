@@ -197,8 +197,13 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .requiredListWithNonNullElements(createLargeNumericListWithoutNulls(100))
                 .optionalList(createOptionalLargeNumericList(100))
                 .optionalListWithNonNullElements(createOptionalLargeNumericList(50))
-                .build()
-        );
+                .build(),
+                // Record with large numbers (within NUMERIC(38,9) limits)
+
+            aValidTestRecord(14)
+                    .bigDecimalFromString("1234.123456789012345678901234567890123") // 33 digits after the  decimal
+                    .build()
+            );
     }
     
     /**

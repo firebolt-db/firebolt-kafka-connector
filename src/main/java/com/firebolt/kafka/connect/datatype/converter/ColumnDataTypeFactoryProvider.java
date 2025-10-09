@@ -1,20 +1,20 @@
 package com.firebolt.kafka.connect.datatype.converter;
 
-public class ColumnDataTypeColumnFactoryProvider {
+public class ColumnDataTypeFactoryProvider {
 
-    private static ColumnDataTypeColumnFactoryProvider instance;
+    private static ColumnDataTypeFactoryProvider instance;
 
     private SchemaColumnTypeConverterFactory schemaColumnTypeConverterFactory;
     private SchemalessColumnTypeConverterFactory schemalessColumnTypeConverterFactory;
 
-    private ColumnDataTypeColumnFactoryProvider() {
+    private ColumnDataTypeFactoryProvider() {
         this.schemaColumnTypeConverterFactory = new SchemaColumnTypeConverterFactory();
         this.schemalessColumnTypeConverterFactory = new SchemalessColumnTypeConverterFactory();
     }
 
     public static ColumnDataTypeConverterFactory getInstance(boolean isSchemaless) {
         if (instance == null) {
-            instance = new ColumnDataTypeColumnFactoryProvider();
+            instance = new ColumnDataTypeFactoryProvider();
         }
 
         return isSchemaless ? instance.schemalessColumnTypeConverterFactory : instance.schemaColumnTypeConverterFactory;

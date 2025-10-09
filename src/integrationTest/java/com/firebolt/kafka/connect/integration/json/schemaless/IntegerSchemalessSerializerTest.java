@@ -86,23 +86,30 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .build();
         IntegerTestRecord validRecord2 = aValidTestRecord(202)
                 .build();
-        IntegerTestRecord invalidRecord1 = aValidTestRecord(203)
+        IntegerTestRecord validRecord3 = aValidTestRecord(203)
+                .build();
+        IntegerTestRecord invalidRecord1 = aValidTestRecord(204)
                 .integerFromString("abc")
                 .build();
-        IntegerTestRecord invalidRecord2 = aValidTestRecord(204)
+        IntegerTestRecord invalidRecord2 = aValidTestRecord(205)
                 .integerFromString("1.23")
+                .build();
+        IntegerTestRecord invalidRecord3 = aValidTestRecord(206)
+                .integerFromString(Long.toString((long)Integer.MAX_VALUE + 100000))
                 .build();
 
         List<IntegerTestRecord> testRecords = List.of(
                 validRecord1,
                 invalidRecord1,
                 validRecord2,
-                invalidRecord2
+                invalidRecord2,
+                invalidRecord3,
+                validRecord3
         );
 
         publishMessages(testRecords);
 
-        List<IntegerTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
+        List<IntegerTestRecord> expectedRecords = List.of(validRecord1, validRecord2, validRecord3);
         waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
 
         verifyIntegerRecordsInFirebolt(expectedRecords);

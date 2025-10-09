@@ -52,8 +52,8 @@ public class SchemalessBasedRecordConverter extends RecordConverter {
         for (Map.Entry<?, ?> entry : source.entrySet()) {
             Object rawKey = entry.getKey();
             if (!(rawKey instanceof String)) {
-                // Skip non-string keys; schemaless JSON objects should use string keys
-                continue;
+                log.warn("There is a key {} that has the class type non-string {}", rawKey, rawKey.getClass());
+                throw new RecordConversionException("Only support for string as key of the kafka message");
             }
             String fieldName = (String) rawKey;
             Object fieldValue = entry.getValue();

@@ -48,6 +48,34 @@ public class SchemalessRealDataTypeConverterTest {
         assertThrows(ColumnConversionFailedException.class,
             () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
     }
+
+    @Test
+    void acceptsFloatValueUsesString() throws SQLException {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(Float.MAX_VALUE).build();
+        converter.convertAndSet(mockStatement, 1, value, testColumn);
+        verify(mockStatement).setString(1, String.valueOf(Float.MAX_VALUE));
+    }
+
+    @Test
+    void convertsLongWithinFloatRange() throws SQLException {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(100L).build();
+        converter.convertAndSet(mockStatement, 1, value, testColumn);
+        verify(mockStatement).setFloat(1, 100.0f);
+    }
+
+    @Test
+    void nullValueThrows() {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(null).build();
+        assertThrows(ColumnConversionFailedException.class,
+            () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
+    }
+
+    @Test
+    void nonNumericTypeThrows() {
+        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(true).build();
+        assertThrows(ColumnConversionFailedException.class,
+            () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
+    }
 }
 
 

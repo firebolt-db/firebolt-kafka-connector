@@ -169,6 +169,7 @@ public class RealSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
                 .requiredListWithNonNullElements(Arrays.asList(19.99f, 39.95f, 59.00f, 79.25f))
                 .build()
 
+                // uncomment these tests or remove them ( https://packboard.atlassian.net/browse/FIR-49832)
 //            // Record with actual Float.MIN_VALUE (smallest positive non-zero)
 //            aValidTestRecord(6)
 //                .requiredReal(Float.MIN_VALUE)
