@@ -167,33 +167,31 @@ public class RealSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
                 .optionalReal(-987654.32f)
                 .requiredListWithNullableElements(Arrays.asList(99.99f, null, 149.95f, null, 29.50f))
                 .requiredListWithNonNullElements(Arrays.asList(19.99f, 39.95f, 59.00f, 79.25f))
-                .build()
+                .build(),
 
-                // uncomment these tests or remove them ( https://packboard.atlassian.net/browse/FIR-49832)
-//            // Record with actual Float.MIN_VALUE (smallest positive non-zero)
-//            aValidTestRecord(6)
-//                .requiredReal(Float.MIN_VALUE)
-//                .optionalReal(Float.MIN_VALUE)
-//                .requiredListWithNullableElements(Arrays.asList(Float.MIN_VALUE, null))
-//                .requiredListWithNonNullElements(Arrays.asList(Float.MIN_VALUE))
-//                .build()
-//
-//            // Record with Float.MAX_VALUE (largest possible float)
-//            aValidTestRecord(7)
-//                .requiredReal(Float.MAX_VALUE)
-//                .optionalReal(Float.MAX_VALUE)
-//                .requiredListWithNullableElements(Arrays.asList(null, Float.MAX_VALUE))
-//                .requiredListWithNonNullElements(Arrays.asList(Float.MAX_VALUE))
-//                .build()
-//
-//            // Record with negative Float.MAX_VALUE (largest negative)
-//            aValidTestRecord(8)
-//                .requiredReal(-Float.MAX_VALUE)
-//                .optionalReal(-Float.MAX_VALUE)
-//                .requiredListWithNullableElements(Arrays.asList(-Float.MAX_VALUE, null))
-//                .requiredListWithNonNullElements(Arrays.asList(-Float.MAX_VALUE))
-//                .build(),
-//
+            // Record with actual Float.MIN_VALUE (smallest positive non-zero)
+            aValidTestRecord(9)
+                .requiredReal(Float.MIN_VALUE)
+                .optionalReal(Float.MIN_VALUE)
+                .requiredListWithNullableElements(Arrays.asList(Float.MIN_VALUE, null))
+                .requiredListWithNonNullElements(Arrays.asList(Float.MIN_VALUE))
+                .build(),
+
+            // Record with Float.MAX_VALUE (largest possible float)
+            aValidTestRecord(10)
+                .requiredReal(Float.MAX_VALUE)
+                .optionalReal(Float.MAX_VALUE)
+                .requiredListWithNullableElements(Arrays.asList(null, Float.MAX_VALUE))
+                .requiredListWithNonNullElements(Arrays.asList(Float.MAX_VALUE))
+                .build(),
+
+            // Record with negative Float.MAX_VALUE (largest negative)
+            aValidTestRecord(11)
+                .requiredReal(-Float.MAX_VALUE)
+                .optionalReal(-Float.MAX_VALUE)
+                .requiredListWithNullableElements(Arrays.asList(-Float.MAX_VALUE, null))
+                .requiredListWithNonNullElements(Arrays.asList(-Float.MAX_VALUE))
+                .build()
 
         );
 

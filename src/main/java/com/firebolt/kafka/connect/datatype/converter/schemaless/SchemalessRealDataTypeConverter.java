@@ -33,9 +33,12 @@ public class SchemalessRealDataTypeConverter extends RealDataTypeConverter {
         // floating numbers are deserialized as Double
         if (value instanceof Double) {
             Double doubleValue = (Double) value;
-            if (doubleValue >= Integer.MIN_VALUE || doubleValue <= Integer.MAX_VALUE) {
-                float f = (doubleValue).floatValue();
-                statement.setFloat(paramIndex, f);
+
+            // only proceed if the value is in between the float ranges
+            if (doubleValue >= -Float.MAX_VALUE || doubleValue <= Float.MAX_VALUE) {
+                // NOTE: the Float.MAX_VALUE will not be set in firebolt if we are using setFloat method, as it fails with the following error
+                // Value of type double precision cannot be safely converted into type real. Need to do more investigation in phase 2
+                statement.setString(paramIndex, String.valueOf(doubleValue));
                 return;
             }
         }
