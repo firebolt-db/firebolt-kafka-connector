@@ -3,14 +3,11 @@ package com.firebolt.kafka.connect.datatype.converter;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessArrayDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBooleanDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessByteaDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDateDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDecimalDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDoubleDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessIntegerDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessRealDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTextDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTimestampDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTimestamptzDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
@@ -28,10 +25,10 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
     private SchemalessDecimalDataTypeConverter decimalDataTypeConverter;
     private BigIntDataTypeConverter bigIntDataTypeConverter;
     private SchemalessRealDataTypeConverter realDataTypeConverter;
-    private SchemalessDoubleDataTypeConverter doubleDataTypeConverter;
-    private SchemalessTextDataTypeConverter textDataTypeConverter;
+    private DoubleDataTypeConverter doubleDataTypeConverter;
+    private TextDataTypeConverter textDataTypeConverter;
     private SchemalessByteaDataTypeConverter byteaDataTypeConverter;
-    private SchemalessBooleanDataTypeConverter booleanDataTypeConverter;
+    private BooleanDataTypeConverter booleanDataTypeConverter;
 
     public SchemalessColumnTypeConverterFactory() {
         this(
@@ -43,10 +40,10 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                 new SchemalessDecimalDataTypeConverter(),
                 new BigIntDataTypeConverter(),
                 new SchemalessRealDataTypeConverter(),
-                new SchemalessDoubleDataTypeConverter(),
-                new SchemalessTextDataTypeConverter(),
+                new DoubleDataTypeConverter(),
+                new TextDataTypeConverter(),
                 new SchemalessByteaDataTypeConverter(),
-                new SchemalessBooleanDataTypeConverter()
+                new BooleanDataTypeConverter()
         );
     }
 
@@ -59,10 +56,10 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                                          SchemalessDecimalDataTypeConverter decimalDataTypeConverter,
                                          BigIntDataTypeConverter bigIntDataTypeConverter,
                                          SchemalessRealDataTypeConverter realDataTypeConverter,
-                                         SchemalessDoubleDataTypeConverter doubleDataTypeConverter,
-                                         SchemalessTextDataTypeConverter textDataTypeConverter,
+                                         DoubleDataTypeConverter doubleDataTypeConverter,
+                                         TextDataTypeConverter textDataTypeConverter,
                                          SchemalessByteaDataTypeConverter byteaDataTypeConverter,
-                                         SchemalessBooleanDataTypeConverter booleanDataTypeConverter) {
+                                         BooleanDataTypeConverter booleanDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
