@@ -16,13 +16,13 @@ public class FireboltRecord {
     @Getter
     private final String tableName;
     @Getter
-    private final Map<String, KafkaMessageColumnValue> columnValues;
+    private final Map<String, ? extends KafkaMessageColumnValue> columnValues;
     private final long timestamp;
     @Getter
     private final SinkRecord sinkRecord;
 
     public FireboltRecord(String tableName,
-                          Map<String, KafkaMessageColumnValue> columnValues,
+                          Map<String, ? extends KafkaMessageColumnValue> columnValues,
                           SinkRecord sinkRecord) {
         this.tableName = tableName;
         this.columnValues = columnValues;

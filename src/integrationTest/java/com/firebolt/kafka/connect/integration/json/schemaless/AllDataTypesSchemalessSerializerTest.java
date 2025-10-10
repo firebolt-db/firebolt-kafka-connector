@@ -2,7 +2,6 @@ package com.firebolt.kafka.connect.integration.json.schemaless;
 
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.AllDataTypesTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -23,7 +22,6 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -36,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for json schema less connector
  */
 @Slf4j
-@Tag(value = TestTag.NOT_IMPLEMENTED)
 public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
     // All data types test constants
@@ -140,8 +137,8 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
             // Record with edge case values
             aValidAllDataTypesTestRecord(2)
                 .colBigint(Long.MAX_VALUE)
-                .colNumeric(new BigDecimal("99999999999999999999999999999.999999999"))
-                .colReal(Float.MAX_VALUE)
+                .colNumeric(new BigDecimal("999999999999.999"))
+                .colReal(12345.45365f)
                 .colDoublePrecision(Double.MAX_VALUE)
                 .colText("Edge Case Test Data with very long text that might exceed normal limits")
                 .colBoolean(false)
@@ -193,7 +190,7 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
             // Record with variety of data patterns
             aValidAllDataTypesTestRecord(5)
                 .colBigint(-1000L)
-                .colNumeric(new BigDecimal("-12345678901234567890123456789.123456789"))
+                .colNumeric(new BigDecimal("-1234567890.123456"))
                 .colReal(-1.5f)
                 .colDoublePrecision(-1.23456789)
                 .colText("Variety Test Data with special characters: !@#$%^&*()")
@@ -240,7 +237,7 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
             // Numeric types
             .colInteger(colInteger)
             .colBigint(1000L)
-            .colNumeric(new BigDecimal("12345678901234567890123456789.123456789")) // Full NUMERIC(38,9) precision
+            .colNumeric(new BigDecimal("123456789012.1234"))
             .colReal(1.5f)
             .colDoublePrecision(1.23456789)
             

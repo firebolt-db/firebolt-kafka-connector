@@ -1,8 +1,14 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.OffsetDateTimeSerializer;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,10 +22,12 @@ import org.apache.kafka.common.serialization.StringSerializer;
 @Slf4j
 public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
+    private static SimpleModule jtm = new JavaTimeModule();
+
     protected static ObjectMapper mapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            // optional: write ISO-8601 strings instead of numeric timestamps
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            .registerModule(jtm)
+            .enable(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN)
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);// no scientific notation
 
     /**
      * Centralized setup method for test resources.

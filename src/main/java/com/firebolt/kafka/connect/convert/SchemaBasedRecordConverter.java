@@ -39,7 +39,7 @@ public class SchemaBasedRecordConverter extends RecordConverter {
     }
 
     @Override
-    protected Map<String, KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
+    protected Map<String, ? extends KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
         Object value = record.value();
         Schema valueSchema = record.valueSchema();
 

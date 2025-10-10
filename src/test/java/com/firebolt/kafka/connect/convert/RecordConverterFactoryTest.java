@@ -194,9 +194,8 @@ public class RecordConverterFactoryTest {
         when(mockSinkRecord.value()).thenReturn(Map.of("key", "value"));
         when(mockSinkRecord.topic()).thenReturn("test-topic");
 
-        assertThrows(NullPointerException.class, () -> {
-            factory.convert(mockSinkRecord);
-        });
+        // With SchemalessBasedRecordConverter registered, conversion should succeed
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> factory.convert(mockSinkRecord));
     }
 
     @Test

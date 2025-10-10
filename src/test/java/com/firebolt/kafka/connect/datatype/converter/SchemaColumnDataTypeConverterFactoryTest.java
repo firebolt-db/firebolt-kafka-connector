@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class ColumnDataTypeConverterFactoryTest {
+public class SchemaColumnDataTypeConverterFactoryTest {
 
     @Mock
     private IntegerDataTypeConverter mockIntegerDataTypeConverter;
@@ -56,7 +56,7 @@ public class ColumnDataTypeConverterFactoryTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        factory = new ColumnDataTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter,
+        factory = new SchemaColumnTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter,
                 mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter,
                 mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter);
     }
@@ -321,17 +321,8 @@ public class ColumnDataTypeConverterFactoryTest {
     }
 
     @Test
-    void testGetInstanceReturnsSameInstance() {
-        ColumnDataTypeConverterFactory instance1 = ColumnDataTypeConverterFactory.getInstance();
-        ColumnDataTypeConverterFactory instance2 = ColumnDataTypeConverterFactory.getInstance();
-        
-        assertNotNull(instance1);
-        assertSame(instance1, instance2);
-    }
-
-    @Test
     void testConstructorWithMocks() {
-        ColumnDataTypeConverterFactory testFactory = new ColumnDataTypeConverterFactory(
+        ColumnDataTypeConverterFactory testFactory = new SchemaColumnTypeConverterFactory(
             mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter,
                 mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter);
         

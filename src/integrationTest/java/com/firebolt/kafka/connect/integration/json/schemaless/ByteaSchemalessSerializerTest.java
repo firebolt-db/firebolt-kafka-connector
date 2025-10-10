@@ -1,8 +1,8 @@
+
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.ByteaTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -16,10 +16,10 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.testcontainers.shaded.org.bouncycastle.util.encoders.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-@Tag(value = TestTag.NOT_IMPLEMENTED)
 public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
     private static final String TABLE_NAME = "bytea_test_table_schemaless";
@@ -197,7 +196,6 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
             String key = "bytea-test-key-" + record.getRecordId();
             ProducerRecord<String, String> producerRecord =
                 new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
-            
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
                     log.error("Failed to send message with key {}: {}", key, exception.getMessage());
@@ -238,8 +236,8 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
                 
                 // Verify each field
                 Integer actualRecordId = rs.getInt("recordId");
-                byte[] actualRequiredBytea = rs.getBytes("requiredBytea");
-                byte[] actualOptionalBytea = rs.getBytes("optionalBytea");
+                byte[] actualRequiredBytea = Base64.decode(rs.getBytes("requiredBytea"));
+                byte[] actualOptionalBytea = rs.getBytes("optionalBytea") == null ? null : Base64.decode(rs.getBytes("optionalBytea"));
                 
                 // Read new string-mapped BYTEA columns
                 byte[] actualStringAsBytea = rs.getBytes("stringAsBytea");
@@ -361,8 +359,13 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
                 assertNull(actualElement, 
                     fieldName + " element " + i + " should be null at index " + recordIndex);
             } else {
-                assertArrayEquals(expectedElement, actualElement,
-                    fieldName + " element " + i + " mismatch at index " + recordIndex);
+                if (expectedElement.length == 0) {
+                  assertTrue(actualElement.length == 0, "Actual element does not have length of 0");
+                } else {
+                    // byte arrays are saved as base64 encoded.
+                    assertArrayEquals(expectedElement, Base64.decode(actualElement),
+                            fieldName + " element " + i + " mismatch at index " + recordIndex);
+                }
             }
         }
     }
