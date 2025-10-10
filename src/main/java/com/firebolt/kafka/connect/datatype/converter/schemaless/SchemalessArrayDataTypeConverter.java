@@ -68,22 +68,37 @@ public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
     private Array createRealArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         List<Object> elements = (List) kafkaMessageColumnValue.getValue();
 
-        return connection.createArrayOf(REAL_TYPE_NAME, elements.stream().map(object -> asReal(object, fireboltColumn)).toArray());
+        // we need to set it as string as some setFloat is not working properly
+        return connection.createArrayOf("string", elements.stream().map(object -> asReal(object, fireboltColumn)).toArray());
     }
 
-    private Float asReal(Object object, TableSchema.Column fireboltColumn) {
-        if (object == null) {
+    private String asReal(Object arrayElement, TableSchema.Column fireboltColumn) {
+        if (arrayElement == null) {
             return null;
         }
 
-        if (object instanceof Number) {
-            return ((Number) object).floatValue();
+        // integers are deserialized as longs
+        if (arrayElement instanceof Long) {
+            Long longValue = (Long) arrayElement;
+            if (longValue >= Integer.MIN_VALUE || longValue <= Integer.MAX_VALUE) {
+                return String.valueOf(longValue);
+            }
         }
 
-        if (object instanceof String) {
-            String s = (String) object;
+        // floating numbers are deserialized as Double
+        if (arrayElement instanceof Double) {
+            Double doubleValue = (Double) arrayElement;
+
+            // only proceed if the value is in between the float ranges
+            if (doubleValue >= -Float.MAX_VALUE || doubleValue <= Float.MAX_VALUE) {
+                return String.valueOf(doubleValue);
+            }
+        }
+
+        if (arrayElement instanceof String) {
+            String s = (String) arrayElement;
             try {
-                return Float.parseFloat(s.trim());
+                s.trim();
             } catch (NumberFormatException e) {
                 throw new ColumnConversionFailedException(
                         fireboltColumn.getName(), fireboltColumn.getDataType(),

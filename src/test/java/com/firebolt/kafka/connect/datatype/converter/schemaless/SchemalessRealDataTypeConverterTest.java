@@ -32,7 +32,7 @@ public class SchemalessRealDataTypeConverterTest {
     void convertsNumberToFloat() throws SQLException {
         KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(12.5d).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
-        verify(mockStatement).setFloat(1, 12.5f);
+        verify(mockStatement).setString(1, "12.5");
     }
 
     @Test
