@@ -1,14 +1,16 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
+import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import org.apache.kafka.connect.data.Schema;
 
-public class TimestamptzDataTypeConverter extends AbstractColumnTypeConverter {
+public class SchemaTimestamptzDataTypeConverter extends AbstractColumnTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -19,7 +21,6 @@ public class TimestamptzDataTypeConverter extends AbstractColumnTypeConverter {
         } else if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING) {
             String timestamp = (String) kafkaMessageColumnValue.getValue();
 
-            // make sure we can convert it to a valid timestamptz value
             if (FireboltTimestamptzConverter.isValidTimestamptz(timestamp)) {
                 statement.setString(paramIndex, timestamp);
                 return;
@@ -29,3 +30,5 @@ public class TimestamptzDataTypeConverter extends AbstractColumnTypeConverter {
         throw aColumnConversionFailedException(fireboltColumn, kafkaMessageColumnValue.getValue());
     }
 }
+
+

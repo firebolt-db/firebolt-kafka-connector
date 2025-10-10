@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
@@ -15,18 +15,18 @@ import org.mockito.MockitoAnnotations;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 
-public class DecimalDataTypeConverterTest {
+public class SchemaDecimalDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
 
-    private DecimalDataTypeConverter converter;
+    private SchemaDecimalDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new DecimalDataTypeConverter();
+        converter = new SchemaDecimalDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "decimal", 2, true);
     }
 

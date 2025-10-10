@@ -1,14 +1,14 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.FireboltByteaConverter;
 import java.nio.ByteBuffer;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Base64;
 
-public class ByteaDataTypeConverter extends AbstractColumnTypeConverter {
+public class SchemaByteaDataTypeConverter extends AbstractColumnTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -31,3 +31,5 @@ public class ByteaDataTypeConverter extends AbstractColumnTypeConverter {
         throw aColumnConversionFailedException(fireboltColumn, value);
     }
 }
+
+

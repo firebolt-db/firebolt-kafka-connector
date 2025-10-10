@@ -2,12 +2,12 @@ package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.RealDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaRealDataTypeConverter;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class SchemalessRealDataTypeConverter extends RealDataTypeConverter {
+public class SchemalessRealDataTypeConverter extends SchemaRealDataTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {

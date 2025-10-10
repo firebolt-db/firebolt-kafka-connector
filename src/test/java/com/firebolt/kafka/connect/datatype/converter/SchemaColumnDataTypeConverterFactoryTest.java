@@ -1,6 +1,18 @@
 package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaArrayDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBigIntDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBooleanDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaByteaDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDateDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDecimalDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDoubleDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaIntegerDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaRealDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTextDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTimestampDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTimestamptzDataTypeConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,40 +28,40 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class SchemaColumnDataTypeConverterFactoryTest {
 
     @Mock
-    private IntegerDataTypeConverter mockIntegerDataTypeConverter;
+    private SchemaIntegerDataTypeConverter mockIntegerDataTypeConverter;
 
     @Mock
-    private ArrayDataTypeConverter mockArrayDataTypeConverter;
+    private SchemaArrayDataTypeConverter mockArrayDataTypeConverter;
 
     @Mock
-    private TimestampDataTypeConverter mockTimestampDataTypeConverter;
+    private SchemaTimestampDataTypeConverter mockTimestampDataTypeConverter;
 
     @Mock
-    private TimestamptzDataTypeConverter mockTimestamptzDataTypeConverter;
+    private SchemaTimestamptzDataTypeConverter mockTimestamptzDataTypeConverter;
 
     @Mock
-    private DateDataTypeConverter mockDateDataTypeConverter;
+    private SchemaDateDataTypeConverter mockDateDataTypeConverter;
 
     @Mock
-    private DecimalDataTypeConverter mockDecimalDataTypeConverter;
+    private SchemaDecimalDataTypeConverter mockDecimalDataTypeConverter;
 
     @Mock
-    private BigIntDataTypeConverter mockBigIntDataTypeConverter;
+    private SchemaBigIntDataTypeConverter mockBigIntDataTypeConverter;
 
     @Mock
-    private RealDataTypeConverter mockRealDataTypeConverter;
+    private SchemaRealDataTypeConverter mockRealDataTypeConverter;
 
     @Mock
-    private DoubleDataTypeConverter mockDoubleDataTypeConverter;
+    private SchemaDoubleDataTypeConverter mockDoubleDataTypeConverter;
 
     @Mock
-    private TextDataTypeConverter mockTextDataTypeConverter;
+    private SchemaTextDataTypeConverter mockTextDataTypeConverter;
 
     @Mock
-    private ByteaDataTypeConverter mockByteaDataTypeConverter;
+    private SchemaByteaDataTypeConverter mockByteaDataTypeConverter;
 
     @Mock
-    private BooleanDataTypeConverter mockBooleanDataTypeConverter;
+    private SchemaBooleanDataTypeConverter mockBooleanDataTypeConverter;
 
     private ColumnDataTypeConverterFactory factory;
 

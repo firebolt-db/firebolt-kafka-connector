@@ -1,15 +1,15 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Date;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class DateDataTypeConverter extends AbstractColumnTypeConverter {
+public class SchemaDateDataTypeConverter extends AbstractColumnTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -29,5 +29,6 @@ public class DateDataTypeConverter extends AbstractColumnTypeConverter {
 
         throw aColumnConversionFailedException(fireboltColumn, value);
     }
-
 }
+
+

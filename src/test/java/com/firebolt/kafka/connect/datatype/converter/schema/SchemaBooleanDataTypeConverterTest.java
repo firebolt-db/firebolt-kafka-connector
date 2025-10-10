@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
@@ -21,18 +21,18 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-public class BooleanDataTypeConverterTest {
+public class SchemaBooleanDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
 
-    private BooleanDataTypeConverter converter;
+    private SchemaBooleanDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new BooleanDataTypeConverter();
+        converter = new SchemaBooleanDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "boolean", 16, true);
     }
 

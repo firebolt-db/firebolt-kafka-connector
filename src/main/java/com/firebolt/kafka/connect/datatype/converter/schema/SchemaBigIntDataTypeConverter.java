@@ -1,19 +1,18 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
+import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class BigIntDataTypeConverter extends NumericDataTypeConverter {
+public class SchemaBigIntDataTypeConverter extends NumericDataTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         Object value = kafkaMessageColumnValue.getValue();
 
-        // do not check for Double or Float since we do not want to lose precision implicitly. Maybe in the future we can have a flag on the connector configuration for this to be allowed
         if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
             statement.setLong(paramIndex, ((Number) value).longValue());
             return;
@@ -34,5 +33,6 @@ public class BigIntDataTypeConverter extends NumericDataTypeConverter {
 
         throw aColumnConversionFailedException(fireboltColumn, value);
     }
-
 }
+
+

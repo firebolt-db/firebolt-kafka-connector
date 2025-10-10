@@ -1,12 +1,13 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class DoubleDataTypeConverter extends NumericDataTypeConverter {
+public class SchemaDoubleDataTypeConverter extends NumericDataTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -33,3 +34,5 @@ public class DoubleDataTypeConverter extends NumericDataTypeConverter {
         throw aColumnConversionFailedException(fireboltColumn, value);
     }
 }
+
+

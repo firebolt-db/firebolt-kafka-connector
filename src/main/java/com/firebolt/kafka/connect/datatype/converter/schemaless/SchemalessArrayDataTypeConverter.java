@@ -2,18 +2,17 @@ package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.ArrayDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.FireboltByteaConverter;
 import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
 import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaArrayDataTypeConverter;
 import java.nio.ByteBuffer;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -21,9 +20,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.kafka.connect.data.Schema;
 
-public class SchemalessArrayDataTypeConverter extends ArrayDataTypeConverter {
+public class SchemalessArrayDataTypeConverter extends SchemaArrayDataTypeConverter {
 
     private static final String DATE_ARRAY_TYPE_NAME = "date";
     private static final String TIMESTAMP_ARRAY_TYPE_NAME = "timestamp";

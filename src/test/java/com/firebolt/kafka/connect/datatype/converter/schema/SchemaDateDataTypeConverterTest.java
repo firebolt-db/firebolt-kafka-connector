@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
@@ -20,18 +20,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
-public class DateDataTypeConverterTest {
+public class SchemaDateDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
 
-    private DateDataTypeConverter converter;
+    private SchemaDateDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new DateDataTypeConverter();
+        converter = new SchemaDateDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "date", 91, true);
     }
 
