@@ -36,8 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Slf4j
 public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TOPIC_NAME = "timestamp-test-topic-schemaless";
-    private static final String TABLE_NAME = "timestamp_test_table_schemaless";
+    private static final String TOPIC_NAME = generateTopicName("timestamp-test-topic");
+    private static final String TABLE_NAME = generateTableName("timestamp_test_table");
     private Producer<String, String> producer;
 
     @BeforeEach
@@ -45,7 +45,7 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
         super.setUp(testInfo);
         
         // Generate unique connector name for this test run
-        generateUniqueConnectorName("timestamp-serializer-test-schemaless");
+        generateUniqueConnectorName("timestamp-serializer-test");
 
         // Setup test resources using centralized method
         setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, timestampTableSchema());

@@ -1,6 +1,6 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration.json.schema;
 
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.IntegerTestRecord;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -26,10 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class IntegerSerializerTest extends BaseIntegrationTest {
+public class IntegerSchemaSerializerTest extends SchemaBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "integer_test_table";
-    private static final String TOPIC_NAME = "integer-test-topic";
+    private static final String TABLE_NAME = generateTableName("integer_test_table");
+    private static final String TOPIC_NAME = generateTopicName("integer-test-topic");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, IntegerTestRecord> producer;

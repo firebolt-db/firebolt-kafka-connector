@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Slf4j
 public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "boolean_test_table_schemaless";
-    private static final String TOPIC_NAME = "boolean-test-topic-schemaless";
+    private static final String TABLE_NAME = generateTableName("boolean_test_table");
+    private static final String TOPIC_NAME = generateTopicName("boolean-test-topic");
 
     private Producer<String, String> producer;
 
@@ -40,7 +40,7 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         super.setUp(testInfo);
         
         // Generate unique connector name for this test run
-        generateUniqueConnectorName("boolean-serializer-test-schemaless");
+        generateUniqueConnectorName("boolean-serializer-test");
         
         // Setup test resources using centralized method
         setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, booleanTableSchema());

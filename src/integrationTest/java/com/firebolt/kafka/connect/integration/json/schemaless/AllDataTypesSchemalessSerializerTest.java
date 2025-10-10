@@ -37,8 +37,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
     // All data types test constants
-    private static final String ALL_DATA_TYPES_TABLE_NAME = "all_data_types_test_table_schemaless";
-    private static final String ALL_DATA_TYPES_TOPIC_NAME = "all-data-types-test-topic-schemaless";
+    private static final String ALL_DATA_TYPES_TABLE_NAME = generateTableName("all_data_types_test_table");
+    private static final String ALL_DATA_TYPES_TOPIC_NAME = generateTopicName("all-data-types-test-topic");
 
     private static final DateFormat ISO_8601_DATE_FORMAT = new java.text.SimpleDateFormat("yyyy-MM-dd");
 
@@ -48,7 +48,7 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
     protected void setUp(TestInfo testInfo) {
         super.setUp(testInfo);
 
-        generateUniqueConnectorName("all-data-types-test-connector-schemaless");
+        generateUniqueConnectorName("all-data-types-test-connector");
 
         // Setup test resources using centralized method
         setupSchemalessTestResources(ALL_DATA_TYPES_TOPIC_NAME, ALL_DATA_TYPES_TABLE_NAME, allDataTypesTableSchema());

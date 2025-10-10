@@ -1,6 +1,6 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration.json.schema;
 
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.AllDataTypesTestRecord;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
@@ -31,11 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class AllDataTypesSerializerTest extends BaseIntegrationTest {
+public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest {
 
     // All data types test constants
-    private static final String ALL_DATA_TYPES_TABLE_NAME = "all_data_types_test_table";
-    private static final String ALL_DATA_TYPES_TOPIC_NAME = "all-data-types-test-topic";
+    private static final String ALL_DATA_TYPES_TABLE_NAME = generateTableName("all_data_types_test_table");
+    private static final String ALL_DATA_TYPES_TOPIC_NAME = generateTopicName("all-data-types-test-topic");
     private static final String ALL_DATA_TYPES_SCHEMA_SUBJECT = ALL_DATA_TYPES_TOPIC_NAME + "-value";
 
     private static final DateFormat ISO_8601_DATE_FORMAT = new java.text.SimpleDateFormat("yyyy-MM-dd");
