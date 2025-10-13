@@ -16,7 +16,7 @@ ext {
     junitJupiterVersion = '5.13.4'
     log4jVersion = '2.25.2'
     okhttpVersion = '5.1.0'
-    kafkaVersion = '3.9.1'
+    kafkaVersion = '8.0.2-ce'
     testcontainersVersion = '1.21.3'
     slf4jVersion = '2.0.17'
     fireboltJdbcVersion = '3.7.1'
