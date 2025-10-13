@@ -1,7 +1,10 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.FireboltTimestampConverter;
+import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -9,7 +12,7 @@ import java.sql.Timestamp;
 import java.util.Date;
 import org.apache.kafka.connect.data.Schema;
 
-public class TimestampDataTypeConverter extends AbstractColumnTypeConverter {
+public class SchemaTimestampDataTypeConverter extends AbstractColumnTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -39,3 +42,5 @@ public class TimestampDataTypeConverter extends AbstractColumnTypeConverter {
 
     }
 }
+
+

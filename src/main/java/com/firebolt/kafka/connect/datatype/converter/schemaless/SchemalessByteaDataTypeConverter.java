@@ -2,11 +2,11 @@ package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.ByteaDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaByteaDataTypeConverter;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class SchemalessByteaDataTypeConverter extends ByteaDataTypeConverter {
+public class SchemalessByteaDataTypeConverter extends SchemaByteaDataTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {

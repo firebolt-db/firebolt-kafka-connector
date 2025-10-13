@@ -1,7 +1,8 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import org.apache.kafka.connect.data.Schema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,13 +24,13 @@ public class TimestampDataTypeConverterTest {
     @Mock
     private PreparedStatement mockStatement;
 
-    private TimestampDataTypeConverter converter;
+    private SchemaTimestampDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new TimestampDataTypeConverter();
+        converter = new SchemaTimestampDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "timestamp", 93, true);
     }
 

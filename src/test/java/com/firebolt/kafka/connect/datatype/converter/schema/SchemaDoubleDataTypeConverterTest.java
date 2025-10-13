@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
@@ -17,18 +17,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 
-public class DoubleDataTypeConverterTest {
+public class SchemaDoubleDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
 
-    private DoubleDataTypeConverter converter;
+    private SchemaDoubleDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new DoubleDataTypeConverter();
+        converter = new SchemaDoubleDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "double", 8, true);
     }
 

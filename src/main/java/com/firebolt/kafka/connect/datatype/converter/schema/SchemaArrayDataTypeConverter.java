@@ -1,8 +1,11 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
+import com.firebolt.kafka.connect.datatype.converter.CompositeDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.FireboltByteaConverter;
+import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
+import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.nio.ByteBuffer;
 import java.sql.Array;
@@ -10,21 +13,18 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.data.Schema;
 
 /**
  * A class that tries to convert the value from the kafka message to an array firebolt type
  */
-public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
+public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter {
 
     private static final String DATE_ARRAY_TYPE_NAME = "date";
     private static final String TIMESTAMP_ARRAY_TYPE_NAME = "timestamp";
@@ -203,5 +203,6 @@ public class ArrayDataTypeConverter extends CompositeDataTypeConverter {
 
         throw new ColumnConversionFailedException("","", "failed to convert string as date");
     }
-
 }
+
+

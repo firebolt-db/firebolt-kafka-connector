@@ -1,22 +1,20 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class BooleanDataTypeConverter extends AbstractColumnTypeConverter {
+public class SchemaBooleanDataTypeConverter extends AbstractColumnTypeConverter {
 
-    // keep them as lowercase
     private static Set<String> ALLOWED_STRING_VALUES_AS_BOOLEAN = Set.of("t", "f", "true", "false", "0", "1");
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        // we can set boolean value from multiple object types so go over these types one by one
         if (kafkaMessageColumnValue.getValue() instanceof Boolean) {
             statement.setBoolean(paramIndex, (Boolean) kafkaMessageColumnValue.getValue());
             return;
@@ -37,5 +35,6 @@ public class BooleanDataTypeConverter extends AbstractColumnTypeConverter {
     private boolean isValidBooleanValueAsString(String valueFromKafkaMessage) {
         return ALLOWED_STRING_VALUES_AS_BOOLEAN.contains(valueFromKafkaMessage.toLowerCase());
     }
-
 }
+
+

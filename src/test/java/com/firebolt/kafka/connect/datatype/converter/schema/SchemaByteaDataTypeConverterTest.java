@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
@@ -18,18 +18,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-public class ByteaDataTypeConverterTest {
+public class SchemaByteaDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
 
-    private ByteaDataTypeConverter converter;
+    private SchemaByteaDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new ByteaDataTypeConverter();
+        converter = new SchemaByteaDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "bytea", -2, true);
     }
 

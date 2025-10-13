@@ -3,16 +3,14 @@ package com.firebolt.kafka.connect.datatype.converter.schemaless;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.FireboltTimestampConverter;
-import com.firebolt.kafka.connect.datatype.converter.TimestampDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTimestampDataTypeConverter;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.Date;
-import org.apache.kafka.connect.data.Schema;
 
-public class SchemalessTimestampDataTypeConverter extends TimestampDataTypeConverter {
+public class SchemalessTimestampDataTypeConverter extends SchemaTimestampDataTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {

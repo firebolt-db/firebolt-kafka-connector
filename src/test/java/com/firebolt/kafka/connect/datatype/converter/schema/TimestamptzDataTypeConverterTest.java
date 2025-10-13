@@ -1,7 +1,8 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.time.Instant;
@@ -20,13 +21,13 @@ import static org.mockito.Mockito.verify;
 
 public class TimestamptzDataTypeConverterTest {
 
-    private TimestamptzDataTypeConverter converter;
+    private SchemaTimestamptzDataTypeConverter converter;
     private PreparedStatement statement;
     private TableSchema.Column column;
 
     @BeforeEach
     void setUp() {
-        converter = new TimestamptzDataTypeConverter();
+        converter = new SchemaTimestamptzDataTypeConverter();
         statement = mock(PreparedStatement.class);
         column = new TableSchema.Column("col", "timestamptz", 1002, true);
     }

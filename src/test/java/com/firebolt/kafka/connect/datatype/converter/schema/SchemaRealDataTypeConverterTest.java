@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
@@ -17,18 +17,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 
-public class RealDataTypeConverterTest {
+public class SchemaRealDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
 
-    private RealDataTypeConverter converter;
+    private SchemaRealDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new RealDataTypeConverter();
+        converter = new SchemaRealDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "real", 7, true);
     }
 

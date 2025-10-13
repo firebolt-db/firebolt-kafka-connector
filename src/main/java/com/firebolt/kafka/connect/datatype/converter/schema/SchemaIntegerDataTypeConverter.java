@@ -1,15 +1,16 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 /**
- * A class that tries to convert the value from the kafka message attribute to an integer value
+ * Converts kafka message attribute to an integer value
  */
-public class IntegerDataTypeConverter extends NumericDataTypeConverter {
+public class SchemaIntegerDataTypeConverter extends NumericDataTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -34,6 +35,6 @@ public class IntegerDataTypeConverter extends NumericDataTypeConverter {
 
         throw aColumnConversionFailedException(fireboltColumn, value);
     }
-
-
 }
+
+

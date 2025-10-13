@@ -1,7 +1,8 @@
-package com.firebolt.kafka.connect.datatype.converter;
+package com.firebolt.kafka.connect.datatype.converter.schema;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.apache.kafka.connect.data.Schema;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,11 +17,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-public class ArrayDataTypeConverterTest {
+public class SchemaArrayDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
@@ -39,7 +38,7 @@ public class ArrayDataTypeConverterTest {
     @Mock
     private Array mockArray;
 
-    private ArrayDataTypeConverter converter;
+    private SchemaArrayDataTypeConverter converter;
     private TableSchema.Column integerArrayColumn;
     private TableSchema.Column textArrayColumn;
     private TableSchema.Column timestampArrayColumn;
@@ -49,7 +48,7 @@ public class ArrayDataTypeConverterTest {
     @BeforeEach
     void setUp() throws SQLException {
         MockitoAnnotations.openMocks(this);
-        converter = new ArrayDataTypeConverter();
+        converter = new SchemaArrayDataTypeConverter();
         integerArrayColumn = new TableSchema.Column("test_column", "array(integer)", 2003, true);
         textArrayColumn = new TableSchema.Column("test_column", "array(text)", 2003, true);
         timestampArrayColumn = new TableSchema.Column("test_column", "array(timestamp)", 2003, true);

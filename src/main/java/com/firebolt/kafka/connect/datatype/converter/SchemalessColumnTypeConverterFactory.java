@@ -2,6 +2,10 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBigIntDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBooleanDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDoubleDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTextDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessArrayDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessByteaDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDateDataTypeConverter;
@@ -23,12 +27,12 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
     private SchemalessTimestamptzDataTypeConverter timestamptzDataTypeConverter;
     private SchemalessDateDataTypeConverter dateDataTypeConverter;
     private SchemalessDecimalDataTypeConverter decimalDataTypeConverter;
-    private BigIntDataTypeConverter bigIntDataTypeConverter;
+    private SchemaBigIntDataTypeConverter bigIntDataTypeConverter;
     private SchemalessRealDataTypeConverter realDataTypeConverter;
-    private DoubleDataTypeConverter doubleDataTypeConverter;
-    private TextDataTypeConverter textDataTypeConverter;
+    private SchemaDoubleDataTypeConverter doubleDataTypeConverter;
+    private SchemaTextDataTypeConverter textDataTypeConverter;
     private SchemalessByteaDataTypeConverter byteaDataTypeConverter;
-    private BooleanDataTypeConverter booleanDataTypeConverter;
+    private SchemaBooleanDataTypeConverter booleanDataTypeConverter;
 
     public SchemalessColumnTypeConverterFactory() {
         this(
@@ -38,12 +42,12 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                 new SchemalessTimestamptzDataTypeConverter(),
                 new SchemalessDateDataTypeConverter(),
                 new SchemalessDecimalDataTypeConverter(),
-                new BigIntDataTypeConverter(),
+                new SchemaBigIntDataTypeConverter(),
                 new SchemalessRealDataTypeConverter(),
-                new DoubleDataTypeConverter(),
-                new TextDataTypeConverter(),
+                new SchemaDoubleDataTypeConverter(),
+                new SchemaTextDataTypeConverter(),
                 new SchemalessByteaDataTypeConverter(),
-                new BooleanDataTypeConverter()
+                new SchemaBooleanDataTypeConverter()
         );
     }
 
@@ -54,12 +58,12 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                                          SchemalessTimestamptzDataTypeConverter timestamptzDataTypeConverter,
                                          SchemalessDateDataTypeConverter dateDataTypeConverter,
                                          SchemalessDecimalDataTypeConverter decimalDataTypeConverter,
-                                         BigIntDataTypeConverter bigIntDataTypeConverter,
+                                         SchemaBigIntDataTypeConverter bigIntDataTypeConverter,
                                          SchemalessRealDataTypeConverter realDataTypeConverter,
-                                         DoubleDataTypeConverter doubleDataTypeConverter,
-                                         TextDataTypeConverter textDataTypeConverter,
+                                         SchemaDoubleDataTypeConverter doubleDataTypeConverter,
+                                         SchemaTextDataTypeConverter textDataTypeConverter,
                                          SchemalessByteaDataTypeConverter byteaDataTypeConverter,
-                                         BooleanDataTypeConverter booleanDataTypeConverter) {
+                                         SchemaBooleanDataTypeConverter booleanDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;

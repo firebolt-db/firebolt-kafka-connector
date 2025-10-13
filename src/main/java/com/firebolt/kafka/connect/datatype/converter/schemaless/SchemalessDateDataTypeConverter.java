@@ -2,13 +2,13 @@ package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.DateDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDateDataTypeConverter;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
 
-public class SchemalessDateDataTypeConverter extends DateDataTypeConverter {
+public class SchemalessDateDataTypeConverter extends SchemaDateDataTypeConverter {
 
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
