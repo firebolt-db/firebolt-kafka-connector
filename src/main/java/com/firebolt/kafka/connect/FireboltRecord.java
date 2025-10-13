@@ -45,4 +45,8 @@ public class FireboltRecord {
     public long getTimestamp() {
         return timestamp;
     }
+
+    public boolean hasValueSchema() {
+        return sinkRecord.valueSchema() != null;
+    }
 }

@@ -80,7 +80,6 @@ public abstract class RecordConverter {
      */
     public abstract String getDescription();
 
-
     /**
      * Handles null values in records.
      *
