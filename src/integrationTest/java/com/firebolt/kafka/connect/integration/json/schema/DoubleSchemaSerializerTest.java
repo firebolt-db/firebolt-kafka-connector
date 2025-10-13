@@ -1,5 +1,5 @@
-package com.firebolt.kafka.connect.integration.json;
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
+package com.firebolt.kafka.connect.integration.json.schema;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.DoubleTestRecord;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -25,10 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class DoubleSerializerTest extends BaseIntegrationTest {
+public class DoubleSchemaSerializerTest extends SchemaBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "double_test_table";
-    private static final String TOPIC_NAME = "double-test-topic";
+    private static final String TABLE_NAME = generateTableName("double_test_table");
+    private static final String TOPIC_NAME = generateTopicName("double-test-topic");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, DoubleTestRecord> producer;

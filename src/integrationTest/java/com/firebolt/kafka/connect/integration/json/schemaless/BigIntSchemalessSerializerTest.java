@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Slf4j
 public class BigIntSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "bigint_test_table_schemaless";
-    private static final String TOPIC_NAME = "bigint-test-topic-schemaless";
+    private static final String TABLE_NAME = generateTableName("bigint_test_table");
+    private static final String TOPIC_NAME = generateTopicName("bigint-test-topic");
 
     private Producer<String, String> producer;
     
@@ -40,7 +40,7 @@ public class BigIntSchemalessSerializerTest extends SchemalessBaseIntegrationTes
         super.setUp(testInfo);
         
         // Generate unique connector name for this test run
-        generateUniqueConnectorName("bigint-serializer-test-schemaless");
+        generateUniqueConnectorName("bigint-serializer-test");
         
         // Setup test resources using centralized method
         setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, bigIntTableSchema());

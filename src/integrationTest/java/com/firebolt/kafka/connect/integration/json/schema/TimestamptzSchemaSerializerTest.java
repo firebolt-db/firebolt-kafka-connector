@@ -1,7 +1,7 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration.json.schema;
 
 import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.TimestamptzTestRecord;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -30,10 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class TimestamptzSerializerTest extends BaseIntegrationTest {
+public class TimestamptzSchemaSerializerTest extends SchemaBaseIntegrationTest {
 
-    private static final String TOPIC_NAME = "timestamptz-test-topic";
-    private static final String TABLE_NAME = "timestamptz_test_table";
+    private static final String TOPIC_NAME = generateTopicName("timestamptz-test-topic");
+    private static final String TABLE_NAME = generateTableName("timestamptz_test_table");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, Object> producer;

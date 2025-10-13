@@ -1,6 +1,6 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration.json.schema;
 
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.BigIntTestRecord;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -26,10 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class BigIntSerializerTest extends BaseIntegrationTest {
+public class BigIntSchemaSerializerTest extends SchemaBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "bigint_test_table";
-    private static final String TOPIC_NAME = "bigint-test-topic";
+    private static final String TABLE_NAME = generateTableName("bigint_test_table");
+    private static final String TOPIC_NAME = generateTopicName("bigint-test-topic");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
     
     private Producer<String, BigIntTestRecord> producer;

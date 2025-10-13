@@ -36,8 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DateSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
-    private static final String TOPIC_NAME = "date-test-topic-schemaless";
-    private static final String TABLE_NAME = "date_test_table_schemaless";
+    private static final String TOPIC_NAME = generateTopicName("date-test-topic");
+    private static final String TABLE_NAME = generateTableName("date_test_table");
     private Producer<String, String> producer;
 
     @BeforeEach
@@ -45,7 +45,7 @@ public class DateSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
         super.setUp(testInfo);
 
         // Generate unique connector name for this test run
-        generateUniqueConnectorName("date-serializer-test-schemaless");
+        generateUniqueConnectorName("date-serializer-test");
 
         // Setup test resources using centralized method
         setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, dateTableSchema());

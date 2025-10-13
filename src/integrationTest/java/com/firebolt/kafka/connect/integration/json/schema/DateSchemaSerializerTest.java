@@ -1,6 +1,6 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration.json.schema;
 
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.DateTestRecord;
 import java.sql.Array;
 import java.sql.Date;
@@ -31,11 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class DateSerializerTest extends BaseIntegrationTest {
+public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
     private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
-    private static final String TOPIC_NAME = "date-test-topic";
-    private static final String TABLE_NAME = "date_test_table";
+    private static final String TOPIC_NAME = generateTopicName("date-test-topic");
+    private static final String TABLE_NAME = generateTableName("date_test_table");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, Object> producer;

@@ -1,8 +1,7 @@
-package com.firebolt.kafka.connect.integration.json;
+package com.firebolt.kafka.connect.integration.json.schema;
 
-import com.firebolt.kafka.connect.integration.BaseIntegrationTest;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.TextTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,7 +15,6 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -27,10 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class TextSerializerTest extends BaseIntegrationTest {
+public class TextSchemaSerializerTest extends SchemaBaseIntegrationTest {
     
-    private static final String TABLE_NAME = "text_test_table";
-    private static final String TOPIC_NAME = "text-test-topic";
+    private static final String TABLE_NAME = generateTableName("text_test_table");
+    private static final String TOPIC_NAME = generateTopicName("text-test-topic");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, TextTestRecord> producer;

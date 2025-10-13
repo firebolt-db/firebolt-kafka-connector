@@ -29,6 +29,18 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
             .enable(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN)
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);// no scientific notation
 
+    protected void generateUniqueConnectorName(String connectorType) {
+        super.generateUniqueConnectorName(connectorType + "-schemaless");
+    }
+
+    protected static String generateTableName(String name) {
+        return name + "_schemaless";
+    }
+
+    protected static String generateTopicName(String name) {
+        return name + "-schemaless";
+    }
+
     /**
      * Centralized setup method for test resources.
      * This method handles setup of Firebolt table, Kafka topic, and Kafka Connect connector.
