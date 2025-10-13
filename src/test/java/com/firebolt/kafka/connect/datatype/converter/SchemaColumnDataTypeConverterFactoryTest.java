@@ -2,15 +2,15 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaArrayDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBigIntDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBooleanDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBigIntDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBooleanDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaByteaDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDateDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDecimalDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDoubleDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDoubleDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaIntegerDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaRealDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTextDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTextDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTimestampDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTimestamptzDataTypeConverter;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,22 +46,22 @@ public class SchemaColumnDataTypeConverterFactoryTest {
     private SchemaDecimalDataTypeConverter mockDecimalDataTypeConverter;
 
     @Mock
-    private SchemaBigIntDataTypeConverter mockBigIntDataTypeConverter;
+    private SchemalessBigIntDataTypeConverter mockBigIntDataTypeConverter;
 
     @Mock
     private SchemaRealDataTypeConverter mockRealDataTypeConverter;
 
     @Mock
-    private SchemaDoubleDataTypeConverter mockDoubleDataTypeConverter;
+    private SchemalessDoubleDataTypeConverter mockDoubleDataTypeConverter;
 
     @Mock
-    private SchemaTextDataTypeConverter mockTextDataTypeConverter;
+    private SchemalessTextDataTypeConverter mockTextDataTypeConverter;
 
     @Mock
     private SchemaByteaDataTypeConverter mockByteaDataTypeConverter;
 
     @Mock
-    private SchemaBooleanDataTypeConverter mockBooleanDataTypeConverter;
+    private SchemalessBooleanDataTypeConverter mockBooleanDataTypeConverter;
 
     private ColumnDataTypeConverterFactory factory;
 

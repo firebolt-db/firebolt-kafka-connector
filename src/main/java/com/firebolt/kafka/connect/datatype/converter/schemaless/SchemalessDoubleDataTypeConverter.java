@@ -1,17 +1,17 @@
-package com.firebolt.kafka.connect.datatype.converter.schema;
+package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class SchemaDoubleDataTypeConverter extends NumericDataTypeConverter<SchemaKafkaMessageColumnValue> {
+public class SchemalessDoubleDataTypeConverter extends NumericDataTypeConverter<SchemalessKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = schemaKafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemalessKafkaMessageColumnValue.getValue();
 
         if (value instanceof Number) {
             double doubleValue = ((Number) value).doubleValue();

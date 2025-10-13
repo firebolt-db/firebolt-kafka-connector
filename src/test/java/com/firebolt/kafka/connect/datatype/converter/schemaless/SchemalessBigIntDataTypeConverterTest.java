@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.datatype.converter.schema;
+package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
 import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
@@ -17,18 +17,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 
-public class SchemaBigIntDataTypeConverterTest {
+public class SchemalessBigIntDataTypeConverterTest {
 
     @Mock
     private PreparedStatement mockStatement;
 
-    private SchemaBigIntDataTypeConverter converter;
+    private SchemalessBigIntDataTypeConverter converter;
     private TableSchema.Column testColumn;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        converter = new SchemaBigIntDataTypeConverter();
+        converter = new SchemalessBigIntDataTypeConverter();
         testColumn = new TableSchema.Column("test_column", "bigint", 8, true);
     }
 

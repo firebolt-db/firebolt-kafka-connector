@@ -1,17 +1,17 @@
-package com.firebolt.kafka.connect.datatype.converter.schema;
+package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class SchemaBigIntDataTypeConverter extends NumericDataTypeConverter<SchemaKafkaMessageColumnValue> {
+public class SchemalessBigIntDataTypeConverter extends NumericDataTypeConverter<SchemalessKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = schemaKafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemalessKafkaMessageColumnValue.getValue();
 
         if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
             statement.setLong(paramIndex, ((Number) value).longValue());
