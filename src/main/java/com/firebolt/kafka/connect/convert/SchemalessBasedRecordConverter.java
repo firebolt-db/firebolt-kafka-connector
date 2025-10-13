@@ -1,15 +1,12 @@
 package com.firebolt.kafka.connect.convert;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
@@ -17,7 +14,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
  * Expects the record value to be a Map<String, Object> representing the JSON payload.
  */
 @Slf4j
-public class SchemalessBasedRecordConverter extends RecordConverter {
+public class SchemalessBasedRecordConverter extends RecordConverter<SchemalessKafkaMessageColumnValue> {
 
     public SchemalessBasedRecordConverter(SinkConfig config) {
         super(config);
@@ -34,7 +31,7 @@ public class SchemalessBasedRecordConverter extends RecordConverter {
     }
 
     @Override
-    protected Map<String, ? extends KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
+    protected Map<String, SchemalessKafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
         Object value = record.value();
         if (value == null) {
             return handleNullValue(record);

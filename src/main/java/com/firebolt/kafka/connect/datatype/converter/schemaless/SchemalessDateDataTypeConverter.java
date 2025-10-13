@@ -1,18 +1,18 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDateDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
 
-public class SchemalessDateDataTypeConverter extends SchemaDateDataTypeConverter {
+public class SchemalessDateDataTypeConverter extends AbstractColumnTypeConverter<SchemalessKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = kafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemalessKafkaMessageColumnValue.getValue();
 
         // if it is a number then it is considered to be the number of seconds from epoch
         if (value instanceof Number) {

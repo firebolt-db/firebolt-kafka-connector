@@ -145,14 +145,14 @@ public class InsertPreparedStatement {
         for (TableSchema.Column column : schema.getColumns()) {
             if (validColumnNames.containsKey(column.getName())) {
                 String attributeName = validColumnNames.get(column.getName());
-                KafkaMessageColumnValue value = record.getColumnValues().get(attributeName);
+                KafkaMessageColumnValue kafkaMessageColumnValue = record.getColumnValues().get(attributeName);
 
-                if (value == null || value.getValue() == null) {
+                if (kafkaMessageColumnValue == null || kafkaMessageColumnValue.getValue() == null) {
                     stmt.setNull(parameterIndex, column.getSqlType());
                 } else {
                     ColumnDataTypeConverter columnDataTypeConverter = ColumnDataTypeFactoryProvider.getInstance(record.hasValueSchema()).getConverter(column);
                     try {
-                        columnDataTypeConverter.convertAndSet(stmt, parameterIndex, value, column);
+                        columnDataTypeConverter.convertAndSet(stmt, parameterIndex, kafkaMessageColumnValue, column);
                     } catch (ColumnConversionFailedException e) {
                         log.error("Conversion failed for table {} column {} for kafka record from partition {} offset {}", schema.getTableName(), column.getName(), record.getPartition(), record.getOffset());
 

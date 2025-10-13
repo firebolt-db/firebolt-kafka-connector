@@ -1,21 +1,21 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDecimalDataTypeConverter;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class SchemalessDecimalDataTypeConverter extends SchemaDecimalDataTypeConverter {
+public class SchemalessDecimalDataTypeConverter extends NumericDataTypeConverter<SchemalessKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = kafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemalessKafkaMessageColumnValue.getValue();
 
         if (value instanceof String) {
-            String stringValue = (String) kafkaMessageColumnValue.getValue();
+            String stringValue = (String) schemalessKafkaMessageColumnValue.getValue();
             try {
                 // Validate string can be parsed as BigDecimal (supports scientific notation)
                 new BigDecimal(stringValue.trim());

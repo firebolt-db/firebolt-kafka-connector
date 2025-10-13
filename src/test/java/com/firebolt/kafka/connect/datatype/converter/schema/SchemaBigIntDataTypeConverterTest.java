@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +48,7 @@ public class SchemaBigIntDataTypeConverterTest {
     })
     void testConvertAndSetWithValidLongValues(String longValueStr) throws SQLException {
         Long longValue = Long.parseLong(longValueStr);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(longValue)
                 .build();
 
@@ -59,7 +59,7 @@ public class SchemaBigIntDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNonLongValueThrowsException() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(new Object())
                 .build();
 
@@ -75,7 +75,7 @@ public class SchemaBigIntDataTypeConverterTest {
             "-9223372036854775808"
     })
     void testConvertAndSetWithValidStringLongs(String input) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(input)
                 .build();
 
@@ -93,7 +93,7 @@ public class SchemaBigIntDataTypeConverterTest {
             "-9223372036854775809"
     })
     void testConvertAndSetWithInvalidStringLongsThrowsColumnConversionFailed(String input) {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(input)
                 .build();
 
@@ -109,7 +109,7 @@ public class SchemaBigIntDataTypeConverterTest {
             "-42"
     })
     void testConvertAndSetWithByteValues(byte value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -127,7 +127,7 @@ public class SchemaBigIntDataTypeConverterTest {
             "-1024"
     })
     void testConvertAndSetWithShortValues(short value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -145,7 +145,7 @@ public class SchemaBigIntDataTypeConverterTest {
             "-123456"
     })
     void testConvertAndSetWithIntegerValues(int value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 

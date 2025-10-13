@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
@@ -30,49 +30,49 @@ public class SchemalessIntegerDataTypeConverterTest {
 
     @Test
     void convertsNumberToInteger() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(42L).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(42L).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setInt(1, 42);
     }
 
     @Test
     void parsesStringInteger() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(" 123 ").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(" 123 ").build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setInt(1, 123);
     }
 
     @Test
     void invalidStringThrows() {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value("abc").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value("abc").build();
         assertThrows(ColumnConversionFailedException.class,
             () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
     }
 
     @Test
     void convertsMinBoundaryLong() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value((long) Integer.MIN_VALUE).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value((long) Integer.MIN_VALUE).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setInt(1, Integer.MIN_VALUE);
     }
 
     @Test
     void convertsMaxBoundaryLong() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value((long) Integer.MAX_VALUE).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value((long) Integer.MAX_VALUE).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setInt(1, Integer.MAX_VALUE);
     }
 
     @Test
     void nonNumericTypeThrows() {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(12.34d).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(12.34d).build();
         assertThrows(ColumnConversionFailedException.class,
             () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
     }
 
     @Test
     void nullValueThrows() {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(null).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(null).build();
         assertThrows(ColumnConversionFailedException.class,
             () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
     }

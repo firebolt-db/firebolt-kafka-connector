@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
@@ -30,21 +30,21 @@ public class SchemalessDecimalDataTypeConverterTest {
 
     @Test
     void acceptsStringBigDecimal() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value("123.450").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value("123.450").build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setString(1, "123.450");
     }
 
     @Test
     void acceptsNumericToString() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(42).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(42).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setString(1, "42");
     }
 
     @Test
     void invalidStringThrows() {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value("not-a-number").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value("not-a-number").build();
         assertThrows(ColumnConversionFailedException.class,
             () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
     }

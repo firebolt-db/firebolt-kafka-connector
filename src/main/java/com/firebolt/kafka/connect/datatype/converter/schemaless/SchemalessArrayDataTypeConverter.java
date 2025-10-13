@@ -1,12 +1,12 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.CompositeDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.FireboltByteaConverter;
 import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
 import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaArrayDataTypeConverter;
 import java.nio.ByteBuffer;
 import java.sql.Array;
 import java.sql.Connection;
@@ -21,7 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.collections.CollectionUtils;
 
-public class SchemalessArrayDataTypeConverter extends SchemaArrayDataTypeConverter {
+public class SchemalessArrayDataTypeConverter extends CompositeDataTypeConverter<SchemalessKafkaMessageColumnValue> {
 
     private static final String DATE_ARRAY_TYPE_NAME = "date";
     private static final String TIMESTAMP_ARRAY_TYPE_NAME = "timestamp";
@@ -30,13 +30,13 @@ public class SchemalessArrayDataTypeConverter extends SchemaArrayDataTypeConvert
     private static final String REAL_TYPE_NAME = "real";
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
-        Array array = convertToArray(statement.getConnection(), kafkaMessageColumnValue, fireboltColumn);
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
+        Array array = convertToArray(statement.getConnection(), schemalessKafkaMessageColumnValue, fireboltColumn);
         statement.setArray(paramIndex, array);
     }
 
-    private Array convertToArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
-        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+    private Array convertToArray(Connection connection, SchemalessKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException, ColumnConversionFailedException {
+        List<Object> elements = (List) schemaKafkaMessageColumnValue.getValue();
 
         String typeName = detectTypeName(fireboltColumn);
         if (CollectionUtils.isEmpty(elements)) {
@@ -45,26 +45,26 @@ public class SchemalessArrayDataTypeConverter extends SchemaArrayDataTypeConvert
 
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
         if (typeName.equals(TIMESTAMP_ARRAY_TYPE_NAME)) {
-            return createTimestampArray(connection, kafkaMessageColumnValue, fireboltColumn);
+            return createTimestampArray(connection, schemaKafkaMessageColumnValue, fireboltColumn);
         } else if (typeName.equals(TIMESTAMPTZ_ARRAY_TYPE_NAME)) {
-            return createTimestamptzArray(connection, kafkaMessageColumnValue, fireboltColumn);
+            return createTimestamptzArray(connection, schemaKafkaMessageColumnValue, fireboltColumn);
         } else if (typeName.equals(DATE_ARRAY_TYPE_NAME)) {
-            return createDateArray(connection, kafkaMessageColumnValue, fireboltColumn);
+            return createDateArray(connection, schemaKafkaMessageColumnValue, fireboltColumn);
         } else if (typeName.equals("numeric")) {
-            if (kafkaMessageColumnValue.getValue() instanceof String) {
+            if (schemaKafkaMessageColumnValue.getValue() instanceof String) {
                 return connection.createArrayOf("string", elements.stream().map(objectValue -> objectValue == null ? null : String.valueOf(objectValue)).toArray());
             }
         } else if (typeName.equals(REAL_TYPE_NAME)) {
-            return createRealArray(connection, kafkaMessageColumnValue, fireboltColumn);
+            return createRealArray(connection, schemaKafkaMessageColumnValue, fireboltColumn);
         } else if (typeName.equals(BYTEA_ARRAY_TYPE_NAME)) {
-            return createByteaArray(connection, kafkaMessageColumnValue, fireboltColumn);
+            return createByteaArray(connection, schemaKafkaMessageColumnValue, fireboltColumn);
         }
 
         return connection.createArrayOf(typeName, toObjectArray(elements));
     }
 
-    private Array createRealArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+    private Array createRealArray(Connection connection, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) schemalessKafkaMessageColumnValue.getValue();
 
         // we need to set it as string as some setFloat is not working properly
         return connection.createArrayOf("string", elements.stream().map(object -> asReal(object, fireboltColumn)).toArray());
@@ -151,8 +151,8 @@ public class SchemalessArrayDataTypeConverter extends SchemaArrayDataTypeConvert
         return "string";
     }
 
-    private Array createByteaArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+    private Array createByteaArray(Connection connection, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) schemalessKafkaMessageColumnValue.getValue();
 
         // empty byte array will be serialized as empty string in kafka connect. In firebolt and empty byte is represented by \x
         return connection.createArrayOf(BYTEA_ARRAY_TYPE_NAME, elements.stream().map(objectValue -> objectValue == null ? null :asBytea(objectValue)).toArray());
@@ -168,18 +168,18 @@ public class SchemalessArrayDataTypeConverter extends SchemaArrayDataTypeConvert
         return FireboltByteaConverter.convertFireboltBytea(array);
     }
 
-    private Array createDateArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+    private Array createDateArray(Connection connection, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) schemalessKafkaMessageColumnValue.getValue();
         return connection.createArrayOf(DATE_ARRAY_TYPE_NAME, elements.stream().map(this::asStringDate).toArray());
     }
 
-    private Array createTimestampArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+    private Array createTimestampArray(Connection connection, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) schemalessKafkaMessageColumnValue.getValue();
         return connection.createArrayOf("string", elements.stream().map(this::asStringTimestamp).toArray());
     }
 
-    private Array createTimestamptzArray(Connection connection, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        List<Object> elements = (List) kafkaMessageColumnValue.getValue();
+    private Array createTimestamptzArray(Connection connection, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        List<Object> elements = (List) schemalessKafkaMessageColumnValue.getValue();
         return connection.createArrayOf("string", elements.stream().map(this::asStringTimestamptz).toArray());
     }
 

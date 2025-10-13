@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
@@ -43,7 +43,7 @@ public class SchemaDoubleDataTypeConverterTest {
             "-128"
     })
     void testConvertAndSetWithByteValues(byte value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -63,7 +63,7 @@ public class SchemaDoubleDataTypeConverterTest {
             "-32768"
     })
     void testConvertAndSetWithShortValues(short value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -83,7 +83,7 @@ public class SchemaDoubleDataTypeConverterTest {
             "-100000"
     })
     void testConvertAndSetWithIntValues(int value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -103,7 +103,7 @@ public class SchemaDoubleDataTypeConverterTest {
             "-10000000000"
     })
     void testConvertAndSetWithLongValues(long value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -121,7 +121,7 @@ public class SchemaDoubleDataTypeConverterTest {
             "-42.25"
     })
     void testConvertAndSetWithFloatValues(float value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -139,7 +139,7 @@ public class SchemaDoubleDataTypeConverterTest {
             "1.23E+10"
     })
     void testConvertAndSetWithDoubleValues(double value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -158,7 +158,7 @@ public class SchemaDoubleDataTypeConverterTest {
             "  12.34  "
     })
     void testConvertAndSetWithValidStringValues(String input) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(input)
                 .build();
 
@@ -172,7 +172,7 @@ public class SchemaDoubleDataTypeConverterTest {
     @ParameterizedTest
     @ValueSource(strings = {"abc", "", " ", "+-1", "1,23"})
     void testConvertAndSetWithInvalidStringValuesThrowsColumnConversionFailed(String input) {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(input)
                 .build();
 
@@ -181,7 +181,7 @@ public class SchemaDoubleDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithSQLExceptionPropagation() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123.45)
                 .build();
 

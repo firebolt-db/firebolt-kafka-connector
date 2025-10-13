@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter;
 
+import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.time.LocalDate;
@@ -7,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 
-public abstract class AbstractColumnTypeConverter implements ColumnDataTypeConverter {
+public abstract class AbstractColumnTypeConverter<T extends KafkaMessageColumnValue> implements ColumnDataTypeConverter<T> {
 
     private static final DateTimeFormatter ISO_DATE_STRICT =
             DateTimeFormatter.ISO_LOCAL_DATE.withResolverStyle(ResolverStyle.STRICT);

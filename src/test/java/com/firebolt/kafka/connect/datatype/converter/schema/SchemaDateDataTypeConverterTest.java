@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +40,7 @@ public class SchemaDateDataTypeConverterTest {
         Date sqlDate = Date.valueOf("2023-01-01");
         java.util.Date utilDate = new java.util.Date(sqlDate.getTime());
 
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(utilDate)
                 .build();
 
@@ -68,7 +68,7 @@ public class SchemaDateDataTypeConverterTest {
         "2023-06-30"
     })
     void testConvertAndSetWithValidIsoDateString(String dateString) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(dateString)
                 .build();
 
@@ -90,7 +90,7 @@ public class SchemaDateDataTypeConverterTest {
         "2024-00-10"
     })
     void testThrowsOnInvalidIsoDateString(String invalid) {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(invalid)
                 .build();
 
@@ -100,7 +100,7 @@ public class SchemaDateDataTypeConverterTest {
 
     @Test
     void testThrowsOnNullValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(null)
                 .build();
 
@@ -113,7 +113,7 @@ public class SchemaDateDataTypeConverterTest {
         Date sqlDate = Date.valueOf("2023-01-01");
         java.util.Date utilDate = new java.util.Date(sqlDate.getTime());
 
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(utilDate)
                 .build();
 
@@ -128,7 +128,7 @@ public class SchemaDateDataTypeConverterTest {
 
     @Test
     void testSQLExceptionPropagationForSetString() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("2023-01-01")
                 .build();
 

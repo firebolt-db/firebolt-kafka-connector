@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
@@ -9,14 +9,14 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import org.apache.kafka.connect.data.Schema;
 
-public class SchemaDecimalDataTypeConverter extends NumericDataTypeConverter {
+public class SchemaDecimalDataTypeConverter extends NumericDataTypeConverter<SchemaKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = kafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemaKafkaMessageColumnValue.getValue();
 
-        if (kafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING) {
-            String stringValue = (String) kafkaMessageColumnValue.getValue();
+        if (schemaKafkaMessageColumnValue.getSchemaType() == Schema.Type.STRING) {
+            String stringValue = (String) schemaKafkaMessageColumnValue.getValue();
             try {
                 new BigDecimal(stringValue.trim());
             } catch (Exception ex) {

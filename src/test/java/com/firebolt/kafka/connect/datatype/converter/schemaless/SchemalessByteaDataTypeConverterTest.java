@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -28,7 +28,7 @@ public class SchemalessByteaDataTypeConverterTest {
 
     @Test
     void acceptsString() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value("aGVsbG8=").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value("aGVsbG8=").build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setString(1, "aGVsbG8=");
     }

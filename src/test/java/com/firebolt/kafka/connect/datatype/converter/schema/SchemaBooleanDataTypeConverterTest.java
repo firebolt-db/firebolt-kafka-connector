@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +42,7 @@ public class SchemaBooleanDataTypeConverterTest {
             "false"
     })
     void testConvertAndSetWithValidBooleans(boolean booleanValue) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(booleanValue)
                 .build();
 
@@ -53,7 +53,7 @@ public class SchemaBooleanDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithSQLExceptionPropagation() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(true)
                 .build();
 
@@ -70,7 +70,7 @@ public class SchemaBooleanDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithSQLExceptionPropagationForString() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("true")
                 .build();
 
@@ -99,7 +99,7 @@ public class SchemaBooleanDataTypeConverterTest {
             "0"
     })
     void testConvertAndSetWithValidBooleanStrings(String stringValue) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(stringValue)
                 .build();
 
@@ -110,7 +110,7 @@ public class SchemaBooleanDataTypeConverterTest {
 
     @Test
     void willThrowExceptionWhenCannotDeserializeColumnAsBoolean() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("not_a_boolean")
                 .build();
 

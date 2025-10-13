@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect.convert;
 
 import com.firebolt.kafka.connect.FireboltRecord;
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,7 +13,6 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

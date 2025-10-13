@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -33,7 +33,7 @@ public class SchemaDecimalDataTypeConverterTest {
     @Test
     void testConvertAndSetWithBigDecimal() throws SQLException {
         java.math.BigDecimal bd = new java.math.BigDecimal("123.456");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(bd)
                 .build();
 
@@ -53,7 +53,7 @@ public class SchemaDecimalDataTypeConverterTest {
             "-32768"
     })
     void testConvertAndSetWithIntegralNumbers(short value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -71,7 +71,7 @@ public class SchemaDecimalDataTypeConverterTest {
             "-42.25"
     })
     void testConvertAndSetWithFloatingNumbers(double value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -95,7 +95,7 @@ public class SchemaDecimalDataTypeConverterTest {
         "'-0.001'"
     })
     void testConvertAndSetWithStringSchemaType(String decimalString) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(decimalString)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -107,7 +107,7 @@ public class SchemaDecimalDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithStringSchemaTypeButNonStringValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(12345L)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -120,7 +120,7 @@ public class SchemaDecimalDataTypeConverterTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"abc", "", " ", "+-1", "1,23"})
     void testConvertAndSetWithInvalidDecimalStringThrowsColumnConversionFailed(String input) {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(input)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -134,7 +134,7 @@ public class SchemaDecimalDataTypeConverterTest {
     @Test
     void testConvertAndSetWithUnsupportedTypeThrowsColumnConversionFailed() {
         Object unsupported = new Object();
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(unsupported)
                 .build();
 

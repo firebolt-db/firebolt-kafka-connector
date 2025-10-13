@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
@@ -35,7 +35,7 @@ public class TimestamptzDataTypeConverterTest {
     @Test
     void convertsInt64MillisToOffsetDateTime() throws Exception {
         long millis = 1_700_000_000_000L;
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder()
                 .schemaType(Schema.Type.INT64)
                 .value(millis)
                 .build();
@@ -49,7 +49,7 @@ public class TimestamptzDataTypeConverterTest {
     @Test
     void convertsInt64MicrosToOffsetDateTime() throws Exception {
         long micros = 1_700_000_000_123_456L;
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder()
                 .schemaType(Schema.Type.INT64)
                 .value(micros)
                 .build();
@@ -62,7 +62,7 @@ public class TimestamptzDataTypeConverterTest {
 
     @Test
     void convertsNullInt64ToNull() throws Exception {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder()
                 .schemaType(Schema.Type.INT64)
                 .value(null)
                 .build();
@@ -81,7 +81,7 @@ public class TimestamptzDataTypeConverterTest {
             "2024-01-15 14:30:45.12+02:00"
     })
     void acceptsValidStringTimestamptz(String input) throws Exception {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder()
                 .schemaType(Schema.Type.STRING)
                 .value(input)
                 .build();
@@ -99,7 +99,7 @@ public class TimestamptzDataTypeConverterTest {
             "2024-01-15T14:30:45+2"          // invalid offset
     })
     void rejectsInvalidStringTimestamptz(String input) throws Exception {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder()
                 .schemaType(Schema.Type.STRING)
                 .value(input)
                 .build();
@@ -110,7 +110,7 @@ public class TimestamptzDataTypeConverterTest {
 
     @Test
     void rejectsInvalidStringThatIsNotATimestamptz() {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder()
                 .schemaType(Schema.Type.STRING)
                 .value("not-a-timestamp")
                 .build();
@@ -121,7 +121,7 @@ public class TimestamptzDataTypeConverterTest {
 
     @Test
     void rejectsUnsupportedSchemaType() {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder()
                 .schemaType(Schema.Type.INT32)
                 .value(123)
                 .build();

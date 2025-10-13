@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.PreparedStatement;
@@ -44,7 +44,7 @@ public class SchemaIntegerDataTypeConverterTest {
         "-100000"      // Large negative
     })
     void testConvertAndSetWithValidIntegers(int intValue) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(intValue)
                 .build();
 
@@ -55,7 +55,7 @@ public class SchemaIntegerDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithValueBeyondIntegerMaxThrowsConversionFailed() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(Long.MAX_VALUE)
                 .build();
 
@@ -64,7 +64,7 @@ public class SchemaIntegerDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithValueBeyondIntegerMinThrowsConversionFailed() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(Long.MIN_VALUE)
                 .build();
 
@@ -73,7 +73,7 @@ public class SchemaIntegerDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNullValueThrowsException() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(null)
                 .build();
 
@@ -82,7 +82,7 @@ public class SchemaIntegerDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNonConvertibleTypeThrowsColumnConversionFailed() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(Set.of(1, 2, 3))
                 .build();
 
@@ -98,7 +98,7 @@ public class SchemaIntegerDataTypeConverterTest {
             "-2147483648,-2147483648"
     })
     void testConvertAndSetWithValidIntegerStrings(String input, int expected) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(input)
                 .build();
 
@@ -117,7 +117,7 @@ public class SchemaIntegerDataTypeConverterTest {
             "-2147483649"   // underflow
     })
     void testConvertAndSetWithInvalidIntegerStringsThrowsColumnConversionFailed(String input) {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(input)
                 .build();
 
@@ -133,7 +133,7 @@ public class SchemaIntegerDataTypeConverterTest {
             "-42"
     })
     void testConvertAndSetWithByteValues(byte value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 
@@ -151,7 +151,7 @@ public class SchemaIntegerDataTypeConverterTest {
             "-1024"
     })
     void testConvertAndSetWithShortValues(short value) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(value)
                 .build();
 

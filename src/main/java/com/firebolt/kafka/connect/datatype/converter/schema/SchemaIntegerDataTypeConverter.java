@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
@@ -10,11 +10,11 @@ import java.sql.SQLException;
 /**
  * Converts kafka message attribute to an integer value
  */
-public class SchemaIntegerDataTypeConverter extends NumericDataTypeConverter {
+public class SchemaIntegerDataTypeConverter extends NumericDataTypeConverter<SchemaKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = kafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemaKafkaMessageColumnValue.getValue();
 
         if (value instanceof Byte || value instanceof Short || value instanceof Integer) {
             long intValue = ((Number) value).intValue();

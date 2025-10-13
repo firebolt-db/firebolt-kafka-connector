@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +92,7 @@ public class TextDataTypeConverterTest {
         // Remove quotes from CSV source parameter for actual string value
         String actualValue = stringValue.substring(1, stringValue.length() - 1);
         
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(actualValue)
                 .build();
 
@@ -103,7 +103,7 @@ public class TextDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithEmptyString() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("")
                 .build();
 
@@ -114,7 +114,7 @@ public class TextDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithSQLExceptionPropagation() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("test value")
                 .build();
 
@@ -138,7 +138,7 @@ public class TextDataTypeConverterTest {
         }
         String expectedValue = largeString.toString();
 
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(expectedValue)
                 .build();
 

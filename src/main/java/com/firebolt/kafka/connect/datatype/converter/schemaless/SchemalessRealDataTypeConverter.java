@@ -1,17 +1,17 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.NumericDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaRealDataTypeConverter;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class SchemalessRealDataTypeConverter extends SchemaRealDataTypeConverter {
+public class SchemalessRealDataTypeConverter extends NumericDataTypeConverter<SchemalessKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = kafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemalessKafkaMessageColumnValue.getValue();
 
         if (value instanceof Float) {
             // NOTE: the Float.MAX_VALUE will not be set in firebolt if we are using setFloat method, as it fails with the following error

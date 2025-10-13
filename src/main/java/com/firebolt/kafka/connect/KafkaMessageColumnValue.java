@@ -1,24 +1,14 @@
 package com.firebolt.kafka.connect;
 
-import java.util.Map;
-import lombok.Builder;
-import lombok.Data;
-import lombok.Getter;
-import org.apache.kafka.connect.data.Schema;
-
-@Data
-@Getter
-@Builder
-public class KafkaMessageColumnValue {
-
-    private Object value;
-
-    private Schema.Type schemaType;
+/**
+ * Base class for the value of a column from a Kafka message
+ */
+public interface KafkaMessageColumnValue {
 
     /**
-     * In case of an array we will keep here the type of each element in the array
+     * Return the value of the column from the kafka message
+     * @return
      */
-    private Schema.Type schemaSubType;
+    Object getValue();
 
-    private Map<String, String> schemaTypeParams;
 }
