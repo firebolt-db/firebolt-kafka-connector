@@ -178,7 +178,7 @@ public class InsertPreparedStatementTest {
         validColumnNames.put(COLUMN_NAME_2, "NAME");
 
         try (MockedStatic<ColumnDataTypeFactoryProvider> factoryStatic = Mockito.mockStatic(ColumnDataTypeFactoryProvider.class)) {
-            factoryStatic.when(() -> ColumnDataTypeFactoryProvider.getInstance(false)).thenReturn(mockFactory);
+            factoryStatic.when(() -> ColumnDataTypeFactoryProvider.getInstance(true)).thenReturn(mockFactory);
 
             // Use reflection to invoke private setStatementParameters and verify it throws RecordConversionFailedException
             java.lang.reflect.Method method = InsertPreparedStatement.class.getDeclaredMethod(
@@ -302,11 +302,10 @@ public class InsertPreparedStatementTest {
 
     private static FireboltRecord buildRecord(String tableName, int partition, long offset,
                                               Map<String, KafkaMessageColumnValue> values) {
-        new SinkRecord("topic", 1, null, null, null, null, 1234L);
         return new FireboltRecord(
                 tableName,
                 values,
-                new SinkRecord("topic", partition, null, null, null, null, offset)
+                new SinkRecord("topic", partition, null, null, Schema.OPTIONAL_STRING_SCHEMA, null, offset)
         );
     }
 

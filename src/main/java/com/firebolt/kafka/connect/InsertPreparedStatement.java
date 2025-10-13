@@ -150,8 +150,7 @@ public class InsertPreparedStatement {
                 if (value == null || value.getValue() == null) {
                     stmt.setNull(parameterIndex, column.getSqlType());
                 } else {
-                    boolean isSchemaless = value instanceof SchemalessKafkaMessageColumnValue;
-                    ColumnDataTypeConverter columnDataTypeConverter = ColumnDataTypeFactoryProvider.getInstance(isSchemaless).getConverter(column);
+                    ColumnDataTypeConverter columnDataTypeConverter = ColumnDataTypeFactoryProvider.getInstance(record.hasValueSchema()).getConverter(column);
                     try {
                         columnDataTypeConverter.convertAndSet(stmt, parameterIndex, value, column);
                     } catch (ColumnConversionFailedException e) {

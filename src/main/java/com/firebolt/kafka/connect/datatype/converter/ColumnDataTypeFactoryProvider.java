@@ -12,11 +12,11 @@ public class ColumnDataTypeFactoryProvider {
         this.schemalessColumnTypeConverterFactory = new SchemalessColumnTypeConverterFactory();
     }
 
-    public static ColumnDataTypeConverterFactory getInstance(boolean isSchemaless) {
+    public static ColumnDataTypeConverterFactory getInstance(boolean hasSchema) {
         if (instance == null) {
             instance = new ColumnDataTypeFactoryProvider();
         }
 
-        return isSchemaless ? instance.schemalessColumnTypeConverterFactory : instance.schemaColumnTypeConverterFactory;
+        return hasSchema ? instance.schemaColumnTypeConverterFactory : instance.schemalessColumnTypeConverterFactory;
     }
 }
