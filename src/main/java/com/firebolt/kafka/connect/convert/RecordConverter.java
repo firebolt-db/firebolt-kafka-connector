@@ -2,6 +2,8 @@ package com.firebolt.kafka.connect.convert;
 
 import com.firebolt.kafka.connect.FireboltRecord;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import java.util.HashMap;
@@ -14,7 +16,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
  * Provides common functionality and defines the contract for specific converter implementations.
  */
 @Slf4j
-public abstract class RecordConverter {
+public abstract class RecordConverter<T extends KafkaMessageColumnValue> {
 
     protected final SinkConfig config;
 
@@ -37,7 +39,7 @@ public abstract class RecordConverter {
      */
     public final FireboltRecord convert(SinkRecord record) throws RecordConversionException {
         // Delegate to specific implementation
-        Map<String, ? extends KafkaMessageColumnValue> columnValues = convertRecordValue(record);
+        Map<String, T> columnValues = convertRecordValue(record);
 
         String tableName = config.getTableNameForTopic(record.topic());
 
@@ -63,7 +65,7 @@ public abstract class RecordConverter {
      * @return map of column names to values
      * @throws RecordConversionException if conversion fails
      */
-    protected abstract Map<String, ? extends KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException;
+    protected abstract Map<String, T> convertRecordValue(SinkRecord record) throws RecordConversionException;
 
     /**
      * Determines if this converter can handle the given record.
@@ -86,7 +88,7 @@ public abstract class RecordConverter {
      * @param record the SinkRecord with null value
      * @return empty map for null values
      */
-    protected final Map<String, ? extends KafkaMessageColumnValue> handleNullValue(SinkRecord record) {
+    protected final Map<String, T> handleNullValue(SinkRecord record) {
         log.debug("Record value is null for topic={}, partition={}, offset={}",
                 record.topic(), record.kafkaPartition(), record.kafkaOffset());
         return new HashMap<>();

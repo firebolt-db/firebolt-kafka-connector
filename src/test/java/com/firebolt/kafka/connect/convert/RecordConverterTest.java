@@ -1,7 +1,7 @@
 package com.firebolt.kafka.connect.convert;
 
 import com.firebolt.kafka.connect.FireboltRecord;
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -55,9 +55,9 @@ public class RecordConverterTest {
         when(mockSinkRecord.timestamp()).thenReturn(1234567890L);
 
         // Configure test converter to return test data
-        Map<String, KafkaMessageColumnValue> testColumnValues = new HashMap<>();
-        testColumnValues.put("field1", KafkaMessageColumnValue.builder().value("value1").build());
-        testColumnValues.put("field2", KafkaMessageColumnValue.builder().value(42).build());
+        Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
+        testColumnValues.put("field1", SchemaKafkaMessageColumnValue.builder().value("value1").build());
+        testColumnValues.put("field2", SchemaKafkaMessageColumnValue.builder().value(42).build());
         converter.setTestColumnValues(testColumnValues);
 
         FireboltRecord result = converter.convert(mockSinkRecord);
@@ -79,7 +79,7 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
         when(mockSinkRecord.timestamp()).thenReturn(1234567890L);
 
-        Map<String, KafkaMessageColumnValue> testColumnValues = new HashMap<>();
+        Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
         FireboltRecord result = converter.convert(mockSinkRecord);
@@ -98,7 +98,7 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
         when(mockSinkRecord.timestamp()).thenReturn(null); // null timestamp
 
-        Map<String, KafkaMessageColumnValue> testColumnValues = new HashMap<>();
+        Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
         FireboltRecord result = converter.convert(mockSinkRecord);
@@ -137,7 +137,7 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
         when(mockSinkRecord.timestamp()).thenReturn(1234567890L);
 
-        Map<String, KafkaMessageColumnValue> testColumnValues = new HashMap<>();
+        Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
         FireboltRecord result = converter.convert(mockSinkRecord);
@@ -162,7 +162,7 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaOffset()).thenReturn(offset);
         when(mockSinkRecord.timestamp()).thenReturn(1234567890L);
 
-        Map<String, KafkaMessageColumnValue> testColumnValues = new HashMap<>();
+        Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
         FireboltRecord result = converter.convert(mockSinkRecord);
@@ -178,7 +178,7 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaPartition()).thenReturn(1);
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
 
-        Map<String, ? extends KafkaMessageColumnValue> result = converter.testHandleNullValue(mockSinkRecord);
+        Map<String, ? extends SchemaKafkaMessageColumnValue> result = converter.testHandleNullValue(mockSinkRecord);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -192,8 +192,8 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
         when(mockSinkRecord.timestamp()).thenReturn(1234567890L);
 
-        Map<String, KafkaMessageColumnValue> expectedColumnValues = new HashMap<>();
-        expectedColumnValues.put("test_field", KafkaMessageColumnValue.builder().value("test_value").build());
+        Map<String, SchemaKafkaMessageColumnValue> expectedColumnValues = new HashMap<>();
+        expectedColumnValues.put("test_field", SchemaKafkaMessageColumnValue.builder().value("test_value").build());
         converter.setTestColumnValues(expectedColumnValues);
 
         FireboltRecord result = converter.convert(mockSinkRecord);
@@ -224,7 +224,7 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
         when(mockSinkRecord.timestamp()).thenReturn(1234567890L);
 
-        Map<String, KafkaMessageColumnValue> emptyColumnValues = new HashMap<>();
+        Map<String, SchemaKafkaMessageColumnValue> emptyColumnValues = new HashMap<>();
         converter.setTestColumnValues(emptyColumnValues);
 
         FireboltRecord result = converter.convert(mockSinkRecord);
@@ -242,11 +242,11 @@ public class RecordConverterTest {
         when(mockSinkRecord.kafkaOffset()).thenReturn(100L);
         when(mockSinkRecord.timestamp()).thenReturn(1234567890L);
 
-        Map<String, KafkaMessageColumnValue> complexColumnValues = new HashMap<>();
-        complexColumnValues.put("string_field", KafkaMessageColumnValue.builder().value("test_string").build());
-        complexColumnValues.put("int_field", KafkaMessageColumnValue.builder().value(42).build());
-        complexColumnValues.put("double_field", KafkaMessageColumnValue.builder().value(3.14).build());
-        complexColumnValues.put("boolean_field", KafkaMessageColumnValue.builder().value(true).build());
+        Map<String, SchemaKafkaMessageColumnValue> complexColumnValues = new HashMap<>();
+        complexColumnValues.put("string_field", SchemaKafkaMessageColumnValue.builder().value("test_string").build());
+        complexColumnValues.put("int_field", SchemaKafkaMessageColumnValue.builder().value(42).build());
+        complexColumnValues.put("double_field", SchemaKafkaMessageColumnValue.builder().value(3.14).build());
+        complexColumnValues.put("boolean_field", SchemaKafkaMessageColumnValue.builder().value(true).build());
         complexColumnValues.put("null_field", null);
         
         converter.setTestColumnValues(complexColumnValues);
@@ -262,7 +262,7 @@ public class RecordConverterTest {
      * This allows us to test the concrete methods in the abstract base class.
      */
     private static class TestRecordConverter extends RecordConverter {
-        private Map<String, KafkaMessageColumnValue> testColumnValues = new HashMap<>();
+        private Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         private boolean convertRecordValueCalled = false;
         private boolean shouldThrowException = false;
 
@@ -274,7 +274,7 @@ public class RecordConverterTest {
             return this.config;
         }
 
-        public void setTestColumnValues(Map<String, KafkaMessageColumnValue> columnValues) {
+        public void setTestColumnValues(Map<String, SchemaKafkaMessageColumnValue> columnValues) {
             this.testColumnValues = columnValues;
         }
 
@@ -286,12 +286,12 @@ public class RecordConverterTest {
             return convertRecordValueCalled;
         }
 
-        public Map<String, ? extends KafkaMessageColumnValue> testHandleNullValue(SinkRecord record) {
+        public Map<String, ? extends SchemaKafkaMessageColumnValue> testHandleNullValue(SinkRecord record) {
             return handleNullValue(record);
         }
 
         @Override
-        protected Map<String, KafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
+        protected Map<String, SchemaKafkaMessageColumnValue> convertRecordValue(SinkRecord record) throws RecordConversionException {
             convertRecordValueCalled = true;
             if (shouldThrowException) {
                 throw new RecordConversionException("Test conversion error");

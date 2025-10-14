@@ -1,22 +1,22 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.FireboltTimestampConverter;
 import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTimestampDataTypeConverter;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
-public class SchemalessTimestampDataTypeConverter extends SchemaTimestampDataTypeConverter {
+public class SchemalessTimestampDataTypeConverter extends AbstractColumnTypeConverter<SchemalessKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = kafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemalessKafkaMessageColumnValue.getValue();
         if (value instanceof String) {
-            String dateTimeAsString = (String) kafkaMessageColumnValue.getValue();
+            String dateTimeAsString = (String) schemalessKafkaMessageColumnValue.getValue();
             if (FireboltTimestampConverter.isIsoLocalDateTime(dateTimeAsString)) {
                 statement.setString(paramIndex, dateTimeAsString);
                 return;
@@ -25,7 +25,7 @@ public class SchemalessTimestampDataTypeConverter extends SchemaTimestampDataTyp
         }
 
         if (value instanceof Number) {
-            long millisFromEpoch = ((Number) kafkaMessageColumnValue.getValue()).longValue();
+            long millisFromEpoch = ((Number) schemalessKafkaMessageColumnValue.getValue()).longValue();
             Timestamp timestamp = TimestampUtil.asTimestamp(millisFromEpoch);
             statement.setTimestamp(paramIndex, timestamp);
             return;

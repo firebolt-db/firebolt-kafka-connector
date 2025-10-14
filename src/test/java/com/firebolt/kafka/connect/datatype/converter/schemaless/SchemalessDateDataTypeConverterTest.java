@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -31,7 +31,7 @@ public class SchemalessDateDataTypeConverterTest {
 
     @Test
     void convertsEpochDaysToDate() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(1).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(1).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         ArgumentCaptor<Date> captor = ArgumentCaptor.forClass(Date.class);
         verify(mockStatement).setDate(org.mockito.ArgumentMatchers.eq(1), captor.capture());
@@ -40,7 +40,7 @@ public class SchemalessDateDataTypeConverterTest {
 
     @Test
     void passesIsoStringThrough() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value("2024-01-15").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value("2024-01-15").build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setString(1, "2024-01-15");
     }

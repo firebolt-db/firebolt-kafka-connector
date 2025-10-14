@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,7 +72,7 @@ public class SchemaRealDataTypeConverterTest {
                 floatValue = Float.parseFloat(floatValueStr);
         }
         
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(floatValue)
                 .build();
 
@@ -83,7 +83,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNullValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(null)
                 .build();
 
@@ -93,7 +93,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNonFloatValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("not a number")
                 .build();
 
@@ -103,7 +103,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithIntegerValue() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(42) // Integer instead of Float
                 .build();
 
@@ -114,7 +114,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithShortValue() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(Short.valueOf("12"))
                 .build();
 
@@ -125,7 +125,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithByteValue() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(Byte.valueOf("34"))
                 .build();
 
@@ -136,7 +136,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithDoubleValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(42.5) // Double instead of Float
                 .build();
 
@@ -146,7 +146,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithBooleanValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(true) // Boolean instead of Float
                 .build();
 
@@ -156,7 +156,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithDifferentParameterIndex() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123.45f)
                 .build();
 
@@ -167,7 +167,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNegativeParameterIndex() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123.45f)
                 .build();
 
@@ -178,7 +178,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithLargeParameterIndex() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123.45f)
                 .build();
 
@@ -189,7 +189,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithSQLExceptionPropagation() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123.45f)
                 .build();
 
@@ -206,7 +206,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithDifferentColumnTypes() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123.45f)
                 .build();
 
@@ -227,7 +227,7 @@ public class SchemaRealDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNullableColumn() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123.45f)
                 .build();
 

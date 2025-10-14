@@ -91,20 +91,20 @@ public class InsertPreparedStatementTest {
         // 4 records so we expect first executeBatch to fail with 413, then two successful halves
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 1L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build(),
+                "NAME", SchemaKafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 2L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT32).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("b").schemaType(Schema.Type.STRING).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT32).build(),
+                "NAME", SchemaKafkaMessageColumnValue.builder().value("b").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 3L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(3).schemaType(Schema.Type.INT32).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("c").schemaType(Schema.Type.STRING).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(3).schemaType(Schema.Type.INT32).build(),
+                "NAME", SchemaKafkaMessageColumnValue.builder().value("c").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 4L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(4).schemaType(Schema.Type.INT32).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("d").schemaType(Schema.Type.STRING).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(4).schemaType(Schema.Type.INT32).build(),
+                "NAME", SchemaKafkaMessageColumnValue.builder().value("d").schemaType(Schema.Type.STRING).build()
         )));
 
         // Prepare three statements: first fails with 413, next two succeed
@@ -138,8 +138,8 @@ public class InsertPreparedStatementTest {
 
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 1, 1234L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(5L).schemaType(Schema.Type.INT64).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("huge").schemaType(Schema.Type.STRING).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(5L).schemaType(Schema.Type.INT64).build(),
+                "NAME", SchemaKafkaMessageColumnValue.builder().value("huge").schemaType(Schema.Type.STRING).build()
         )));
 
         PreparedStatement psFail = Mockito.mock(PreparedStatement.class);
@@ -160,8 +160,8 @@ public class InsertPreparedStatementTest {
     void willPropagateColumnConversionFailureAsRecordConversionFailedException() throws Exception {
         // Arrange a record with values that will trigger a converter failure
         FireboltRecord record = buildRecord(TABLE_NAME, 7, 123L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
-                "NAME", KafkaMessageColumnValue.builder().value("not_a_boolean").schemaType(Schema.Type.STRING).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
+                "NAME", SchemaKafkaMessageColumnValue.builder().value("not_a_boolean").schemaType(Schema.Type.STRING).build()
         ));
 
         // Mock converter to throw ColumnConversionFailedException
@@ -216,12 +216,12 @@ public class InsertPreparedStatementTest {
     void shouldBuildCorrectInsertSQLAndSetParametersWithCaseInsensitiveColumnNames() throws SQLException {        
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 10L, mapOf(
-                "ID", KafkaMessageColumnValue.builder().value(Integer.valueOf(123)).schemaType(Schema.Type.INT32).build(),
-                "name", KafkaMessageColumnValue.builder().value("Alice").schemaType(Schema.Type.STRING).build()
+                "ID", SchemaKafkaMessageColumnValue.builder().value(Integer.valueOf(123)).schemaType(Schema.Type.INT32).build(),
+                "name", SchemaKafkaMessageColumnValue.builder().value("Alice").schemaType(Schema.Type.STRING).build()
         )));
         records.add(buildRecord(TABLE_NAME, 0, 11L, mapOf(
-                "ID", KafkaMessageColumnValue.builder().value(Integer.valueOf(456)).schemaType(Schema.Type.INT32).build(),
-                "name", KafkaMessageColumnValue.builder().value("Bob").schemaType(Schema.Type.STRING).build()
+                "ID", SchemaKafkaMessageColumnValue.builder().value(Integer.valueOf(456)).schemaType(Schema.Type.INT32).build(),
+                "name", SchemaKafkaMessageColumnValue.builder().value("Bob").schemaType(Schema.Type.STRING).build()
         )));
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
@@ -243,12 +243,12 @@ public class InsertPreparedStatementTest {
     void shouldHandleNullValuesAndSetSqlNull() throws SQLException {
         List<FireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 100L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(Integer.valueOf(1)).schemaType(Schema.Type.INT32).build(),
-                "name", KafkaMessageColumnValue.builder().value("Carol").schemaType(Schema.Type.STRING).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(Integer.valueOf(1)).schemaType(Schema.Type.INT32).build(),
+                "name", SchemaKafkaMessageColumnValue.builder().value("Carol").schemaType(Schema.Type.STRING).build()
         )));
         // name missing -> should be setNull
         records.add(buildRecord(TABLE_NAME, 0, 101L, mapOf(
-                "id", KafkaMessageColumnValue.builder().value(Integer.valueOf(2)).schemaType(Schema.Type.INT32).build()
+                "id", SchemaKafkaMessageColumnValue.builder().value(Integer.valueOf(2)).schemaType(Schema.Type.INT32).build()
         )));
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
@@ -269,10 +269,10 @@ public class InsertPreparedStatementTest {
 
     @Test
     void shouldIgnoreExtraColumnsNotInSchema() throws SQLException {
-        Map<String, KafkaMessageColumnValue> values = new HashMap<>();
-        values.put("id", KafkaMessageColumnValue.builder().value(100).schemaType(Schema.Type.INT32).build());
-        values.put("name", KafkaMessageColumnValue.builder().value("widget").schemaType(Schema.Type.STRING).build());
-        values.put("unknown", KafkaMessageColumnValue.builder().value("ignored").schemaType(Schema.Type.STRING).build());
+        Map<String, SchemaKafkaMessageColumnValue> values = new HashMap<>();
+        values.put("id", SchemaKafkaMessageColumnValue.builder().value(100).schemaType(Schema.Type.INT32).build());
+        values.put("name", SchemaKafkaMessageColumnValue.builder().value("widget").schemaType(Schema.Type.STRING).build());
+        values.put("unknown", SchemaKafkaMessageColumnValue.builder().value("ignored").schemaType(Schema.Type.STRING).build());
 
         List<FireboltRecord> records = List.of(buildRecord(TABLE_NAME, 0, 1L, values));
 
@@ -287,8 +287,8 @@ public class InsertPreparedStatementTest {
 
     @Test
     void willOnlyCreatePreparedStatementWithColumnsInRecordsIfNotAllColumnsArePresent() throws SQLException {
-        Map<String, KafkaMessageColumnValue> values = new HashMap<>();
-        values.put("id", KafkaMessageColumnValue.builder().value(100).schemaType(Schema.Type.INT32).build());
+        Map<String, SchemaKafkaMessageColumnValue> values = new HashMap<>();
+        values.put("id", SchemaKafkaMessageColumnValue.builder().value(100).schemaType(Schema.Type.INT32).build());
 
         List<FireboltRecord> records = List.of(buildRecord(TABLE_NAME, 0, 1L, values));
 
@@ -301,7 +301,7 @@ public class InsertPreparedStatementTest {
     }
 
     private static FireboltRecord buildRecord(String tableName, int partition, long offset,
-                                              Map<String, KafkaMessageColumnValue> values) {
+                                              Map<String, SchemaKafkaMessageColumnValue> values) {
         return new FireboltRecord(
                 tableName,
                 values,
@@ -310,11 +310,11 @@ public class InsertPreparedStatementTest {
     }
 
     @SafeVarargs
-    private static Map<String, KafkaMessageColumnValue> mapOf(Object... keyVals) {
-        Map<String, KafkaMessageColumnValue> map = new HashMap<>();
+    private static Map<String, SchemaKafkaMessageColumnValue> mapOf(Object... keyVals) {
+        Map<String, SchemaKafkaMessageColumnValue> map = new HashMap<>();
         for (int i = 0; i < keyVals.length; i += 2) {
             String key = (String) keyVals[i];
-            KafkaMessageColumnValue val = (KafkaMessageColumnValue) keyVals[i + 1];
+            SchemaKafkaMessageColumnValue val = (SchemaKafkaMessageColumnValue) keyVals[i + 1];
             map.put(key, val);
         }
         return map;

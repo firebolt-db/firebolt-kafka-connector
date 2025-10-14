@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -31,7 +31,7 @@ public class SchemalessTimestampDataTypeConverterTest {
 
     @Test
     void acceptsIsoLocalDateTimeString() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value("2024-01-15T14:30:45").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value("2024-01-15T14:30:45").build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setString(1, "2024-01-15T14:30:45");
     }
@@ -39,7 +39,7 @@ public class SchemalessTimestampDataTypeConverterTest {
     @Test
     void convertsEpochMillisToTimestamp() throws SQLException {
         long millis = 1705336245000L;
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(millis).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(millis).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         ArgumentCaptor<Timestamp> captor = ArgumentCaptor.forClass(Timestamp.class);
         verify(mockStatement).setTimestamp(org.mockito.ArgumentMatchers.eq(1), captor.capture());

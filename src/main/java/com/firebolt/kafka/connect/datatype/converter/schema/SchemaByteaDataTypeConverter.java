@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.AbstractColumnTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.FireboltByteaConverter;
@@ -8,11 +8,11 @@ import java.nio.ByteBuffer;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public class SchemaByteaDataTypeConverter extends AbstractColumnTypeConverter {
+public class SchemaByteaDataTypeConverter extends AbstractColumnTypeConverter<SchemaKafkaMessageColumnValue> {
 
     @Override
-    public void convertAndSet(PreparedStatement statement, int paramIndex, KafkaMessageColumnValue kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
-        Object value = kafkaMessageColumnValue.getValue();
+    public void convertAndSet(PreparedStatement statement, int paramIndex, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
+        Object value = schemaKafkaMessageColumnValue.getValue();
         if (value instanceof byte[]) {
             statement.setBytes(paramIndex, FireboltByteaConverter.convertFireboltBytea((byte[]) value));
             return;

@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.Array;
@@ -42,7 +42,7 @@ public class SchemalessArrayDataTypeConverterTest {
     void createsIntegerArray() throws SQLException {
         TableSchema.Column col = new TableSchema.Column("ints", "array(integer)", 2003, true);
         List<Object> list = Arrays.asList(1, 2, 3);
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(list).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(list).build();
         when(mockConnection.createArrayOf("integer", list.toArray())).thenReturn(mockArray);
 
         converter.convertAndSet(mockStatement, 1, value, col);
@@ -53,7 +53,7 @@ public class SchemalessArrayDataTypeConverterTest {
     void convertsTimestampLongsToStringArray() throws SQLException {
         TableSchema.Column col = new TableSchema.Column("ts", "array(timestamp)", 2003, true);
         List<Object> list = Arrays.asList(1705336245000L, null, 1705336245123L);
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(list).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(list).build();
 
         ArgumentCaptor<Object[]> elementsCaptor = ArgumentCaptor.forClass(Object[].class);
         when(mockConnection.createArrayOf(org.mockito.ArgumentMatchers.eq("string"), elementsCaptor.capture())).thenReturn(mockArray);
@@ -71,7 +71,7 @@ public class SchemalessArrayDataTypeConverterTest {
     void createsRealArrayFromMixedNumericTypes() throws SQLException {
         TableSchema.Column col = new TableSchema.Column("reals", "array(real)", 2003, true);
         List<Object> list = Arrays.asList(100L, 12.5d, null);
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(list).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(list).build();
 
         ArgumentCaptor<Object[]> elementsCaptor = ArgumentCaptor.forClass(Object[].class);
         when(mockConnection.createArrayOf(org.mockito.ArgumentMatchers.eq("string"), elementsCaptor.capture())).thenReturn(mockArray);
@@ -89,7 +89,7 @@ public class SchemalessArrayDataTypeConverterTest {
     void realArrayWithInvalidStringThrows() {
         TableSchema.Column col = new TableSchema.Column("reals", "array(real)", 2003, true);
         List<Object> list = Arrays.asList("abc");
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(list).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(list).build();
 
         assertThrows(ColumnConversionFailedException.class, () ->
                 converter.convertAndSet(mockStatement, 1, value, col));
@@ -99,7 +99,7 @@ public class SchemalessArrayDataTypeConverterTest {
     void realArrayWithUnsupportedTypeThrows() {
         TableSchema.Column col = new TableSchema.Column("reals", "array(real)", 2003, true);
         List<Object> list = Arrays.asList(true);
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(list).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(list).build();
 
         assertThrows(ColumnConversionFailedException.class, () ->
                 converter.convertAndSet(mockStatement, 1, value, col));
@@ -109,7 +109,7 @@ public class SchemalessArrayDataTypeConverterTest {
     void realArrayEmptyListCreatesRealArrayType() throws SQLException {
         TableSchema.Column col = new TableSchema.Column("reals", "array(real)", 2003, true);
         List<Object> list = Arrays.asList();
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(list).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(list).build();
 
         when(mockConnection.createArrayOf("real", list.toArray())).thenReturn(mockArray);
 

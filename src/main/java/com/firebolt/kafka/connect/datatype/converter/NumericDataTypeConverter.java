@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.datatype.converter;
 
-public abstract class NumericDataTypeConverter extends AbstractColumnTypeConverter {
+import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+
+public abstract class NumericDataTypeConverter<T extends KafkaMessageColumnValue> extends AbstractColumnTypeConverter<T> {
 
 }

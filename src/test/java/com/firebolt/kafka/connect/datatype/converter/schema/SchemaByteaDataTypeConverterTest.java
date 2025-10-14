@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ public class SchemaByteaDataTypeConverterTest {
         "Empty-ish:   "
     })
     void testConvertAndSetWithStringValues(String stringValue) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(stringValue)
                 .build();
 
@@ -60,7 +60,7 @@ public class SchemaByteaDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithEmptyString() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("")
                 .build();
 
@@ -72,7 +72,7 @@ public class SchemaByteaDataTypeConverterTest {
     @Test
     void testConvertAndSetWithByteArrayNonEmpty() throws SQLException {
         byte[] data = new byte[]{0x00, 0x01, 0x02};
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(data)
                 .build();
 
@@ -84,7 +84,7 @@ public class SchemaByteaDataTypeConverterTest {
     @Test
     void testConvertAndSetWithByteArrayEmptyConvertsToBackslashX() throws SQLException {
         byte[] empty = new byte[]{};
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(empty)
                 .build();
 
@@ -97,7 +97,7 @@ public class SchemaByteaDataTypeConverterTest {
     void testConvertAndSetWithByteBuffer() throws SQLException {
         byte[] data = new byte[]{0x0A, 0x0B};
         ByteBuffer buffer = ByteBuffer.wrap(data);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(buffer)
                 .build();
 
@@ -109,7 +109,7 @@ public class SchemaByteaDataTypeConverterTest {
     @Test
     void testConvertAndSetWithSQLExceptionPropagationForString() throws SQLException {
         String val = "test";
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(val)
                 .build();
 
@@ -125,7 +125,7 @@ public class SchemaByteaDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithUnsupportedTypeThrows() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(123)
                 .build();
 
@@ -146,7 +146,7 @@ public class SchemaByteaDataTypeConverterTest {
         };
 
         for (String s : samples) {
-            KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+            SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                     .value(s)
                     .build();
 

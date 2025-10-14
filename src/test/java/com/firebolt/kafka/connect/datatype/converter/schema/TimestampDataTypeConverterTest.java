@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import org.apache.kafka.connect.data.Schema;
@@ -46,7 +46,7 @@ public class TimestampDataTypeConverterTest {
         "-1000"                 // Negative value (before epoch)
     })
     void testConvertAndSetWithInt64SchemaType(long timestampValue) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValue)
                 .schemaType(Schema.Type.INT64)
                 .build();
@@ -70,7 +70,7 @@ public class TimestampDataTypeConverterTest {
         "'2024-01-15 14:30:45.123456789Z'"
     })
     void testConvertAndSetWithStringSchemaType(String timestampString) throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampString)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -82,7 +82,7 @@ public class TimestampDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNullInt64Value() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(null)
                 .schemaType(Schema.Type.INT64)
                 .build();
@@ -94,7 +94,7 @@ public class TimestampDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNullStringValue() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(null)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -106,7 +106,7 @@ public class TimestampDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithInt64SchemaTypeButNonLongValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("not a long")
                 .schemaType(Schema.Type.INT64)
                 .build();
@@ -118,7 +118,7 @@ public class TimestampDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithStringSchemaTypeButNonStringValue() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(12345L)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -130,7 +130,7 @@ public class TimestampDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithZeroTimestamp() throws SQLException {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(0L)
                 .schemaType(Schema.Type.INT64)
                 .build();
@@ -144,7 +144,7 @@ public class TimestampDataTypeConverterTest {
     @Test
     void testConvertAndSetWithDateValue() throws SQLException {
         java.util.Date date = new java.util.Date(1700000000000L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(date)
                 .build();
 
@@ -160,7 +160,7 @@ public class TimestampDataTypeConverterTest {
         "'2024-01-15T14:30:45.'"
     })
     void testConvertAndSetWithInvalidStringShouldThrow(String invalid) {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(invalid)
                 .schemaType(Schema.Type.STRING)
                 .build();

@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect.datatype.converter.schema;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
@@ -69,7 +69,7 @@ public class SchemaArrayDataTypeConverterTest {
     })
     void testConvertAndSetWithSingleValueArrays(long value, String description) throws SQLException {
         List<Long> arrayValues = Arrays.asList(value);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(arrayValues)
                 .build();
 
@@ -90,7 +90,7 @@ public class SchemaArrayDataTypeConverterTest {
                 1000L, 
                 (long) Integer.MAX_VALUE
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(arrayValues)
                 .build();
 
@@ -103,7 +103,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithEmptyArray() throws SQLException {
         List<Long> emptyArray = new ArrayList<>();
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(emptyArray)
                 .build();
 
@@ -116,7 +116,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithArrayContainingZerosAndNulls() throws SQLException {
         List<Long> arrayValues = Arrays.asList(0L, 0L, 0L, null, null);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(arrayValues)
                 .build();
 
@@ -132,7 +132,7 @@ public class SchemaArrayDataTypeConverterTest {
         for (int i = 0; i < 1000; i++) {
             largeArray.add((long) i);
         }
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(largeArray)
                 .build();
 
@@ -145,7 +145,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithTextArrayType() throws SQLException {
         List<String> textValues = Arrays.asList("hello", "world", "text array test");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(textValues)
                 .build();
 
@@ -167,7 +167,7 @@ public class SchemaArrayDataTypeConverterTest {
             "text\nwith\nnewlines",
             "very long text that might be used to test performance and edge cases with larger string content"
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(textValues)
                 .build();
 
@@ -180,7 +180,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithBigIntArrayType() throws SQLException {
         List<Long> bigIntValues = Arrays.asList(1L, 2L, 3L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(bigIntValues)
                 .build();
 
@@ -195,7 +195,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithRealArrayType() throws SQLException {
         List<Float> realValues = Arrays.asList(1.5f, 2.7f, 3.14f);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(realValues)
                 .build();
 
@@ -210,7 +210,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithRealArrayTypeFloat32Schema() throws SQLException {
         List<Float> realValues = Arrays.asList(1.5f, 2.7f, 3.14f, null, 0.0f);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(realValues)
                 .schemaSubType(Schema.Type.FLOAT32)
                 .build();
@@ -231,7 +231,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithDoubleArrayType() throws SQLException {
         List<Double> doubleValues = Arrays.asList(1.5, 2.7, 3.14159265359);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(doubleValues)
                 .build();
 
@@ -246,7 +246,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithDateArrayTypeStringSchemaValidStrings() throws SQLException {
         List<String> dateValues = Arrays.asList("2023-01-01", "2024-12-31", null, "2000-02-29");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(dateValues)
                 .schemaSubType(Schema.Type.STRING)
                 .build();
@@ -265,7 +265,7 @@ public class SchemaArrayDataTypeConverterTest {
         java.util.Date u2 = new java.util.Date(d2.getTime());
 
         List<Object> values = Arrays.asList(u1, null, u2);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(values)
                 .schemaSubType(Schema.Type.STRING)
                 .build();
@@ -283,7 +283,7 @@ public class SchemaArrayDataTypeConverterTest {
         java.util.Date u2 = new java.util.Date(d2.getTime());
         List<Object> values = Arrays.asList("2023-01-01", u2, null);
 
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(values)
                 .schemaSubType(Schema.Type.STRING)
                 .build();
@@ -298,7 +298,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithEmptyDateArray() throws SQLException {
         List<Object> emptyArray = new ArrayList<>();
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(emptyArray)
                 .build();
 
@@ -311,7 +311,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithDateArrayInvalidStringThrows() {
         List<String> badValues = Arrays.asList("2024-1-02", "abc");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(badValues)
                 .schemaSubType(Schema.Type.STRING)
                 .build();
@@ -323,7 +323,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithDateArrayUnsupportedSchemaTypeThrows() {
         List<String> dateValues = Arrays.asList("2023-01-01");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(dateValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -337,7 +337,7 @@ public class SchemaArrayDataTypeConverterTest {
         java.sql.Date d2 = java.sql.Date.valueOf("2023-01-01");
         java.util.Date u2 = new java.util.Date(d2.getTime());
         List<Object> dateValues = Arrays.asList(u2);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(dateValues)
                 .schemaSubType(Schema.Type.INT32)
                 .build();
@@ -351,7 +351,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithBooleanArrayType() throws SQLException {
         List<Boolean> booleanValues = Arrays.asList(true, false, true, null, false);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(booleanValues)
                 .build();
 
@@ -367,7 +367,7 @@ public class SchemaArrayDataTypeConverterTest {
     void testConvertAndSetWithUnsupportedArrayTypeDefaultsToString() throws SQLException {
         TableSchema.Column unsupportedColumn = new TableSchema.Column("test_column", "unsupported_array_type", 2003, true);
         List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(arrayValues)
                 .build();
 
@@ -387,7 +387,7 @@ public class SchemaArrayDataTypeConverterTest {
     })
     void testConvertAndSetWithTimestampArrayInt64Schema(long timestampValue) throws SQLException {
         List<Long> timestampValues = Arrays.asList(timestampValue, timestampValue + 1000);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -406,7 +406,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithTimestampArrayStringSchema() throws SQLException {
         List<String> timestampStrings = Arrays.asList("2021-01-01 00:00:00", "2024-12-31 23:59:59");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampStrings)
                 .schemaSubType(Schema.Type.STRING)
                 .build();
@@ -420,7 +420,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithEmptyTimestampArray() throws SQLException {
         List<Long> emptyArray = new ArrayList<>();
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(emptyArray)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -434,7 +434,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithTimestampArrayContainingNulls() throws SQLException {
         List<Long> timestampValues = Arrays.asList(1609459200000L, null, 1609459260000L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -460,7 +460,7 @@ public class SchemaArrayDataTypeConverterTest {
                 10000000000001L,    // Microseconds (above threshold)
                 1609459200000L      // Milliseconds
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -482,7 +482,7 @@ public class SchemaArrayDataTypeConverterTest {
         java.util.Date d2 = new java.util.Date(1700003600000L);
         List<java.util.Date> timestampValues = Arrays.asList(d1, null, d2);
 
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -501,7 +501,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithTimestampArrayUnsupportedSubtypeThrows() {
         List<Integer> values = Arrays.asList(1, 2, 3);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(values)
                 .schemaSubType(Schema.Type.INT32)
                 .build();
@@ -524,7 +524,7 @@ public class SchemaArrayDataTypeConverterTest {
     })
     void testConvertAndSetWithTimestamptzArrayInt64Schema(long timestampValue) throws SQLException {
         List<Long> timestampValues = Arrays.asList(timestampValue, timestampValue + 1000);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -545,7 +545,7 @@ public class SchemaArrayDataTypeConverterTest {
     void testConvertAndSetWithTimestamptzArrayStringSchema() throws SQLException {
         // Must be valid timestamptz strings
         List<String> timestampStrings = Arrays.asList("2021-01-01 00:00:00+00:00", "2024-12-31T23:59:59Z");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampStrings)
                 .schemaSubType(Schema.Type.STRING)
                 .build();
@@ -561,7 +561,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithEmptyTimestamptzArray() throws SQLException {
         List<Long> emptyArray = new ArrayList<>();
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(emptyArray)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -577,7 +577,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithTimestamptzArrayContainingNulls() throws SQLException {
         List<Long> timestampValues = Arrays.asList(1609459200000L, null, 1609459260000L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -603,7 +603,7 @@ public class SchemaArrayDataTypeConverterTest {
                 10000000000001L,    // Microseconds (above threshold)
                 1609459200000L      // Milliseconds
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(timestampValues)
                 .schemaSubType(Schema.Type.INT64)
                 .build();
@@ -620,7 +620,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithTimestamptzArrayStringSchemaInvalidThrows() {
         List<String> invalidStrings = Arrays.asList("2021-01-01 00:00:00", "invalid");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(invalidStrings)
                 .schemaSubType(Schema.Type.STRING)
                 .build();
@@ -647,7 +647,7 @@ public class SchemaArrayDataTypeConverterTest {
     })
     void testConvertAndSetWithNumericArrayStringSchema(String decimalString) throws SQLException {
         List<String> decimalValues = Arrays.asList(decimalString, "456.78", "0.99");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(decimalValues)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -661,7 +661,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithEmptyNumericArray() throws SQLException {
         List<String> emptyArray = new ArrayList<>();
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(emptyArray)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -675,7 +675,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithNumericArrayContainingNulls() throws SQLException {
         List<String> decimalValues = Arrays.asList("123.45", null, "456.78");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(decimalValues)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -692,7 +692,7 @@ public class SchemaArrayDataTypeConverterTest {
         for (int i = 0; i < 1000; i++) {
             largeArray.add(String.valueOf(i) + ".99");
         }
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(largeArray)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -713,7 +713,7 @@ public class SchemaArrayDataTypeConverterTest {
             "0",                // Integer
             "-123.45"           // Negative
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(mixedPrecisionValues)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -733,7 +733,7 @@ public class SchemaArrayDataTypeConverterTest {
             "1.23e+10",
             "1.23E0"
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(scientificNotationValues)
                 .schemaType(Schema.Type.STRING)
                 .build();
@@ -747,7 +747,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithNumericArrayUnsupportedSchemaType() throws SQLException {
         List<Long> numericValues = Arrays.asList(123L, 456L, 789L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(numericValues)
                 .schemaType(Schema.Type.INT64)
                 .build();
@@ -766,7 +766,7 @@ public class SchemaArrayDataTypeConverterTest {
             "Test string",
             "123456789"
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(byteaValues)
                 .build();
 
@@ -785,7 +785,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithByteaArrayTypeEmptyString() throws SQLException {
         List<String> byteaValues = Arrays.asList("", "Test", "");
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(byteaValues)
                 .build();
 
@@ -810,7 +810,7 @@ public class SchemaArrayDataTypeConverterTest {
             null,
             "World"
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(byteaValues)
                 .build();
 
@@ -831,7 +831,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithEmptyByteaArray() throws SQLException {
         List<String> emptyArray = new ArrayList<>();
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(emptyArray)
                 .build();
 
@@ -850,7 +850,7 @@ public class SchemaArrayDataTypeConverterTest {
             String testData = "Test data " + i;
             largeArray.add(testData);
         }
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(largeArray)
                 .build();
 
@@ -875,7 +875,7 @@ public class SchemaArrayDataTypeConverterTest {
             binaryData1,
             binaryData2
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(byteaValues)
                 .build();
 
@@ -898,7 +898,7 @@ public class SchemaArrayDataTypeConverterTest {
             specialChars,
             unicodeText
         );
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(byteaValues)
                 .build();
 
@@ -917,7 +917,7 @@ public class SchemaArrayDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNullValueThrowsException() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(null)
                 .build();
 
@@ -928,7 +928,7 @@ public class SchemaArrayDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithNonListValueThrowsException() {
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value("not a list")
                 .build();
 
@@ -940,7 +940,7 @@ public class SchemaArrayDataTypeConverterTest {
     @Test
     void testConvertAndSetWithSQLExceptionFromConnection() throws SQLException {
         List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(arrayValues)
                 .build();
         
@@ -961,7 +961,7 @@ public class SchemaArrayDataTypeConverterTest {
     })
     void testConvertAndSetWithDifferentParameterIndices(int paramIndex, String description) throws SQLException {
         List<Long> arrayValues = Arrays.asList(1L, 2L, 3L);
-        KafkaMessageColumnValue kafkaValue = KafkaMessageColumnValue.builder()
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(arrayValues)
                 .build();
 

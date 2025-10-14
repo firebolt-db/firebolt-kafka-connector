@@ -2,10 +2,10 @@ package com.firebolt.kafka.connect.datatype.converter;
 
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBigIntDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaBooleanDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaDoubleDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.schema.SchemaTextDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBigIntDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessBooleanDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDoubleDataTypeConverter;
+import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessTextDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessArrayDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessByteaDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.schemaless.SchemalessDateDataTypeConverter;
@@ -27,12 +27,12 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
     private SchemalessTimestamptzDataTypeConverter timestamptzDataTypeConverter;
     private SchemalessDateDataTypeConverter dateDataTypeConverter;
     private SchemalessDecimalDataTypeConverter decimalDataTypeConverter;
-    private SchemaBigIntDataTypeConverter bigIntDataTypeConverter;
+    private SchemalessBigIntDataTypeConverter bigIntDataTypeConverter;
     private SchemalessRealDataTypeConverter realDataTypeConverter;
-    private SchemaDoubleDataTypeConverter doubleDataTypeConverter;
-    private SchemaTextDataTypeConverter textDataTypeConverter;
+    private SchemalessDoubleDataTypeConverter doubleDataTypeConverter;
+    private SchemalessTextDataTypeConverter textDataTypeConverter;
     private SchemalessByteaDataTypeConverter byteaDataTypeConverter;
-    private SchemaBooleanDataTypeConverter booleanDataTypeConverter;
+    private SchemalessBooleanDataTypeConverter booleanDataTypeConverter;
 
     public SchemalessColumnTypeConverterFactory() {
         this(
@@ -42,12 +42,12 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                 new SchemalessTimestamptzDataTypeConverter(),
                 new SchemalessDateDataTypeConverter(),
                 new SchemalessDecimalDataTypeConverter(),
-                new SchemaBigIntDataTypeConverter(),
+                new SchemalessBigIntDataTypeConverter(),
                 new SchemalessRealDataTypeConverter(),
-                new SchemaDoubleDataTypeConverter(),
-                new SchemaTextDataTypeConverter(),
+                new SchemalessDoubleDataTypeConverter(),
+                new SchemalessTextDataTypeConverter(),
                 new SchemalessByteaDataTypeConverter(),
-                new SchemaBooleanDataTypeConverter()
+                new SchemalessBooleanDataTypeConverter()
         );
     }
 
@@ -58,12 +58,12 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                                          SchemalessTimestamptzDataTypeConverter timestamptzDataTypeConverter,
                                          SchemalessDateDataTypeConverter dateDataTypeConverter,
                                          SchemalessDecimalDataTypeConverter decimalDataTypeConverter,
-                                         SchemaBigIntDataTypeConverter bigIntDataTypeConverter,
+                                         SchemalessBigIntDataTypeConverter bigIntDataTypeConverter,
                                          SchemalessRealDataTypeConverter realDataTypeConverter,
-                                         SchemaDoubleDataTypeConverter doubleDataTypeConverter,
-                                         SchemaTextDataTypeConverter textDataTypeConverter,
+                                         SchemalessDoubleDataTypeConverter doubleDataTypeConverter,
+                                         SchemalessTextDataTypeConverter textDataTypeConverter,
                                          SchemalessByteaDataTypeConverter byteaDataTypeConverter,
-                                         SchemaBooleanDataTypeConverter booleanDataTypeConverter) {
+                                         SchemalessBooleanDataTypeConverter booleanDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;

@@ -1,11 +1,10 @@
 package com.firebolt.kafka.connect.datatype.converter.schemaless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,7 +31,7 @@ public class SchemalessTimestamptzDataTypeConverterTest {
 
     @Test
     void acceptsValidString() throws SQLException {
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value("2024-01-15T14:30:45.123456Z").build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value("2024-01-15T14:30:45.123456Z").build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         verify(mockStatement).setString(1, "2024-01-15T14:30:45.123456Z");
     }
@@ -40,7 +39,7 @@ public class SchemalessTimestamptzDataTypeConverterTest {
     @Test
     void convertsEpochMillisToOffsetDateTime() throws SQLException {
         long millis = 1705336245123L;
-        KafkaMessageColumnValue value = KafkaMessageColumnValue.builder().value(millis).build();
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(millis).build();
         converter.convertAndSet(mockStatement, 1, value, testColumn);
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(mockStatement).setObject(org.mockito.ArgumentMatchers.eq(1), captor.capture());
