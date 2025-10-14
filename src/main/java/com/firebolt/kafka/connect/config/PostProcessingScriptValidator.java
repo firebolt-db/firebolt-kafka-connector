@@ -2,6 +2,10 @@ package com.firebolt.kafka.connect.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.firebolt.kafka.connect.PostProcessingConfig;
+import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 
@@ -26,28 +30,21 @@ public class PostProcessingScriptValidator implements ConfigDef.Validator {
         }
 
         try {
-            JsonNode root = OBJECT_MAPPER.readTree(json);
-            if (root == null || !root.isObject()) {
+            PostProcessingConfig postProcessingConfig = OBJECT_MAPPER.readValue(json, PostProcessingConfig.class);
+            if (postProcessingConfig == null) {
                 throw new ConfigException(name, value, "Post-processing must be a JSON object");
             }
 
-            JsonNode mappings = root.get("mappings");
-            if (mappings == null || !mappings.isArray() || mappings.size() == 0) {
-                throw new ConfigException(name, value, "'mappings' must be a non-empty array");
-            }
-
-            for (JsonNode mapping : mappings) {
-                if (!mapping.isObject()) {
-                    throw new ConfigException(name, value, "Each mapping must be an object with 'table' and 'script'");
-                }
-                JsonNode table = mapping.get("table");
-                JsonNode script = mapping.get("script");
-                if (table == null || !table.isTextual() || table.asText().trim().isEmpty()) {
-                    throw new ConfigException(name, value, "Each mapping requires non-empty 'table'");
-                }
-                if (script == null || !script.isTextual() || script.asText().trim().isEmpty()) {
-                    throw new ConfigException(name, value, "Each mapping requires non-empty 'script'");
-                }
+            List<PostProcessingConfig.Mapping> mappings = postProcessingConfig.getMappings();
+            if (!CollectionUtils.isEmpty(mappings)) {
+                mappings.stream().forEach(mapping -> {
+                    if (StringUtils.isBlank(mapping.getTable())) {
+                        throw new ConfigException(name, value, "Each mapping requires non-empty 'table'");
+                    }
+                    if (StringUtils.isBlank(mapping.getScript())) {
+                        throw new ConfigException(name, value, "Each mapping requires non-empty 'script'");
+                    }
+                });
             }
         } catch (ConfigException e) {
             throw e;

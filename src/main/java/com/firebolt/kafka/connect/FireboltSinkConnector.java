@@ -1,9 +1,12 @@
 package com.firebolt.kafka.connect;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
 import com.firebolt.kafka.connect.config.TopicToTableValidator;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -31,7 +34,9 @@ import org.apache.kafka.connect.sink.SinkConnector;
  */
 @Slf4j
 public class FireboltSinkConnector extends SinkConnector {
-    
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private Map<String, String> configProperties;
     private FireboltDbService fireboltDbService;
 
@@ -232,41 +237,30 @@ public class FireboltSinkConnector extends SinkConnector {
         }
 
         String postProcessing = connectorConfigs.get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG);
-        if (StringUtils.isEmpty(postProcessing)) {
+        if (StringUtils.isBlank(postProcessing)) {
             return; // optional config
         }
 
-        String trimmed = postProcessing.trim();
-        if (trimmed.isEmpty()) {
-            return;
-        }
-
         try {
-            com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(trimmed);
-            com.fasterxml.jackson.databind.JsonNode mappings = root.get("mappings");
-            if (mappings == null || !mappings.isArray()) {
+            PostProcessingConfig postProcessingConfig = OBJECT_MAPPER.readValue(postProcessing.trim(), PostProcessingConfig.class);
+
+            if (CollectionUtils.isEmpty(postProcessingConfig.getMappings())) {
                 addErrorToConfig(configValues,
                         ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
                         "Invalid post-processing JSON. Expected 'mappings' array");
                 return;
             }
 
-            java.util.Set<String> tables = new java.util.HashSet<>();
-            for (com.fasterxml.jackson.databind.JsonNode mapping : mappings) {
-                com.fasterxml.jackson.databind.JsonNode tableNode = mapping.get("table");
-                if (tableNode != null && tableNode.isTextual()) {
-                    String t = tableNode.asText().trim();
-                    if (!t.isEmpty()) {
-                        tables.add(t);
-                    }
-                }
-            }
+            Set<String> tables = postProcessingConfig.getMappings()
+                    .stream()
+                    .map(PostProcessingConfig.Mapping::getTable)
+                    .collect(Collectors.toSet());
 
             if (tables.isEmpty()) {
                 return; // nothing to validate
             }
 
-            java.util.Set<String> missing = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tables);
+            Set<String> missing = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tables);
             if (!missing.isEmpty()) {
                 addErrorToConfig(configValues,
                         ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
