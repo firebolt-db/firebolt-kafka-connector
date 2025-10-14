@@ -71,12 +71,13 @@ class ConnectorConfigDefinitionTest {
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG));
+            assertTrue(configDef.names().contains(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG));
         }
 
         @Test
         void shouldHaveCorrectNumberOfConfigProperties() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
-            assertEquals(6, configDef.names().size());
+            assertEquals(7, configDef.names().size());
         }
 
         @Test
@@ -95,6 +96,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG).type);
             assertEquals(ConfigDef.Type.STRING,
                 configDef.configKeys().get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG).type);
+            assertEquals(ConfigDef.Type.STRING,
+                configDef.configKeys().get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG).type);
         }
 
         @Test
@@ -113,6 +116,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG).importance);
             assertEquals(ConfigDef.Importance.MEDIUM,
                 configDef.configKeys().get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG).importance);
+            assertEquals(ConfigDef.Importance.MEDIUM,
+                configDef.configKeys().get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG).importance);
         }
     }
 
@@ -162,6 +167,31 @@ class ConnectorConfigDefinitionTest {
             var result = ConnectorConfigDefinition.CONFIG_DEF.validate(config);
             boolean hasErrors = result.stream().anyMatch(v -> !v.errorMessages().isEmpty());
             assertTrue(hasErrors, "Expected validation errors for whitespace-only JDBC connection URL");
+        }
+
+        @Test
+        void shouldRejectInvalidPostProcessingScriptJson() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG, "{ invalid json");
+
+            var result = ConnectorConfigDefinition.CONFIG_DEF.validate(config);
+            boolean hasErrors = result.stream()
+                    .filter(v -> ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG.equals(v.name()))
+                    .anyMatch(v -> !v.errorMessages().isEmpty());
+            assertTrue(hasErrors, "Expected validation errors for invalid post.processing.script JSON");
+        }
+
+        @Test
+        void shouldAcceptValidPostProcessingScriptJson() {
+            Map<String, String> config = createValidConfig();
+            String json = "{\"mappings\":[{\"table\":\"table1\",\"script\":\"UPDATE \\\"table1\\\" SET processed = true\"}]}";
+            config.put(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG, json);
+
+            var result = ConnectorConfigDefinition.CONFIG_DEF.validate(config);
+            boolean hasErrors = result.stream()
+                    .filter(v -> ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG.equals(v.name()))
+                    .anyMatch(v -> !v.errorMessages().isEmpty());
+            assertFalse(hasErrors, "Did not expect validation errors for valid post.processing.script JSON");
         }
 
         @Test
@@ -235,6 +265,7 @@ class ConnectorConfigDefinitionTest {
             assertTrue(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_DOC.contains("Comma-separated"));
             assertTrue(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_DOC.toLowerCase().contains("exactly-once"));
             assertTrue(ConnectorConfigDefinition.ERROR_TOLERANCE_DOC.contains("Error tolerance policy"));
+            assertTrue(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_DOC.toLowerCase().contains("post-processing"));
         }
     }
 

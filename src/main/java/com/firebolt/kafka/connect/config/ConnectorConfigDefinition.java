@@ -29,6 +29,12 @@ public class ConnectorConfigDefinition {
     public static final String TOPIC_TO_TABLE_MAPPING_DOC = "Comma-separated mapping of Kafka topics to Firebolt table names (e.g., topic1:table1,topic2:table2)";
     public static final String TOPIC_TO_TABLE_MAPPING_DEFAULT = null;
 
+    // Optional post processing SQL script(s) to run per table after insert
+    // JSON format: { "mappings" : [ { "table" : "<table>", "script" : "<sql>" } ] }
+    public static final String POST_PROCESSING_SCRIPT_CONFIG = "post.processing.script";
+    public static final String POST_PROCESSING_SCRIPT_DOC = "Optional post-processing SQL to run after insert per table. JSON format: {\"mappings\":[{\"table\":\"<table>\",\"script\":\"<sql>\"}]}";
+    public static final String POST_PROCESSING_SCRIPT_DEFAULT = null;
+
     // =========================
     // CONNECTOR BEHAVIOR
     // =========================
@@ -86,6 +92,12 @@ public class ConnectorConfigDefinition {
                         new TopicToTableValidator(),
                         ConfigDef.Importance.HIGH,
                         TOPIC_TO_TABLE_MAPPING_DOC)
+                .define(POST_PROCESSING_SCRIPT_CONFIG,
+                        ConfigDef.Type.STRING,
+                        POST_PROCESSING_SCRIPT_DEFAULT,
+                        new PostProcessingScriptValidator(),
+                        ConfigDef.Importance.MEDIUM,
+                        POST_PROCESSING_SCRIPT_DOC)
                 // Error handling configuration (optional; typically set at worker level but surfaced here for clarity/testing)
                 .define(ERROR_TOLERANCE_CONFIG,
                         ConfigDef.Type.STRING,

@@ -121,6 +121,9 @@ public class FireboltSinkConnector extends SinkConnector {
             
             // Validate table configuration
             validateTableConfig(connectorConfigs, configValues);
+
+            // Validate post-processing script table exists (if provided)
+            validatePostProcessingTable(connectorConfigs, configValues);
         }
         
         return new Config(configValues);
@@ -205,6 +208,81 @@ public class FireboltSinkConnector extends SinkConnector {
             addErrorToConfig(configValues, 
                            ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG,
                            "Table existence validation failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Validates that the table referenced in post.processing.script exists in the database.
+     * Skips validation when JDBC URL is missing or connection validation has failed.
+     */
+    private void validatePostProcessingTable(Map<String, String> connectorConfigs,
+                                             List<ConfigValue> configValues) {
+        String jdbcUrl = connectorConfigs.get(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG);
+
+        if (StringUtils.isEmpty(jdbcUrl)) {
+            log.debug("Skipping post-processing validation: missing JDBC URL");
+            return;
+        }
+
+        // Skip when connection validation already failed
+        ConfigValue connectionConfigValue = findConfigValue(configValues, ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG);
+        if (connectionConfigValue != null && !connectionConfigValue.errorMessages().isEmpty()) {
+            log.debug("Skipping post-processing validation: connection validation failed");
+            return;
+        }
+
+        String postProcessing = connectorConfigs.get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG);
+        if (StringUtils.isEmpty(postProcessing)) {
+            return; // optional config
+        }
+
+        String trimmed = postProcessing.trim();
+        if (trimmed.isEmpty()) {
+            return;
+        }
+
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(trimmed);
+            com.fasterxml.jackson.databind.JsonNode mappings = root.get("mappings");
+            if (mappings == null || !mappings.isArray()) {
+                addErrorToConfig(configValues,
+                        ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                        "Invalid post-processing JSON. Expected 'mappings' array");
+                return;
+            }
+
+            java.util.Set<String> tables = new java.util.HashSet<>();
+            for (com.fasterxml.jackson.databind.JsonNode mapping : mappings) {
+                com.fasterxml.jackson.databind.JsonNode tableNode = mapping.get("table");
+                if (tableNode != null && tableNode.isTextual()) {
+                    String t = tableNode.asText().trim();
+                    if (!t.isEmpty()) {
+                        tables.add(t);
+                    }
+                }
+            }
+
+            if (tables.isEmpty()) {
+                return; // nothing to validate
+            }
+
+            java.util.Set<String> missing = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tables);
+            if (!missing.isEmpty()) {
+                addErrorToConfig(configValues,
+                        ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                        "Post-processing tables do not exist in the database: " + missing);
+                log.warn("Post-processing validation failed: tables do not exist {}", missing);
+            }
+        } catch (ConnectionFailedException e) {
+            log.warn("Error during post-processing table validation: {}", e.getMessage());
+            addErrorToConfig(configValues,
+                    ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                    "Post-processing table validation failed: " + e.getMessage());
+        } catch (Exception e) {
+            log.warn("Unexpected error during post-processing table validation: {}", e.getMessage());
+            addErrorToConfig(configValues,
+                    ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                    "Post-processing table validation failed: " + e.getMessage());
         }
     }
 
