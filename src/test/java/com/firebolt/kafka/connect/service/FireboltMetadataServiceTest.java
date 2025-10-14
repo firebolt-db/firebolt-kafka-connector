@@ -33,18 +33,6 @@ class FireboltMetadataServiceTest {
     @Mock
     private Statement statement;
 
-    @Mock
-    private PreparedStatement selectPs;
-
-    @Mock
-    private PreparedStatement insertPs;
-
-    @Mock
-    private PreparedStatement updatePs;
-
-    @Mock
-    private ResultSet resultSet;
-
     private JdbcConfig jdbcConfig;
     private FireboltMetadataService metadataService;
 
@@ -78,6 +66,10 @@ class FireboltMetadataServiceTest {
         );
 
         // ensureAndGetOffsets: first prepareStatement is SELECT (no rows), second is INSERT
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        PreparedStatement insertPs = mock(PreparedStatement.class);
+
         when(connection.prepareStatement(startsWith("SELECT topic, topic_partition, partition_offset")))
             .thenReturn(selectPs);
         when(selectPs.executeQuery()).thenReturn(resultSet);
@@ -103,6 +95,9 @@ class FireboltMetadataServiceTest {
             TopicPartitionDto.builder().topic("t1").partition(1).build()
         );
 
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+
         when(connection.prepareStatement(startsWith("SELECT topic, topic_partition, partition_offset")))
             .thenReturn(selectPs);
         when(selectPs.executeQuery()).thenReturn(resultSet);
@@ -112,6 +107,7 @@ class FireboltMetadataServiceTest {
         when(resultSet.getInt("topic_partition")).thenReturn(0);
         when(resultSet.getLong("partition_offset")).thenReturn(5L);
 
+        PreparedStatement insertPs = mock(PreparedStatement.class);
         when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(insertPs);
 
@@ -136,6 +132,7 @@ class FireboltMetadataServiceTest {
             TopicPartitionOffsetDto.builder().topic("t1").partition(1).offset(20L).build()
         );
 
+        PreparedStatement updatePs = mock(PreparedStatement.class);
         when(connection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
 
@@ -146,6 +143,66 @@ class FireboltMetadataServiceTest {
         verify(updatePs, times(1)).executeBatch();
         // no insert should be prepared in this path anymore
         verify(connection, never()).prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\""));
+    }
+
+    @Test
+    void getLastOffsets_twiceWithUpdate_shouldNotDuplicateAndReturnUpdatedOffsets() throws Exception {
+        List<TopicPartitionDto> tps = Arrays.asList(
+            TopicPartitionDto.builder().topic("topicB").partition(0).build(),
+            TopicPartitionDto.builder().topic("topicB").partition(1).build()
+        );
+
+        // First call: SELECT returns no rows -> INSERT missing two -> return offsets [0,0]
+        PreparedStatement selectPsFirst = mock(PreparedStatement.class);
+        PreparedStatement insertPsLocal = mock(PreparedStatement.class);
+        ResultSet rsFirst = mock(ResultSet.class);
+
+        // Second call: SELECT returns two rows with updated offset for partition 1
+        PreparedStatement selectPsSecond = mock(PreparedStatement.class);
+        ResultSet rsSecond = mock(ResultSet.class);
+
+        when(connection.prepareStatement(startsWith("SELECT topic, topic_partition, partition_offset")))
+            .thenReturn(selectPsFirst, selectPsSecond);
+
+        // First SELECT result: empty
+        when(selectPsFirst.executeQuery()).thenReturn(rsFirst);
+        when(rsFirst.next()).thenReturn(false);
+
+        // INSERT prepared statement for first call
+        when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
+            .thenReturn(insertPsLocal);
+
+        List<TopicPartitionOffsetDto> first = metadataService.getLastOffsets(tps);
+        assertEquals(2, first.size());
+        assertTrue(first.stream().allMatch(o -> o.getOffset() == 0L));
+        verify(insertPsLocal, times(2)).addBatch();
+        verify(insertPsLocal, times(1)).executeBatch();
+
+        // Update one offset to 7
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(connection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+            .thenReturn(updatePs);
+        metadataService.updateOffsets(List.of(
+            TopicPartitionOffsetDto.builder().topic("topicB").partition(1).offset(7L).build()
+        ));
+
+        // Second SELECT result: two rows present: partition 0 -> 0, partition 1 -> 7
+        when(selectPsSecond.executeQuery()).thenReturn(rsSecond);
+        when(rsSecond.next()).thenReturn(true, true, false);
+        when(rsSecond.getString("topic")).thenReturn("topicB", "topicB");
+        when(rsSecond.getInt("topic_partition")).thenReturn(0, 1);
+        when(rsSecond.getLong("partition_offset")).thenReturn(0L, 7L);
+
+        // Second call should not perform any INSERTs
+        List<TopicPartitionOffsetDto> second = metadataService.getLastOffsets(tps);
+        assertEquals(2, second.size());
+        long p1Offset = second.stream().filter(o -> o.getPartition() == 1).findFirst().orElseThrow().getOffset();
+        assertEquals(7L, p1Offset);
+
+        // verify no additional inserts triggered in second call
+        // total insert invocations remain from the first call only
+        verify(insertPsLocal, times(2)).addBatch();
+        verify(insertPsLocal, times(1)).executeBatch();
     }
 }
 
