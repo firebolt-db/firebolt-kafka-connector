@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * This service manages the Kafka related metadata in Firebolt: topic, partition, offsets.
@@ -37,8 +38,8 @@ public class FireboltMetadataService {
     private final FireboltDbService fireboltDbService;
     private final JdbcConfig jdbcConfig;
 
-    List<TopicPartitionOffsetDto> getLastOffsets(Map<String, List<Integer>> topicPartitions) {
-        return ensureAndGetOffsets(topicPartitions);
+    List<TopicPartitionOffsetDto> getLastOffsets(String topic, Set<Integer> topicPartitions) {
+        return ensureAndGetOffsets(topic, topicPartitions);
     }
 
     void updateOffsets(List<TopicPartitionOffsetDto> offsets) {
@@ -84,9 +85,9 @@ public class FireboltMetadataService {
         }
     }
 
-    private List<TopicPartitionOffsetDto> ensureAndGetOffsets(Map<String, List<Integer>> topicPartitions) {
+    private List<TopicPartitionOffsetDto> ensureAndGetOffsets(String topic, Set<Integer> topicPartitions) {
         long defaultOffset = 0;
-        if (topicPartitions == null || topicPartitions.isEmpty()) {
+        if (topicPartitions == null || topicPartitions.isEmpty() || StringUtils.isBlank(topic)) {
             return Collections.emptyList();
         }
 
@@ -95,14 +96,7 @@ public class FireboltMetadataService {
         StringBuilder sqlBuilder = new StringBuilder();
         sqlBuilder.append("SELECT topic, topic_partition, partition_offset FROM \"")
             .append(METADATA_TABLE_NAME)
-            .append("\" WHERE ");
-
-        for (int i = 0; i < topicPartitions.size(); i++) {
-            if (i > 0) {
-                sqlBuilder.append(" OR ");
-            }
-            sqlBuilder.append("(topic = ? AND topic_partition in ?)");
-        }
+            .append("\" WHERE topic = ? AND topic_partition in ?");
 
         String querySql = sqlBuilder.toString();
 
@@ -110,20 +104,15 @@ public class FireboltMetadataService {
 
         try (Connection connection = fireboltDbService.createConnection(jdbcConfig);
              PreparedStatement selectPs = connection.prepareStatement(querySql)) {
+            selectPs.setString(1, topic);
+            selectPs.setString(2, createPartitionList(topicPartitions));
 
-            int paramIndex = 1;
-            for (Map.Entry<String, List<Integer>> topicPartition : topicPartitions.entrySet()) {
-                selectPs.setString(paramIndex++, topicPartition.getKey());
-                selectPs.setString(paramIndex++, createPartitionList(topicPartition.getValue()));
-            }
-
-            Set<String> presentKeys = new HashSet<>();
+            Set<Integer> presentTopics = new HashSet<>();
             try (ResultSet rs = selectPs.executeQuery()) {
                 while (rs.next()) {
-                    String topic = rs.getString("topic");
                     int partition = rs.getInt("topic_partition");
                     long offset = rs.getLong("partition_offset");
-                    presentKeys.add(topic + "#" + partition);
+                    presentTopics.add(partition);
                     results.add(TopicPartitionOffsetDto.builder()
                         .topic(topic)
                         .partition(partition)
@@ -133,25 +122,20 @@ public class FireboltMetadataService {
             }
 
             String insertSql = "INSERT INTO \"" + METADATA_TABLE_NAME +
-                "\" (topic, topic_partition, partition_offset) VALUES (?, ?, " + defaultOffset + ")";
+                "\" (topic, topic_partition, partition_offset) VALUES (" + topic + ", ?, " + defaultOffset + ")";
             try (PreparedStatement insertPs = connection.prepareStatement(insertSql)) {
                 boolean hasInserts = false;
-                for (Map.Entry<String, List<Integer>> topicPartition : topicPartitions.entrySet()) {
-                    for (Integer partition : topicPartition.getValue()) {
-                        String topic = topicPartition.getKey();
-                        String key = topic + "#" + partition;
-                        if (!presentKeys.contains(key)) {
-                            insertPs.setString(1, topic);
-                            insertPs.setInt(2, partition);
-                            insertPs.addBatch();
-                            hasInserts = true;
+                for (Integer partition : topicPartitions) {
+                    if (!presentTopics.contains(partition)) {
+                        insertPs.setInt(1, partition);
+                        insertPs.addBatch();
+                        hasInserts = true;
 
-                            results.add(TopicPartitionOffsetDto.builder()
-                                .topic(topic)
-                                .partition(partition)
-                                .offset(defaultOffset)
-                                .build());
-                        }
+                        results.add(TopicPartitionOffsetDto.builder()
+                            .topic(topic)
+                            .partition(partition)
+                            .offset(defaultOffset)
+                            .build());
                     }
                 }
                 if (hasInserts) {
@@ -167,7 +151,7 @@ public class FireboltMetadataService {
         }
     }
 
-    private String createPartitionList(List<Integer> value) {
+    private String createPartitionList(Set<Integer> value) {
         return value.stream().map(String::valueOf).collect(Collectors.joining(", ", "(", ")"));
     }
 
