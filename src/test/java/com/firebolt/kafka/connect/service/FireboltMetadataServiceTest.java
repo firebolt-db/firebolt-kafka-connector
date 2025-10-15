@@ -125,7 +125,6 @@ class FireboltMetadataServiceTest {
         when(selectPs.executeQuery()).thenReturn(resultSet);
         // one existing row (partition 0, offset 5), then end
         when(resultSet.next()).thenReturn(true, false);
-        when(resultSet.getString("topic")).thenReturn("t1");
         when(resultSet.getInt("topic_partition")).thenReturn(0);
         when(resultSet.getLong("partition_offset")).thenReturn(5L);
 
