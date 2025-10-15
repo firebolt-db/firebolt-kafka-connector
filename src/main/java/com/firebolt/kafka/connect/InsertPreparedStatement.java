@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class InsertPreparedStatement {
 
-    private Connection connection;
+    protected Connection connection;
     private TableSchema tableSchema;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
@@ -39,7 +39,7 @@ public class InsertPreparedStatement {
         this.errorToleranceAll = errorToleranceAll;
     }
 
-    public void addRecords(List<FireboltRecord> fireboltRecords) throws SQLException {
+    public void addRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
         // since no schema evolution is supported, keep track of all the column names that are present in the records and filter out the ones that are not part of the table schema column names
         Set<String> columnNamesFromRecords = computeColumnNamesFromRecords(fireboltRecords);
 
@@ -50,11 +50,11 @@ public class InsertPreparedStatement {
         addRecordsInternal(fireboltRecords, validColumnNames);
     }
 
-    private void addRecordsInternal(List<FireboltRecord> fireboltRecords, Map<String, String> validColumnNames) throws SQLException {
+    private void addRecordsInternal(List<AbstractFireboltRecord> fireboltRecords, Map<String, String> validColumnNames) throws SQLException {
         try (PreparedStatement preparedStatement = createPreparedStatement(tableSchema, validColumnNames.keySet())) {
 
             // Execute batch insert
-            for (FireboltRecord record : fireboltRecords) {
+            for (AbstractFireboltRecord record : fireboltRecords) {
                 try {
                     setStatementParameters(preparedStatement, record, tableSchema, validColumnNames);
                     preparedStatement.addBatch();
@@ -78,7 +78,7 @@ public class InsertPreparedStatement {
 
                 // split the records in half and try to process the records
                 if (fireboltRecords.size() == 1) {
-                    FireboltRecord fireboltRecord = fireboltRecords.get(0);
+                    AbstractFireboltRecord fireboltRecord = fireboltRecords.get(0);
                     log.warn("Cannot process the firebolt record from partition {} at offset {}, as it is too large and exceeds the Firebolt request entity size", fireboltRecord.getPartition(), fireboltRecord.getOffset());
                     if (errorToleranceAll) {
                         errorReporter.report(fireboltRecord.getSinkRecord(), e);
@@ -140,12 +140,12 @@ public class InsertPreparedStatement {
         return sql.toString();
     }
 
-    private void setStatementParameters(PreparedStatement stmt, FireboltRecord record, TableSchema schema, Map<String, String> validColumnNames) throws SQLException, RecordConversionFailedException {
+    private void setStatementParameters(PreparedStatement stmt, AbstractFireboltRecord record, TableSchema schema, Map<String, String> validColumnNames) throws SQLException, RecordConversionFailedException {
         int parameterIndex = 1;
         for (TableSchema.Column column : schema.getColumns()) {
             if (validColumnNames.containsKey(column.getName())) {
                 String attributeName = validColumnNames.get(column.getName());
-                KafkaMessageColumnValue kafkaMessageColumnValue = record.getColumnValues().get(attributeName);
+                KafkaMessageColumnValue kafkaMessageColumnValue = record.getColumnValue(attributeName);
 
                 if (kafkaMessageColumnValue == null || kafkaMessageColumnValue.getValue() == null) {
                     stmt.setNull(parameterIndex, column.getSqlType());
@@ -178,11 +178,11 @@ public class InsertPreparedStatement {
      * @param records the list of records to analyze
      * @return a set of column names found across all records
      */
-    private Set<String> computeColumnNamesFromRecords(List<FireboltRecord> records) {
+    protected Set<String> computeColumnNamesFromRecords(List<AbstractFireboltRecord> records) {
         Set<String> columnNames = new HashSet<>();
 
-        for (FireboltRecord record : records) {
-            columnNames.addAll(record.getColumnValues().keySet());
+        for (AbstractFireboltRecord record : records) {
+            columnNames.addAll(record.getColumnNames());
         }
 
         return columnNames;

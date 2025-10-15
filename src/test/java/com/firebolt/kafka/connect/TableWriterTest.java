@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
@@ -78,8 +79,8 @@ public class TableWriterTest {
         // by default connection is not closed
         when(mockConnection.isClosed()).thenReturn(false);
 
-        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, new HashMap<>(), mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false);
-        when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false)).thenReturn(mockInsertPrepareStatement);
+        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, new HashMap<>(), mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
+        when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockInsertPrepareStatement);
 
         doNothing().when(mockInsertPrepareStatement).addRecords(anyList());
     }
@@ -138,10 +139,10 @@ public class TableWriterTest {
 
     @Test
     void shouldHandleEmptyRecordsList() {
-        List<FireboltRecord> emptyRecords = Collections.emptyList();
+        List<AbstractFireboltRecord> emptyRecords = Collections.emptyList();
         assertDoesNotThrow(() -> tableWriter.insertRecords(emptyRecords));
 
-        verify(mockInsertPrepareStatementProvider, never()).get(any(), any(), any(), anyBoolean());
+        verify(mockInsertPrepareStatementProvider, never()).get(any(), any(), any(), anyBoolean(), any(Optional.class));
         verify(mockConnectionSupplier, never()).get();
     }
 
@@ -164,7 +165,7 @@ public class TableWriterTest {
         when(mockConnectionSupplier.get()).thenReturn(mockConnection, mockSecondConnection);
 
         InsertPreparedStatement mockSecondInsertPreparedStatement = mock(InsertPreparedStatement.class);
-        when(mockInsertPrepareStatementProvider.get(mockSecondConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false)).thenReturn(mockSecondInsertPreparedStatement);
+        when(mockInsertPrepareStatementProvider.get(mockSecondConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockSecondInsertPreparedStatement);
 
         // do the first insert on the first connection
         when(mockConnection.isClosed()).thenReturn(false);

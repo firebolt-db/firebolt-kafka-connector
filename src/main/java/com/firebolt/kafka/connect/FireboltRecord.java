@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect;
 
+import java.util.Set;
 import lombok.Data;
 import lombok.Getter;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -10,15 +11,11 @@ import java.util.Map;
  * Represents a record to be written to Firebolt database.
  * Contains the table name, column values, and metadata.
  */
-@Data
-public class FireboltRecord {
+public class FireboltRecord implements AbstractFireboltRecord {
 
-    @Getter
     private final String tableName;
-    @Getter
     private final Map<String, ? extends KafkaMessageColumnValue> columnValues;
     private final long timestamp;
-    @Getter
     private final SinkRecord sinkRecord;
 
     public FireboltRecord(String tableName,
@@ -28,6 +25,11 @@ public class FireboltRecord {
         this.columnValues = columnValues;
         this.timestamp = sinkRecord.timestamp() != null ? sinkRecord.timestamp() : System.currentTimeMillis();
         this.sinkRecord = sinkRecord;
+    }
+
+    @Override
+    public String getTableName() {
+        return tableName;
     }
 
     public String getTopic() {
@@ -48,5 +50,18 @@ public class FireboltRecord {
 
     public boolean hasValueSchema() {
         return sinkRecord.valueSchema() != null;
+    }
+
+    public Set<String> getColumnNames() {
+        return columnValues.keySet();
+    }
+
+    public KafkaMessageColumnValue getColumnValue(String columnName) {
+        return columnValues.get(columnName);
+    }
+
+    @Override
+    public SinkRecord getSinkRecord() {
+        return sinkRecord;
     }
 }

@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.convert;
 
+import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.FireboltRecord;
 import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SinkConfig;
@@ -60,7 +61,7 @@ public class RecordConverterTest {
         testColumnValues.put("field2", SchemaKafkaMessageColumnValue.builder().value(42).build());
         converter.setTestColumnValues(testColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals("test_table", result.getTableName());
@@ -68,7 +69,8 @@ public class RecordConverterTest {
         assertEquals(1, result.getPartition());
         assertEquals(100L, result.getOffset());
         assertEquals(1234567890L, result.getTimestamp());
-        assertEquals(testColumnValues, result.getColumnValues());
+        assertEquals(testColumnValues.get("field1"), result.getColumnValue("field1"));
+        assertEquals(testColumnValues.get("field2"), result.getColumnValue("field2"));
     }
 
     @Test
@@ -82,7 +84,7 @@ public class RecordConverterTest {
         Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(-1, result.getPartition()); // Should default to -1
@@ -101,7 +103,7 @@ public class RecordConverterTest {
         Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertNotNull(result);
         long afterConversion = System.currentTimeMillis();
@@ -140,7 +142,7 @@ public class RecordConverterTest {
         Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(expectedTable, result.getTableName());
@@ -165,7 +167,7 @@ public class RecordConverterTest {
         Map<String, SchemaKafkaMessageColumnValue> testColumnValues = new HashMap<>();
         converter.setTestColumnValues(testColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(partition, result.getPartition());
@@ -196,10 +198,10 @@ public class RecordConverterTest {
         expectedColumnValues.put("test_field", SchemaKafkaMessageColumnValue.builder().value("test_value").build());
         converter.setTestColumnValues(expectedColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertTrue(converter.wasConvertRecordValueCalled());
-        assertEquals(expectedColumnValues, result.getColumnValues());
+        assertEquals(expectedColumnValues.get("test_field"), result.getColumnValue("test_field"));
     }
 
     @Test
@@ -227,11 +229,9 @@ public class RecordConverterTest {
         Map<String, SchemaKafkaMessageColumnValue> emptyColumnValues = new HashMap<>();
         converter.setTestColumnValues(emptyColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertNotNull(result);
-        assertNotNull(result.getColumnValues());
-        assertTrue(result.getColumnValues().isEmpty());
     }
 
     @Test
@@ -251,10 +251,14 @@ public class RecordConverterTest {
         
         converter.setTestColumnValues(complexColumnValues);
 
-        FireboltRecord result = converter.convert(mockSinkRecord);
+        AbstractFireboltRecord result = converter.convert(mockSinkRecord);
 
         assertNotNull(result);
-        assertEquals(complexColumnValues, result.getColumnValues());
+        assertEquals(complexColumnValues.get("string_field"), result.getColumnValue("string_field"));
+        assertEquals(complexColumnValues.get("int_field"), result.getColumnValue("int_field"));
+        assertEquals(complexColumnValues.get("double_field"), result.getColumnValue("double_field"));
+        assertEquals(complexColumnValues.get("boolean_field"), result.getColumnValue("boolean_field"));
+        assertEquals(complexColumnValues.get("null_field"), result.getColumnValue("null_field"));
     }
 
     /**

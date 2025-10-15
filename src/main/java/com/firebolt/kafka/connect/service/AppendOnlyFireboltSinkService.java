@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.service;
 
+import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.FireboltRecord;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.TableSchema;
@@ -77,11 +78,16 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
                 continue;
             }
 
-            TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig()), errorReporter, errorToleranceAll));
+            TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> initializeTableWriter(tableSchema));
 
-            List<FireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
+            List<AbstractFireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
             tableWriter.insertRecords(fireboltRecords);
         }
+    }
+
+    private TableWriter initializeTableWriter(TableSchema tableSchema) {
+        Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
+        return new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig()), errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     /**
@@ -97,7 +103,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     }
 
     @SneakyThrows
-    private Optional<FireboltRecord> processIndividualRecord(SinkRecord record) {
+    private Optional<AbstractFireboltRecord> processIndividualRecord(SinkRecord record) {
         try {
             // Convert the record to a format suitable for Firebolt
             return Optional.of(recordConverterFactory.convert(record));
@@ -133,7 +139,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
      * @param topic the topic identifier
      * @param records the list of records for this topic/partition
      */
-    private List<FireboltRecord> processRecordsForTopic(String topic, List<SinkRecord> records, Map<Integer, Long> topicProcessedOffsets) {
+    private List<AbstractFireboltRecord> processRecordsForTopic(String topic, List<SinkRecord> records, Map<Integer, Long> topicProcessedOffsets) {
         log.debug("Processing {} records for topic: {}", records.size(), topic);
 
         if (records == null || records.isEmpty()) {

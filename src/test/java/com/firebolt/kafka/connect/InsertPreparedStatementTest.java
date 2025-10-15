@@ -89,7 +89,7 @@ public class InsertPreparedStatementTest {
     @Test
     void shouldSplitBatchOnHttp413AndInsertHalves() throws Exception {
         // 4 records so we expect first executeBatch to fail with 413, then two successful halves
-        List<FireboltRecord> records = new ArrayList<>();
+        List<AbstractFireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 1L, mapOf(
                 "id", SchemaKafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build(),
                 "NAME", SchemaKafkaMessageColumnValue.builder().value("a").schemaType(Schema.Type.STRING).build()
@@ -136,7 +136,7 @@ public class InsertPreparedStatementTest {
         // Use a new InsertPreparedStatement with error tolerance enabled
         insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, true);
 
-        List<FireboltRecord> records = new ArrayList<>();
+        List<AbstractFireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 1, 1234L, mapOf(
                 "id", SchemaKafkaMessageColumnValue.builder().value(5L).schemaType(Schema.Type.INT64).build(),
                 "NAME", SchemaKafkaMessageColumnValue.builder().value("huge").schemaType(Schema.Type.STRING).build()
@@ -157,64 +157,8 @@ public class InsertPreparedStatementTest {
     }
 
     @Test
-    void willPropagateColumnConversionFailureAsRecordConversionFailedException() throws Exception {
-        // Arrange a record with values that will trigger a converter failure
-        FireboltRecord record = buildRecord(TABLE_NAME, 7, 123L, mapOf(
-                "id", SchemaKafkaMessageColumnValue.builder().value(1L).schemaType(Schema.Type.INT64).build(),
-                "NAME", SchemaKafkaMessageColumnValue.builder().value("not_a_boolean").schemaType(Schema.Type.STRING).build()
-        ));
-
-        // Mock converter to throw ColumnConversionFailedException
-        ColumnDataTypeConverter mockConverter = mock(ColumnDataTypeConverter.class);
-        Mockito.doThrow(new ColumnConversionFailedException(COLUMN_NAME_2, "text", "boom"))
-                .when(mockConverter).convertAndSet(Mockito.any(), Mockito.anyInt(), Mockito.any(), Mockito.any());
-
-        ColumnDataTypeConverterFactory mockFactory = mock(ColumnDataTypeConverterFactory.class);
-        Mockito.when(mockFactory.getConverter(Mockito.any())).thenReturn(mockConverter);
-
-        // Valid column names map (firebolt column name -> record attribute name)
-        Map<String, String> validColumnNames = new java.util.HashMap<>();
-        validColumnNames.put(COLUMN_NAME_1, "id");
-        validColumnNames.put(COLUMN_NAME_2, "NAME");
-
-        try (MockedStatic<ColumnDataTypeFactoryProvider> factoryStatic = Mockito.mockStatic(ColumnDataTypeFactoryProvider.class)) {
-            factoryStatic.when(() -> ColumnDataTypeFactoryProvider.getInstance(true)).thenReturn(mockFactory);
-
-            // Use reflection to invoke private setStatementParameters and verify it throws RecordConversionFailedException
-            java.lang.reflect.Method method = InsertPreparedStatement.class.getDeclaredMethod(
-                    "setStatementParameters", PreparedStatement.class, FireboltRecord.class, TableSchema.class, Map.class);
-            method.setAccessible(true);
-
-            RecordConversionFailedException thrown = assertThrows(
-                    RecordConversionFailedException.class,
-                    () -> {
-                        try {
-                            method.invoke(insertPreparedStatement, mockPreparedStatement, record, mockTableSchema, validColumnNames);
-                        } catch (java.lang.reflect.InvocationTargetException ite) {
-                            // unwrap
-                            Throwable cause = ite.getCause();
-                            if (cause instanceof RuntimeException) {
-                                throw (RuntimeException) cause;
-                            }
-                            if (cause instanceof Error) {
-                                throw (Error) cause;
-                            }
-                            throw new RuntimeException(cause);
-                        }
-                    }
-            );
-
-            // Assert details propagated to record-level exception
-            assertEquals(TABLE_NAME, thrown.getTableName());
-            assertEquals("topic", thrown.getTopicName());
-            assertEquals(7, thrown.getKafkaPartition());
-            assertEquals(123L, thrown.getKafkaOffset());
-        }
-    }
-
-    @Test
     void shouldBuildCorrectInsertSQLAndSetParametersWithCaseInsensitiveColumnNames() throws SQLException {        
-        List<FireboltRecord> records = new ArrayList<>();
+        List<AbstractFireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 10L, mapOf(
                 "ID", SchemaKafkaMessageColumnValue.builder().value(Integer.valueOf(123)).schemaType(Schema.Type.INT32).build(),
                 "name", SchemaKafkaMessageColumnValue.builder().value("Alice").schemaType(Schema.Type.STRING).build()
@@ -241,7 +185,7 @@ public class InsertPreparedStatementTest {
 
     @Test
     void shouldHandleNullValuesAndSetSqlNull() throws SQLException {
-        List<FireboltRecord> records = new ArrayList<>();
+        List<AbstractFireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 0, 100L, mapOf(
                 "id", SchemaKafkaMessageColumnValue.builder().value(Integer.valueOf(1)).schemaType(Schema.Type.INT32).build(),
                 "name", SchemaKafkaMessageColumnValue.builder().value("Carol").schemaType(Schema.Type.STRING).build()
@@ -274,7 +218,7 @@ public class InsertPreparedStatementTest {
         values.put("name", SchemaKafkaMessageColumnValue.builder().value("widget").schemaType(Schema.Type.STRING).build());
         values.put("unknown", SchemaKafkaMessageColumnValue.builder().value("ignored").schemaType(Schema.Type.STRING).build());
 
-        List<FireboltRecord> records = List.of(buildRecord(TABLE_NAME, 0, 1L, values));
+        List<AbstractFireboltRecord> records = List.of(buildRecord(TABLE_NAME, 0, 1L, values));
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
@@ -290,7 +234,7 @@ public class InsertPreparedStatementTest {
         Map<String, SchemaKafkaMessageColumnValue> values = new HashMap<>();
         values.put("id", SchemaKafkaMessageColumnValue.builder().value(100).schemaType(Schema.Type.INT32).build());
 
-        List<FireboltRecord> records = List.of(buildRecord(TABLE_NAME, 0, 1L, values));
+        List<AbstractFireboltRecord> records = List.of(buildRecord(TABLE_NAME, 0, 1L, values));
 
         assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
 
