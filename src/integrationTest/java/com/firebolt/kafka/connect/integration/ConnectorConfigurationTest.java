@@ -329,6 +329,19 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void testInvalidPostProcessingScriptJson() throws IOException {
+        Map<String, Object> connectorConfig = createBaseConnectorConfig();
+        // invalid JSON should fail validation
+        connectorConfig.put("post.processing.script", "{ invalid json");
+
+        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
+
+        assertNotNull(errorMessage, "Error message should not be null");
+        assertTrue(errorMessage.toLowerCase().contains("post.processing.script"),
+                   "Error message should mention invalid post.processing.script JSON: " + errorMessage);
+    }
+
+    @Test
     void testNonExistentTablesInMapping() throws IOException {
         Map<String, Object> connectorConfig = createBaseConnectorConfig();
         // Use table names that are very unlikely to exist
@@ -644,6 +657,18 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, config);
 
             assertTrue(success, "Connector creation should succeed when exactlyOnce is omitted (defaults to false)");
+        }
+
+        @Test
+        void testValidPostProcessingScriptJsonParsesAndStartsConnector() throws IOException {
+            Map<String, Object> config = createBaseConnectorConfig();
+            // valid JSON referencing an existing table 'table1'
+            String json = "{\"mappings\":[{\"table\":\"table1\",\"script\":\"UPDATE \\\"table1\\\" SET processed = true\"}]}";
+            config.put("post.processing.script", json);
+
+            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, config);
+
+            assertTrue(success, "Connector creation should succeed with valid post.processing.script JSON");
         }
     }
 

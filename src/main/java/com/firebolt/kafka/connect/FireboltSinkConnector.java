@@ -1,9 +1,12 @@
 package com.firebolt.kafka.connect;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
 import com.firebolt.kafka.connect.config.TopicToTableValidator;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -31,7 +34,9 @@ import org.apache.kafka.connect.sink.SinkConnector;
  */
 @Slf4j
 public class FireboltSinkConnector extends SinkConnector {
-    
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private Map<String, String> configProperties;
     private FireboltDbService fireboltDbService;
 
@@ -121,6 +126,9 @@ public class FireboltSinkConnector extends SinkConnector {
             
             // Validate table configuration
             validateTableConfig(connectorConfigs, configValues);
+
+            // Validate post-processing script table exists (if provided)
+            validatePostProcessingTable(connectorConfigs, configValues);
         }
         
         return new Config(configValues);
@@ -205,6 +213,70 @@ public class FireboltSinkConnector extends SinkConnector {
             addErrorToConfig(configValues, 
                            ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG,
                            "Table existence validation failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Validates that the table referenced in post.processing.script exists in the database.
+     * Skips validation when JDBC URL is missing or connection validation has failed.
+     */
+    private void validatePostProcessingTable(Map<String, String> connectorConfigs,
+                                             List<ConfigValue> configValues) {
+        String jdbcUrl = connectorConfigs.get(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG);
+
+        if (StringUtils.isEmpty(jdbcUrl)) {
+            log.debug("Skipping post-processing validation: missing JDBC URL");
+            return;
+        }
+
+        // Skip when connection validation already failed
+        ConfigValue connectionConfigValue = findConfigValue(configValues, ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG);
+        if (connectionConfigValue != null && !connectionConfigValue.errorMessages().isEmpty()) {
+            log.debug("Skipping post-processing validation: connection validation failed");
+            return;
+        }
+
+        String postProcessing = connectorConfigs.get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG);
+        if (StringUtils.isBlank(postProcessing)) {
+            return; // optional config
+        }
+
+        try {
+            PostProcessingConfig postProcessingConfig = OBJECT_MAPPER.readValue(postProcessing.trim(), PostProcessingConfig.class);
+
+            if (CollectionUtils.isEmpty(postProcessingConfig.getMappings())) {
+                addErrorToConfig(configValues,
+                        ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                        "Invalid post-processing JSON. Expected 'mappings' array");
+                return;
+            }
+
+            Set<String> tables = postProcessingConfig.getMappings()
+                    .stream()
+                    .map(PostProcessingConfig.Mapping::getTable)
+                    .collect(Collectors.toSet());
+
+            if (tables.isEmpty()) {
+                return; // nothing to validate
+            }
+
+            Set<String> missing = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tables);
+            if (!missing.isEmpty()) {
+                addErrorToConfig(configValues,
+                        ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                        "Post-processing tables do not exist in the database: " + missing);
+                log.warn("Post-processing validation failed: tables do not exist {}", missing);
+            }
+        } catch (ConnectionFailedException e) {
+            log.warn("Error during post-processing table validation: {}", e.getMessage());
+            addErrorToConfig(configValues,
+                    ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                    "Post-processing table validation failed: " + e.getMessage());
+        } catch (Exception e) {
+            log.warn("Unexpected error during post-processing table validation: {}", e.getMessage());
+            addErrorToConfig(configValues,
+                    ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                    "Post-processing table validation failed: " + e.getMessage());
         }
     }
 
