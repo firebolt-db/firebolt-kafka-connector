@@ -11,12 +11,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -50,24 +51,25 @@ class FireboltMetadataServiceTest {
             .clientId(Optional.empty())
             .clientSecret(Optional.empty())
             .build();
-        metadataService = new FireboltMetadataService(fireboltDbService, jdbcConfig);
 
         lenient().when(fireboltDbService.createConnection(any())).thenReturn(connection);
         lenient().when(connection.createStatement()).thenReturn(statement);
-        // Default: CREATE TABLE IF NOT EXISTS always succeeds
         lenient().when(statement.executeUpdate(anyString())).thenReturn(0);
+
+        metadataService = new FireboltMetadataService(fireboltDbService, jdbcConfig);
     }
 
     @Test
-    void getLastOffsets_shouldReturnEmpty_whenNullOrEmptyInput() {
-        assertNotNull(metadataService.getLastOffsets(null, null));
-        assertNotNull(metadataService.getLastOffsets(null, Set.of()));
-        assertNotNull(metadataService.getLastOffsets("", null));
-        assertNotNull(metadataService.getLastOffsets("", Set.of()));
-        assertTrue(metadataService.getLastOffsets(null, null).isEmpty());
-        assertTrue(metadataService.getLastOffsets(null, Set.of()).isEmpty());
-        assertTrue(metadataService.getLastOffsets("", null).isEmpty());
-        assertTrue(metadataService.getLastOffsets("", Set.of()).isEmpty());
+    void getLastOffsets_shouldThrow() {
+        Set<Integer> emptySet = new HashSet<>();
+        assertThrows(IllegalArgumentException.class,
+                () -> metadataService.getLastOffsets(null, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> metadataService.getLastOffsets(null, emptySet));
+        assertThrows(IllegalArgumentException.class,
+                () -> metadataService.getLastOffsets("", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> metadataService.getLastOffsets("", emptySet));
     }
 
     @Test
@@ -88,8 +90,8 @@ class FireboltMetadataServiceTest {
         Map<Integer, Long> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
 
         assertEquals(2, result.size());
-        assertTrue(result.values().stream().allMatch(offset -> offset == 0));
-        result.values().forEach(r -> assertEquals(0L, r));
+        assertTrue(result.values().stream().allMatch(offset -> offset == -1));
+        result.values().forEach(r -> assertEquals(-1L, r));
 
         // verify batch insert invoked for two missing rows
         verify(insertPs, times(2)).addBatch();
@@ -120,7 +122,7 @@ class FireboltMetadataServiceTest {
         Long inserted = result.get(1);
 
         assertEquals(5L, existing);
-        assertEquals(0L, inserted);
+        assertEquals(-1L, inserted);
 
         // verify only one insert for missing partition 1
         verify(insertPs, times(1)).addBatch();
@@ -171,7 +173,7 @@ class FireboltMetadataServiceTest {
 
         Map<Integer, Long> first = metadataService.getLastOffsets("topicB", Set.of(0, 1));
         assertEquals(2, first.size());
-        assertTrue(first.values().stream().allMatch(offset -> offset == 0));
+        assertTrue(first.values().stream().allMatch(offset -> offset == -1));
         verify(insertPsLocal, times(2)).addBatch();
         verify(insertPsLocal, times(1)).executeBatch();
 

@@ -32,10 +32,10 @@ public class FireboltMetadataService {
 
     private static final String METADATA_TABLE_NAME = "KafkaSinkConnectorMetadata";
     private static final long DEFAULT_OFFSET = -1;
-    private static final String CREATE_TABLE_QUERY = "CREATE TABLE IF NOT EXISTS \"" + METADATA_TABLE_NAME +
-            "\" (topic TEXT, topic_partition INTEGER, partition_offset BIGINT)";
-    private static final String SELECT_QUERY = "SELECT topic, topic_partition, partition_offset FROM \"" +
-            METADATA_TABLE_NAME + "\" WHERE topic = ? AND topic_partition in ?";
+    private static final String SELECT_QUERY =
+            String.format("SELECT topic, topic_partition, partition_offset FROM \"%s\" WHERE topic = ? AND topic_partition in ?", METADATA_TABLE_NAME);
+    private static final String CREATE_TABLE_QUERY =
+            String.format("CREATE TABLE IF NOT EXISTS \"%s\" (topic TEXT, topic_partition INTEGER, partition_offset BIGINT)", METADATA_TABLE_NAME);
     private final FireboltDbService fireboltDbService;
     private final JdbcConfig jdbcConfig;
 
@@ -46,7 +46,7 @@ public class FireboltMetadataService {
     }
 
     public Map<Integer, Long> getLastOffsets(String topic, Set<Integer> topicPartitions) {
-        if (topicPartitions == null || CollectionUtils.isEmpty(topicPartitions)) {
+        if (StringUtils.isBlank(topic) || CollectionUtils.isEmpty(topicPartitions)) {
             throw new IllegalArgumentException("Topic name or partitions cannot be empty");
         }
         Map<Integer, Long> results = new HashMap<>();
@@ -66,8 +66,8 @@ public class FireboltMetadataService {
                 }
             }
 
-            String insertSql = "INSERT INTO \"" + METADATA_TABLE_NAME +
-                    "\" (topic, topic_partition, partition_offset) VALUES (" + topic + ", ?, " + DEFAULT_OFFSET + ")";
+            String insertSql = String.format("INSERT INTO \"%s\" (topic, topic_partition, partition_offset) VALUES (%s, ?, %d)",
+                    METADATA_TABLE_NAME, topic, DEFAULT_OFFSET);
             try (PreparedStatement insertPs = connection.prepareStatement(insertSql)) {
                 boolean hasInserts = false;
                 for (Integer partition : topicPartitions) {
@@ -97,8 +97,8 @@ public class FireboltMetadataService {
             throw new IllegalArgumentException("Topic name or offsets cannot be empty");
         }
 
-        String updateSql = "UPDATE \"" + METADATA_TABLE_NAME +
-            "\" SET partition_offset = ? WHERE topic = \"" + topicName + "\"? AND topic_partition = ?";
+        String updateSql = String.format("UPDATE \"%s\" SET partition_offset = ? WHERE topic = \"%s\"? AND topic_partition = ?",
+                METADATA_TABLE_NAME, topicName);
 
         try (Connection connection = fireboltDbService.createConnection(jdbcConfig);
              PreparedStatement updatePs = connection.prepareStatement(updateSql)) {
