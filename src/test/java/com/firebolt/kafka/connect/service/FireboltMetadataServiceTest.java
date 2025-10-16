@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.JdbcConfig;
-import com.firebolt.kafka.connect.service.dto.TopicPartitionOffsetDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,14 +11,22 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Arrays;
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FireboltMetadataServiceTest {
@@ -78,10 +85,11 @@ class FireboltMetadataServiceTest {
         when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(insertPs);
 
-        List<TopicPartitionOffsetDto> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
+        Map<Integer, Long> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
 
         assertEquals(2, result.size());
-        result.forEach(r -> assertEquals(0L, r.getOffset()));
+        assertTrue(result.values().stream().allMatch(offset -> offset == 0));
+        result.values().forEach(r -> assertEquals(0L, r));
 
         // verify batch insert invoked for two missing rows
         verify(insertPs, times(2)).addBatch();
@@ -105,14 +113,14 @@ class FireboltMetadataServiceTest {
         when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(insertPs);
 
-        List<TopicPartitionOffsetDto> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
+        Map<Integer, Long> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
 
         assertEquals(2, result.size());
-        TopicPartitionOffsetDto existing = result.stream().filter(r -> r.getPartition() == 0).findFirst().orElseThrow();
-        TopicPartitionOffsetDto inserted = result.stream().filter(r -> r.getPartition() == 1).findFirst().orElseThrow();
+        Long existing = result.get(0);
+        Long inserted = result.get(1);
 
-        assertEquals(5L, existing.getOffset());
-        assertEquals(0L, inserted.getOffset());
+        assertEquals(5L, existing);
+        assertEquals(0L, inserted);
 
         // verify only one insert for missing partition 1
         verify(insertPs, times(1)).addBatch();
@@ -121,16 +129,16 @@ class FireboltMetadataServiceTest {
 
     @Test
     void updateOffsets_shouldBatchUpdateOffsetsOnly() throws Exception {
-        List<TopicPartitionOffsetDto> updates = Arrays.asList(
-            TopicPartitionOffsetDto.builder().topic("t1").partition(0).offset(10L).build(),
-            TopicPartitionOffsetDto.builder().topic("t1").partition(1).offset(20L).build()
+        Map<Integer, Long> updates = Map.of(
+            0, 10L,
+            1, 20L
         );
 
         PreparedStatement updatePs = mock(PreparedStatement.class);
         when(connection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
 
-        metadataService.updateOffsets(updates);
+        metadataService.updateOffsets("t1", updates);
 
         // verify parameters were bound and batch executed
         verify(updatePs, times(2)).addBatch();
@@ -161,9 +169,9 @@ class FireboltMetadataServiceTest {
         when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(insertPsLocal);
 
-        List<TopicPartitionOffsetDto> first = metadataService.getLastOffsets("topicB", Set.of(0, 1));
+        Map<Integer, Long> first = metadataService.getLastOffsets("topicB", Set.of(0, 1));
         assertEquals(2, first.size());
-        assertTrue(first.stream().allMatch(o -> o.getOffset() == 0L));
+        assertTrue(first.values().stream().allMatch(offset -> offset == 0));
         verify(insertPsLocal, times(2)).addBatch();
         verify(insertPsLocal, times(1)).executeBatch();
 
@@ -171,9 +179,7 @@ class FireboltMetadataServiceTest {
         PreparedStatement updatePs = mock(PreparedStatement.class);
         when(connection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
-        metadataService.updateOffsets(List.of(
-            TopicPartitionOffsetDto.builder().topic("topicB").partition(1).offset(7L).build()
-        ));
+        metadataService.updateOffsets("topicB", Map.of(1, 7L));
 
         // Second SELECT result: two rows present: partition 0 -> 0, partition 1 -> 7
         when(selectPsSecond.executeQuery()).thenReturn(rsSecond);
@@ -182,9 +188,9 @@ class FireboltMetadataServiceTest {
         when(rsSecond.getLong("partition_offset")).thenReturn(0L, 7L);
 
         // Second call should not perform any INSERTs
-        List<TopicPartitionOffsetDto> second = metadataService.getLastOffsets("topicB", Set.of(0, 1));
+        Map<Integer, Long> second = metadataService.getLastOffsets("topicB", Set.of(0, 1));
         assertEquals(2, second.size());
-        long p1Offset = second.stream().filter(o -> o.getPartition() == 1).findFirst().orElseThrow().getOffset();
+        long p1Offset = second.get(1);
         assertEquals(7L, p1Offset);
 
         // verify no additional inserts triggered in second call
