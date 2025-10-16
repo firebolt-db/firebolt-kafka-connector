@@ -35,6 +35,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private SinkConfig config;
     private RecordConverterFactory recordConverterFactory;
     private FireboltDbService fireboltDbService;
+    private FireboltMetadataService fireboltMetadataService;
 
     private Map<String, Set<Integer>> assignedTopicPartitions;
 
@@ -56,6 +57,9 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         this.assignedTopicPartitions = topicPartitions;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
+        if (this.config.isExactlyOnce()) {
+            this.fireboltMetadataService = new FireboltMetadataService(fireboltDbService, config.getJdbcConfig());
+        }
     }
 
     @Override
@@ -115,9 +119,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         // kafka metadata service
         // Fallback: until metadata service is implemented, default to -1L for managed partitions
-        return assignedTopicPartitions.getOrDefault(topicName, Collections.emptySet())
-                .stream()
-                .collect(Collectors.toMap(partitionId -> partitionId, partitionId -> -1L));
+        return fireboltMetadataService.getLastOffsets(topicName, assignedTopicPartitions.get(topicName));
     }
 
     /**

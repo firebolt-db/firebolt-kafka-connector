@@ -96,6 +96,6 @@ public class SinkConfig {
      * Returns true if the connector should push messages to firebolt exactly once. When false it will do at-least once semantics.
      */
     public boolean isExactlyOnce() {
-        return Boolean.valueOf(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
+        return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
     }
 }

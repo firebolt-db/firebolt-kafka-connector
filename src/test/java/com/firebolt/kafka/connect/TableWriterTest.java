@@ -1,5 +1,11 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -9,17 +15,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -84,9 +84,9 @@ public class TableWriterTest {
         when(mockConnection.isClosed()).thenReturn(false);
 
         Map<Integer, Long> lastPartitionOffset = new HashMap<>();
-        lastPartitionOffset.put(PARTITION_0,  -1l);
-        lastPartitionOffset.put(PARTITION_1,  -1l);
-        lastPartitionOffset.put(PARTITION_2,  -1l);
+        lastPartitionOffset.put(PARTITION_0,  -1L);
+        lastPartitionOffset.put(PARTITION_1,  -1L);
+        lastPartitionOffset.put(PARTITION_2,  -1L);
         tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
         when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockInsertPrepareStatement);
 
@@ -94,12 +94,16 @@ public class TableWriterTest {
     }
 
     @Test
-    void shouldInitializeWithEmptyProcessedPartitionOffsets() {
-        assertNotNull(tableWriter.getProcessedPartitionOffsets());
-        assertTrue(tableWriter.getProcessedPartitionOffsets().isEmpty());
+    void shouldInitializeWithDefaultProcessedPartitionOffsets() {
+        Map<Integer, Long> processedPartitionOffsets = tableWriter.getProcessedPartitionOffsets();
+        assertNotNull(processedPartitionOffsets);
+        assertFalse(processedPartitionOffsets.isEmpty());
+        assertEquals(-1L, processedPartitionOffsets.get(0));
+        assertEquals(-1L, processedPartitionOffsets.get(1));
+        assertEquals(-1L, processedPartitionOffsets.get(2));
 
         // should not be able to modify the offsets outside the class
-        assertThrows(RuntimeException.class, () -> tableWriter.getProcessedPartitionOffsets().put(1, 1L));
+        assertThrows(RuntimeException.class, () -> processedPartitionOffsets.put(1, 1L));
     }
 
     @Test
@@ -140,8 +144,10 @@ public class TableWriterTest {
         verify(mockConnectionSupplier).get();
 
         Map<Integer, Long> offsets = tableWriter.getProcessedPartitionOffsets();
-        assertEquals(1, offsets.size());
+        assertEquals(3, offsets.size());
         assertEquals(102L, offsets.get(0));
+        assertEquals(-1L, offsets.get(1));
+        assertEquals(-1L, offsets.get(2));
     }
 
 
