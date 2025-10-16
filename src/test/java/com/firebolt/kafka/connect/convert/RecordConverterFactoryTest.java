@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.convert;
 
+import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.FireboltRecord;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
@@ -70,7 +71,7 @@ public class RecordConverterFactoryTest {
         // Setup struct field access
         when(mockSchema.fields()).thenReturn(java.util.Collections.emptyList());
 
-        FireboltRecord result = factory.convert(mockSinkRecord);
+        AbstractFireboltRecord result = factory.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals("test_table", result.getTableName());
@@ -137,7 +138,7 @@ public class RecordConverterFactoryTest {
         // Setup struct field access
         when(mockSchema.fields()).thenReturn(java.util.Collections.emptyList());
 
-        FireboltRecord result = factory.convert(mockSinkRecord);
+        AbstractFireboltRecord result = factory.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(expectedTable, result.getTableName());
@@ -156,7 +157,7 @@ public class RecordConverterFactoryTest {
         // Setup struct field access
         when(mockSchema.fields()).thenReturn(java.util.Collections.emptyList());
 
-        FireboltRecord result = factory.convert(mockSinkRecord);
+        AbstractFireboltRecord result = factory.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(-1, result.getPartition()); // Should default to -1
@@ -176,7 +177,7 @@ public class RecordConverterFactoryTest {
         // Setup struct field access
         when(mockSchema.fields()).thenReturn(java.util.Collections.emptyList());
 
-        FireboltRecord result = factory.convert(mockSinkRecord);
+        AbstractFireboltRecord result = factory.convert(mockSinkRecord);
 
         assertNotNull(result);
         // Should use current system time when timestamp is null
@@ -234,11 +235,11 @@ public class RecordConverterFactoryTest {
         when(mockSchema.fields()).thenReturn(java.util.Collections.emptyList());
         when(mockStruct.get(any(String.class))).thenReturn(null);
 
-        FireboltRecord result = factory.convert(mockSinkRecord);
+        AbstractFireboltRecord result = factory.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals("test_table", result.getTableName());
-        assertNotNull(result.getColumnValues());
+        assertNotNull(result.getColumnNames());
     }
 
     @ParameterizedTest
@@ -259,7 +260,7 @@ public class RecordConverterFactoryTest {
         // Setup struct field access
         when(mockSchema.fields()).thenReturn(java.util.Collections.emptyList());
 
-        FireboltRecord result = factory.convert(mockSinkRecord);
+        AbstractFireboltRecord result = factory.convert(mockSinkRecord);
 
         assertNotNull(result);
         assertEquals(partition, result.getPartition());

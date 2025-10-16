@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.convert;
 
+import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.FireboltRecord;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
@@ -37,7 +38,7 @@ public abstract class RecordConverter<T extends KafkaMessageColumnValue> {
      * @return The converted FireboltRecord
      * @throws RecordConversionException if conversion fails
      */
-    public final FireboltRecord convert(SinkRecord record) throws RecordConversionException {
+    public final AbstractFireboltRecord convert(SinkRecord record) throws RecordConversionException {
         // Delegate to specific implementation
         Map<String, T> columnValues = convertRecordValue(record);
 

@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.convert;
 
+import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.FireboltRecord;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
@@ -42,7 +43,7 @@ public class RecordConverterFactory {
      * @return the converted FireboltRecord
      * @throws RecordConversionException if conversion fails
      */
-    public FireboltRecord convert(SinkRecord record)
+    public AbstractFireboltRecord convert(SinkRecord record)
             throws RecordConversionException {
 
         RecordConverter selectedConverter = selectConverter(record);

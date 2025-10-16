@@ -1,9 +1,14 @@
 package com.firebolt.kafka.connect;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Simple configuration wrapper for the Firebolt Sink Connector.
@@ -11,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class SinkConfig {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final Map<String, String> config;
 
@@ -46,6 +53,28 @@ public class SinkConfig {
                 .clientId(Optional.ofNullable(config.get(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG)))
                 .clientSecret(Optional.ofNullable(config.get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG)))
                 .build();
+    }
+
+    public Optional<String> getPostProcessingScript(String tableName) {
+        String postProcessingConfigAsString = config.get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG);
+        if (StringUtils.isBlank(postProcessingConfigAsString)) {
+            return Optional.empty();
+        }
+
+        try {
+            PostProcessingConfig postProcessingConfig = OBJECT_MAPPER.readValue(postProcessingConfigAsString, PostProcessingConfig.class);
+            List<PostProcessingConfig.Mapping> mappings = postProcessingConfig.getMappings();
+            if (!CollectionUtils.isEmpty(mappings)) {
+                return mappings.stream()
+                        .filter(mapping -> tableName.equals(mapping.getTable()))
+                        .map(PostProcessingConfig.Mapping::getScript)
+                        .findFirst();
+            }
+        } catch (JsonProcessingException e) {
+            log.error("Post processing config is not valid", e.getMessage());
+        }
+
+        return Optional.empty();
     }
 
     // Utility method to get any config value

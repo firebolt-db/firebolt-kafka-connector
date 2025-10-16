@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect;
 
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 
@@ -43,28 +44,31 @@ public class TableWriter {
      */
     private Connection connection;
 
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, ErrorReporter errorReporter, boolean errorToleranceAll) {
-        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll);
+    private Optional<String> postProcessingScript;
+
+    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+        this(tableSchema, connectionSupplier, new HashMap<>(), new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll) {
+    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
+        this.postProcessingScript = postProcessingScript;
     }
 
-    public void insertRecords(List<FireboltRecord> fireboltRecords) throws SQLException {
+    public void insertRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
         log.debug("Processing {} records for table: {}", fireboltRecords.size(), tableSchema.getTableName());
 
         if (CollectionUtils.isEmpty(fireboltRecords)) {
             return;
         }
 
-        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll);
+        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
         insertPreparedStatement.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
@@ -85,7 +89,7 @@ public class TableWriter {
         }
     }
 
-    private void updateProcessedOffsets(List<FireboltRecord> fireboltRecords) {
+    private void updateProcessedOffsets(List<AbstractFireboltRecord> fireboltRecords) {
         fireboltRecords.forEach(fireboltRecord -> {
             Integer partition = fireboltRecord.getPartition();
             Long offset = fireboltRecord.getOffset();
@@ -112,8 +116,9 @@ public class TableWriter {
      * For easier testing
      */
     static class InsertPreparedStatementProvider {
-        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll) {
-            return new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll);
+        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+            return postProcessingScript == null || postProcessingScript.isEmpty() ? new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll)
+                    : new InsertPreparedStatementWithPostProcessing(connection, tableSchema, errorReporter, errorToleranceAll, postProcessingScript.get());
         }
     }
 }
