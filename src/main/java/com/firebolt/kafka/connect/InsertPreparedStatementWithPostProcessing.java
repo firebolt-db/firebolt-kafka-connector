@@ -31,6 +31,7 @@ public class InsertPreparedStatementWithPostProcessing extends InsertPreparedSta
         this.postProcessingScript = postProcessingScript;
     }
 
+    @Override
     public void addRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
         String batchId = UUID.randomUUID().toString();
         log.info("Using batch id: {}", batchId);

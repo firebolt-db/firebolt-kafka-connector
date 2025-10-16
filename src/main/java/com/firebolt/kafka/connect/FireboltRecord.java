@@ -32,30 +32,37 @@ public class FireboltRecord implements AbstractFireboltRecord {
         return tableName;
     }
 
+    @Override
     public String getTopic() {
         return sinkRecord.topic();
     }
 
+    @Override
     public int getPartition() {
         return sinkRecord.kafkaPartition() != null ? sinkRecord.kafkaPartition() : -1;
     }
 
+    @Override
     public long getOffset() {
         return sinkRecord.kafkaOffset();
     }
 
+    @Override
     public long getTimestamp() {
         return timestamp;
     }
 
+    @Override
     public boolean hasValueSchema() {
         return sinkRecord.valueSchema() != null;
     }
 
+    @Override
     public Set<String> getColumnNames() {
         return columnValues.keySet();
     }
 
+    @Override
     public KafkaMessageColumnValue getColumnValue(String columnName) {
         return columnValues.get(columnName);
     }
