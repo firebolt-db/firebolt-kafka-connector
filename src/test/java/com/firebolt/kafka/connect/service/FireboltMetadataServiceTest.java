@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.lenient;
@@ -94,8 +95,9 @@ class FireboltMetadataServiceTest {
         PreparedStatement selectPs = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
 
-        when(mockConnection.prepareStatement("SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in (0, 1)"))
-            .thenReturn(selectPs);
+        when(mockConnection.prepareStatement(argThat(sql ->
+                sql.startsWith("SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in (") &&
+                        (sql.contains("(0, 1)") || sql.contains("(1, 0)"))))).thenReturn(selectPs);
         when(selectPs.executeQuery()).thenReturn(resultSet);
         // one existing row (partition 0, offset 5), then end
         when(resultSet.next()).thenReturn(true, false);
