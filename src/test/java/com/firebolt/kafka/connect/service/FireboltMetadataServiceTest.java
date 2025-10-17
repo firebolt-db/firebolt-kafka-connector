@@ -13,14 +13,13 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -33,34 +32,29 @@ import static org.mockito.Mockito.when;
 class FireboltMetadataServiceTest {
 
     @Mock
-    private FireboltDbService fireboltDbService;
+    private FireboltDbService mockFireboltDbService;
 
     @Mock
-    private Connection connection;
+    private Connection mockConnection;
 
     @Mock
-    private Statement statement;
+    private Statement mockStatement;
 
-    private JdbcConfig jdbcConfig;
+    @Mock
+    private JdbcConfig mockJdbcConfig;
     private FireboltMetadataService metadataService;
 
     @BeforeEach
     void setUp() throws Exception {
-        jdbcConfig = JdbcConfig.builder()
-            .jdbcConnectionUrl("jdbc:firebolt:test_db")
-            .clientId(Optional.empty())
-            .clientSecret(Optional.empty())
-            .build();
+        lenient().when(mockFireboltDbService.createConnection(mockJdbcConfig)).thenReturn(mockConnection);
+        lenient().when(mockConnection.createStatement()).thenReturn(mockStatement);
+        lenient().when(mockStatement.executeUpdate(anyString())).thenReturn(0);
 
-        lenient().when(fireboltDbService.createConnection(any())).thenReturn(connection);
-        lenient().when(connection.createStatement()).thenReturn(statement);
-        lenient().when(statement.executeUpdate(anyString())).thenReturn(0);
-
-        metadataService = new FireboltMetadataService(fireboltDbService, jdbcConfig);
+        metadataService = new FireboltMetadataService(mockFireboltDbService, mockJdbcConfig);
     }
 
     @Test
-    void getLastOffsets_shouldThrow() {
+    void getLastOffsetsShouldThrow() {
         Set<Integer> emptySet = new HashSet<>();
         assertThrows(IllegalArgumentException.class,
                 () -> metadataService.getLastOffsets(null, null));
@@ -73,19 +67,15 @@ class FireboltMetadataServiceTest {
     }
 
     @Test
-    void getLastOffsets_shouldInsertMissingAndReturnZeroOffsets_whenNoneExist() throws Exception {
+    void getLastOffsetsShouldInsertMissingAndReturnZeroOffsetsWhenNoneExist() throws Exception {
         // ensureAndGetOffsets: first prepareStatement is SELECT (no rows), second is INSERT
         PreparedStatement selectPs = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
         PreparedStatement insertPs = mock(PreparedStatement.class);
 
-        when(connection.prepareStatement(startsWith("SELECT topic, topic_partition, partition_offset")))
-            .thenReturn(selectPs);
+        when(mockConnection.prepareStatement(anyString())).thenReturn(selectPs).thenReturn(insertPs);
         when(selectPs.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
-
-        when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
-            .thenReturn(insertPs);
 
         Map<Integer, Long> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
 
@@ -94,16 +84,17 @@ class FireboltMetadataServiceTest {
         result.values().forEach(r -> assertEquals(-1L, r));
 
         // verify batch insert invoked for two missing rows
+        verify(selectPs, times(1)).setString(1, "t1");
         verify(insertPs, times(2)).addBatch();
         verify(insertPs, times(1)).executeBatch();
     }
 
     @Test
-    void getLastOffsets_shouldReturnExistingAndInsertMissing() throws Exception {
+    void getLastOffsetsShouldReturnExistingAndInsertMissing() throws Exception {
         PreparedStatement selectPs = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
 
-        when(connection.prepareStatement(startsWith("SELECT topic, topic_partition, partition_offset")))
+        when(mockConnection.prepareStatement("SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in (0, 1)"))
             .thenReturn(selectPs);
         when(selectPs.executeQuery()).thenReturn(resultSet);
         // one existing row (partition 0, offset 5), then end
@@ -112,7 +103,7 @@ class FireboltMetadataServiceTest {
         when(resultSet.getLong("partition_offset")).thenReturn(5L);
 
         PreparedStatement insertPs = mock(PreparedStatement.class);
-        when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
+        when(mockConnection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(insertPs);
 
         Map<Integer, Long> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
@@ -125,19 +116,20 @@ class FireboltMetadataServiceTest {
         assertEquals(-1L, inserted);
 
         // verify only one insert for missing partition 1
+        verify(insertPs, times(1)).setInt(1, 1);
         verify(insertPs, times(1)).addBatch();
         verify(insertPs, times(1)).executeBatch();
     }
 
     @Test
-    void updateOffsets_shouldBatchUpdateOffsetsOnly() throws Exception {
+    void updateOffsetsShouldBatchUpdateOffsetsOnly() throws Exception {
         Map<Integer, Long> updates = Map.of(
             0, 10L,
             1, 20L
         );
 
         PreparedStatement updatePs = mock(PreparedStatement.class);
-        when(connection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
 
         metadataService.updateOffsets("t1", updates);
@@ -146,11 +138,11 @@ class FireboltMetadataServiceTest {
         verify(updatePs, times(2)).addBatch();
         verify(updatePs, times(1)).executeBatch();
         // no insert should be prepared in this path anymore
-        verify(connection, never()).prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\""));
+        verify(mockConnection, never()).prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\""));
     }
 
     @Test
-    void getLastOffsets_twiceWithUpdate_shouldNotDuplicateAndReturnUpdatedOffsets() throws Exception {
+    void getLastOffsetsTwiceWithUpdateShouldNotDuplicateAndReturnUpdatedOffsets() throws Exception {
         // First call: SELECT returns no rows -> INSERT missing two -> return offsets [0,0]
         PreparedStatement selectPsFirst = mock(PreparedStatement.class);
         PreparedStatement insertPsLocal = mock(PreparedStatement.class);
@@ -160,7 +152,7 @@ class FireboltMetadataServiceTest {
         PreparedStatement selectPsSecond = mock(PreparedStatement.class);
         ResultSet rsSecond = mock(ResultSet.class);
 
-        when(connection.prepareStatement(startsWith("SELECT topic, topic_partition, partition_offset")))
+        when(mockConnection.prepareStatement(startsWith("SELECT topic, topic_partition, partition_offset")))
             .thenReturn(selectPsFirst, selectPsSecond);
 
         // First SELECT result: empty
@@ -168,7 +160,7 @@ class FireboltMetadataServiceTest {
         when(rsFirst.next()).thenReturn(false);
 
         // INSERT prepared statement for first call
-        when(connection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
+        when(mockConnection.prepareStatement(startsWith("INSERT INTO \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(insertPsLocal);
 
         Map<Integer, Long> first = metadataService.getLastOffsets("topicB", Set.of(0, 1));
@@ -179,7 +171,7 @@ class FireboltMetadataServiceTest {
 
         // Update one offset to 7
         PreparedStatement updatePs = mock(PreparedStatement.class);
-        when(connection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
         metadataService.updateOffsets("topicB", Map.of(1, 7L));
 
