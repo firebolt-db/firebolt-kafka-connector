@@ -106,7 +106,7 @@ public class FireboltMetadataService {
             throw new IllegalArgumentException("Topic name or offsets cannot be empty");
         }
 
-        String updateSql = String.format("UPDATE \"%s\" SET partition_offset = ? WHERE topic = \"%s\"? AND topic_partition = ?",
+        String updateSql = String.format("UPDATE \"%s\" SET partition_offset = ? WHERE topic = \"%s\" AND topic_partition = ?",
                 METADATA_TABLE_NAME, topicName);
 
         try (Connection connection = fireboltDbService.createConnection(jdbcConfig);
