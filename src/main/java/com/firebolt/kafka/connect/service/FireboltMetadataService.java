@@ -45,6 +45,13 @@ public class FireboltMetadataService {
         ensureMetadataTableExists();
     }
 
+    /**
+     * @param topicName: the topic name
+     * @param topicPartitions: the set of topic partitions
+     * @return a map of topic partition to last committed offset
+     * @throws IllegalArgumentException if topicName is blank or topicPartitions is empty
+     * @throws RuntimeException if there is an error querying or inserting into the metadata table
+     */
     public Map<Integer, Long> getLastOffsets(String topicName, Set<Integer> topicPartitions) {
         if (StringUtils.isBlank(topicName) || CollectionUtils.isEmpty(topicPartitions)) {
             log.error("Invalid topicName: {}, or partitions {}", topicName, topicPartitions);
