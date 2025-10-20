@@ -27,16 +27,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.math.BigInteger;
 
 @Slf4j
-public class MultipleTopicsSerializerTest extends BaseIntegrationTest {
+public class MultipleTopicsSerializerTest extends SchemaBaseIntegrationTest {
     
     // Topic and table names
-    private static final String TOPIC1_NAME = "topic1";
-    private static final String TOPIC2_NAME = "topic2";
-    private static final String TOPIC3_NAME = "topic3";
+    private static final String TOPIC1_NAME = generateTopicName("topic1");
+    private static final String TOPIC2_NAME = generateTopicName("topic2");
+    private static final String TOPIC3_NAME = generateTopicName("topic3");
     
-    private static final String TABLE1_NAME = "table1";
-    private static final String TABLE2_NAME = "table2";
-    private static final String TABLE3_NAME = "table3";
+    private static final String TABLE1_NAME = generateTableName("table1");
+    private static final String TABLE2_NAME = generateTableName("table2");
+    private static final String TABLE3_NAME = generateTableName("table3");
     
     private static final String SCHEMA1_SUBJECT = TOPIC1_NAME + "-value";
     private static final String SCHEMA2_SUBJECT = TOPIC2_NAME + "-value";

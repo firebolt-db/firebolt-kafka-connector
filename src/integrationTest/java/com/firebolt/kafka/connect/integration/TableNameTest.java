@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class TableNameTest extends BaseIntegrationTest {
+public class TableNameTest extends SchemaBaseIntegrationTest {
 
     private Producer<String, SimpleRecord> producer;
 
@@ -47,7 +47,6 @@ public class TableNameTest extends BaseIntegrationTest {
            generateUniqueConnectorName(connectorName);
 
            // Setup test resources using centralized method
-
            setupTestResources(topicName, tableName, schemaSubject,
                    simpleRecordTableSchema(), jsonSimpleRecordSchema());
 

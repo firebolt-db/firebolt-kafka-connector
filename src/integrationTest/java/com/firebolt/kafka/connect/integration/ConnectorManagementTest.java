@@ -19,7 +19,7 @@ import org.junit.jupiter.api.TestInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Slf4j
-public class ConnectorManagementTest extends BaseIntegrationTest {
+public class ConnectorManagementTest extends SchemaBaseIntegrationTest {
 
     private String topic1Name;
     private String topic2Name;
