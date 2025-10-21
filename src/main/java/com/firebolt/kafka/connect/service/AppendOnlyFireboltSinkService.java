@@ -39,6 +39,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private RecordConverterFactory recordConverterFactory;
     private FireboltDbService fireboltDbService;
     private FireboltMetadataService fireboltMetadataService;
+    private Connection connection;
 
     private Map<String, Set<Integer>> assignedTopicPartitions;
 
@@ -61,8 +62,13 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         this.assignedTopicPartitions = topicPartitions;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
-        if (this.config.isExactlyOnce()) {
-            this.fireboltMetadataService = new FireboltMetadataService(fireboltDbService, config.getJdbcConfig());
+        try {
+            this.connection = fireboltDbService.createConnection(config.getJdbcConfig());
+            if (this.config.isExactlyOnce()) {
+                this.fireboltMetadataService = new FireboltMetadataService(connection);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize AppendOnlyFireboltSinkService connection", e);
         }
         this.tableWriterProvider = tableWriterProvider;
     }
@@ -108,6 +114,18 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
+        Connection tableWriterConnection = fireboltDbService.createConnection(config.getJdbcConfig());
+        FireboltMetadataService tableWriterFireboltMetadataService = null;
+        if (config.isExactlyOnce()) {
+            tableWriterFireboltMetadataService = new FireboltMetadataService(tableWriterConnection);
+        }
+        if (config.isExactlyOnce() || postProcessingScript.isPresent()) {
+            try {
+                tableWriterConnection.setAutoCommit(false);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
         Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
         return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
     }
@@ -134,6 +152,13 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         // close all the table writers
         tableWriterMap.entrySet().forEach(entry -> entry.getValue().close());
+
+        try {
+            if (connection != null) {
+                connection.close();
+            }
+        } catch (Exception ignore) {
+        }
 
         log.info("AppendOnlyFireboltSinkService closed");
     }

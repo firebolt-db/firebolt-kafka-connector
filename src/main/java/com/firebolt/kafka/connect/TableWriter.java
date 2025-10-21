@@ -55,12 +55,12 @@ public class TableWriter {
     TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
-        this.fireboltMetadataService = fireboltMetadataService;
-        this.topicName = topicName;
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
+        this.fireboltMetadataService = fireboltMetadataService;
+        this.topicName = topicName;
         this.postProcessingScript = postProcessingScript;
     }
 
@@ -71,11 +71,16 @@ public class TableWriter {
             return;
         }
 
+        // Auto-commit/commit will be managed by the service when exactly-once or post-processing scripts are enabled
         InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
         insertPreparedStatement.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
         updateProcessedOffsets(fireboltRecords);
+        // Commit is only meaningful when exactly-once is enabled and the service set auto-commit to false.
+        if (!connection.getAutoCommit()) {
+            connection.commit();
+        }
     }
 
     public Map<Integer, Long> getProcessedPartitionOffsets() {
@@ -100,7 +105,9 @@ public class TableWriter {
                 processedPartitionOffsets.put(partition, offset);
             }
         });
-
+        if (fireboltMetadataService != null) {
+            fireboltMetadataService.updateOffsets(topicName, processedPartitionOffsets);
+        }
     }
 
     private Connection getConnection() throws SQLException {

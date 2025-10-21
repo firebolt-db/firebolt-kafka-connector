@@ -404,6 +404,26 @@ public abstract class BaseIntegrationTest {
         log.info("Found expected data in Firebolt table '{}'", tableName);
     }
 
+    protected Map<Integer, Long> readMetadataOffsets(String topic) throws SQLException {
+        String q = "SELECT topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = '" + topic + "'";
+        Map<Integer, Long> result = new HashMap<>();
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(q)) {
+            while (rs.next()) {
+                result.put(rs.getInt("topic_partition"), rs.getLong("partition_offset"));
+            }
+        }
+        return result;
+    }
+
+    protected void removeMetadataTable() {
+        String q = "DROP TABLE IF EXISTS \"KafkaSinkConnectorMetadata\"";
+        try {
+            fireboltDefaultDbClient.executeUpdate(q);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * Generates a unique connector name for test runs.
      * @param connectorType The type/name of the connector (e.g., "integer-serializer-test")

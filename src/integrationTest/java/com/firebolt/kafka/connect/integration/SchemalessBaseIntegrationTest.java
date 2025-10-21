@@ -13,10 +13,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
+import com.firebolt.kafka.connect.utils.TopicOptions;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.internals.Topic;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 @Slf4j
@@ -63,12 +66,15 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
      * @param topicName The name of the Kafka topic to create
      * @param tableName The name of the Firebolt table to create
      * @param tableSchemaSupplier Supplier that provides the Firebolt table schema definition
+     * @param connectorDefinitionOverride Map of connector configuration overrides
+     * @param topicOptions Options for creating the Kafka topic
      */
     protected void setupSchemalessTestResources(
             String topicName,
             String tableName,
             java.util.function.Supplier<String> tableSchemaSupplier,
-            Map<String, String> connectorDefinitionOverride) {
+            Map<String, String> connectorDefinitionOverride,
+            TopicOptions topicOptions) {
 
         try {
             // Clean up any existing resources from previous test runs
@@ -79,7 +85,7 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
 
             // Create Kafka topic
             log.info("Creating Kafka topic: {}", topicName);
-            createKafkaTopic(topicName);
+            createKafkaTopic(topicName, topicOptions);
 
             // Register the Kafka Connect connector
             log.info("Registering Kafka Connect connector: {}", testConnectorName);
@@ -89,6 +95,22 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
             log.error("Failed to set up test resources: {}", e.getMessage());
             throw new RuntimeException("Test resources setup failed", e);
         }
+    }
+
+    /**
+     * Centralized setup method for test resources.
+     * This method handles setup of Firebolt table, Kafka topic, and Kafka Connect connector.
+     *
+     * @param topicName The name of the Kafka topic to create
+     * @param tableName The name of the Firebolt table to create
+     * @param tableSchemaSupplier Supplier that provides the Firebolt table schema definition
+     */
+    protected void setupSchemalessTestResources(
+            String topicName,
+            String tableName,
+            java.util.function.Supplier<String> tableSchemaSupplier,
+            Map<String, String> connectorDefinitionOverride) {
+        setupSchemalessTestResources(topicName, tableName, tableSchemaSupplier, connectorDefinitionOverride, TopicOptions.defaults());
     }
 
     /**

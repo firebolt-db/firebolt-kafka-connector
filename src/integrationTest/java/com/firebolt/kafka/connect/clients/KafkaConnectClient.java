@@ -44,22 +44,20 @@ public class KafkaConnectClient {
     }
 
     public void pauseConnector(String connectorName) throws IOException {
-        Request request = new Request.Builder()
-                .url(baseUrl + "/connectors/" + connectorName + "/pause")
-                .put(RequestBody.create(new byte[0], MediaType.parse("application/json")))
-                .build();
+        updateConnectorState(connectorName, "pause");
+    }
 
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                String body = response.body() != null ? response.body().string() : "";
-                throw new IOException("Failed to pause connector: " + response.code() + " - " + body);
-            }
-        }
+    public void stopConnector(String connectorName) throws IOException {
+        updateConnectorState(connectorName, "stop");
     }
 
     public void resumeConnector(String connectorName) throws IOException {
+        updateConnectorState(connectorName, "resume");
+    }
+
+    private void updateConnectorState(String connectorName, String state) throws IOException {
         Request request = new Request.Builder()
-                .url(baseUrl + "/connectors/" + connectorName + "/resume")
+                .url(baseUrl + "/connectors/" + connectorName + "/" + state)
                 .put(RequestBody.create(new byte[0], MediaType.parse("application/json")))
                 .build();
 
@@ -85,9 +83,37 @@ public class KafkaConnectClient {
         }
     }
 
+    public void resetOffsets(String connectorName) throws IOException {
+        Request request = new Request.Builder()
+                .url(baseUrl + "/connectors/" + connectorName + "/offsets")
+                .delete()
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String body = response.body() != null ? response.body().string() : "";
+                throw new IOException("Failed to restart connector: " + response.code() + " - " + body);
+            }
+        }
+    }
+
     public void waitForConnectorRunning(String connectorName, Duration timeout) {
         log.info("Waiting for connector '{}' to be running...", connectorName);
 
+        waitForConnector(timeout, connectorName, "RUNNING");
+
+        log.info("Connector '{}' is running!", connectorName);
+    }
+
+    public void waitForConnectorStopped(String connectorName, Duration timeout) {
+        log.info("Waiting for connector '{}' to be paused...", connectorName);
+
+        waitForConnector(timeout, connectorName, "STOPPED");
+
+        log.info("Connector '{}' is paused!", connectorName);
+    }
+
+    private void waitForConnector(Duration timeout, String connectorName, String status) {
         await()
                 .atMost(timeout)
                 .pollInterval(Duration.ofSeconds(5))
@@ -95,14 +121,12 @@ public class KafkaConnectClient {
                     try {
                         String state = getConnectorState(connectorName);
                         log.debug("Connector '{}' state: {}", connectorName, state);
-                        return "RUNNING".equalsIgnoreCase(state);
+                        return status.equalsIgnoreCase(state);
                     } catch (Exception e) {
                         log.debug("Error checking connector status: {}", e.getMessage());
                         return false;
                     }
                 });
-
-        log.info("Connector '{}' is running!", connectorName);
     }
 
     public Map<String, Object> getConnectorConfig(String connectorName) throws IOException {

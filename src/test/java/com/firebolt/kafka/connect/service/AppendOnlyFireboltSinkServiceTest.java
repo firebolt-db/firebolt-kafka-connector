@@ -150,9 +150,11 @@ public class AppendOnlyFireboltSinkServiceTest {
     @Test
     void shouldReturnWhenNoRecords() {
         assertDoesNotThrow(() -> service.processRecord(List.of(), Map.of()));
-        verify(mockSinkConfig, times(1)).isExactlyOnce();
-        verifyNoMoreInteractions(mockSinkConfig);
-        verifyNoInteractions(mockDbService, mockConverterFactory);
+        verify(mockSinkConfig).getJdbcConfig();
+        verify(mockSinkConfig).isExactlyOnce();
+        verify(mockDbService).createConnection(null);
+        verifyNoMoreInteractions(mockSinkConfig, mockDbService);
+        verifyNoInteractions(mockConverterFactory);
     }
 
     @Test

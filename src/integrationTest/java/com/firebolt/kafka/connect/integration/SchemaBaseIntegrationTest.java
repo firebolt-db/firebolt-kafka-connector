@@ -4,6 +4,8 @@ import com.firebolt.kafka.connect.clients.SchemaRegistryClient;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+
+import com.firebolt.kafka.connect.utils.TopicOptions;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -53,7 +55,7 @@ public class SchemaBaseIntegrationTest extends BaseIntegrationTest {
             String schemaSubject,
             java.util.function.Supplier<String> tableSchemaSupplier,
             java.util.function.Supplier<String> jsonSchemaSupplier) {
-        setupTestResources(topicName, tableName, schemaSubject, tableSchemaSupplier, jsonSchemaSupplier, Collections.emptyMap());
+        setupTestResources(topicName, tableName, schemaSubject, tableSchemaSupplier, jsonSchemaSupplier, Collections.emptyMap(), TopicOptions.defaults());
     }
 
     /**
@@ -65,6 +67,7 @@ public class SchemaBaseIntegrationTest extends BaseIntegrationTest {
      * @param schemaSubject The name of the schema registry subject to register
      * @param tableSchemaSupplier Supplier that provides the Firebolt table schema definition
      * @param jsonSchemaSupplier Supplier that provides the JSON schema definition for schema registry
+     * @param connectorDefinitionOverride Map of connector configuration overrides
      */
     protected void setupTestResources(
             String topicName,
@@ -73,6 +76,29 @@ public class SchemaBaseIntegrationTest extends BaseIntegrationTest {
             java.util.function.Supplier<String> tableSchemaSupplier,
             java.util.function.Supplier<String> jsonSchemaSupplier,
             Map<String, String> connectorDefinitionOverride) {
+        setupTestResources(topicName, tableName, schemaSubject, tableSchemaSupplier, jsonSchemaSupplier, connectorDefinitionOverride, TopicOptions.defaults());
+    }
+
+    /**
+     * Centralized setup method for test resources.
+     * This method handles setup of Firebolt table, Kafka topic, schema registry, and Kafka Connect connector.
+     *
+     * @param topicName The name of the Kafka topic to create
+     * @param tableName The name of the Firebolt table to create
+     * @param schemaSubject The name of the schema registry subject to register
+     * @param tableSchemaSupplier Supplier that provides the Firebolt table schema definition
+     * @param jsonSchemaSupplier Supplier that provides the JSON schema definition for schema registry
+     * @param connectorDefinitionOverride Map of connector configuration overrides
+     * @param topicOptions Options for creating the Kafka topic
+     */
+    protected void setupTestResources(
+            String topicName,
+            String tableName,
+            String schemaSubject,
+            java.util.function.Supplier<String> tableSchemaSupplier,
+            java.util.function.Supplier<String> jsonSchemaSupplier,
+            Map<String, String> connectorDefinitionOverride,
+            TopicOptions topicOptions) {
 
         try {
             // Clean up any existing resources from previous test runs
@@ -83,7 +109,7 @@ public class SchemaBaseIntegrationTest extends BaseIntegrationTest {
 
             // Create Kafka topic
             log.info("Creating Kafka topic: {}", topicName);
-            createKafkaTopic(topicName);
+            createKafkaTopic(topicName, topicOptions);
 
             // Register JSON schema
             log.info("Registering JSON schema for subject: {}", schemaSubject);
