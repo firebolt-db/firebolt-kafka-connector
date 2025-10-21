@@ -4,6 +4,8 @@ import com.firebolt.kafka.connect.JdbcConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -43,6 +45,10 @@ class FireboltMetadataServiceTest {
 
     @Mock
     private JdbcConfig mockJdbcConfig;
+
+    @Captor
+    private ArgumentCaptor<String> preparedStatementsArgumentCapture;
+
     private FireboltMetadataService metadataService;
 
     @BeforeEach
@@ -84,10 +90,28 @@ class FireboltMetadataServiceTest {
         assertTrue(result.values().stream().allMatch(offset -> offset == -1));
         result.values().forEach(r -> assertEquals(-1L, r));
 
+        verify(mockConnection, times(2)).prepareStatement(preparedStatementsArgumentCapture.capture());
+        // first prepared statement is the select query
+        String selectQuery = preparedStatementsArgumentCapture.getAllValues().get(0);
+
+        // the topic partition is not always sorted
+        Set<String> expectedQuery = Set.of(
+                "SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in (0, 1)",
+                "SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in (1, 0)"
+        );
+        assertTrue(expectedQuery.contains(selectQuery));
+
+        verify(selectPs).setString(1, "t1");
+
+        // second prepared statement is the insert
+        String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+
         // verify batch insert invoked for two missing rows
-        verify(selectPs, times(1)).setString(1, "t1");
+        verify(insertPs).setInt(1, 0);
+        verify(insertPs).setInt(1, 1);
         verify(insertPs, times(2)).addBatch();
-        verify(insertPs, times(1)).executeBatch();
+        verify(insertPs).executeBatch();
     }
 
     @Test
@@ -117,6 +141,10 @@ class FireboltMetadataServiceTest {
         assertEquals(5L, existing);
         assertEquals(-1L, inserted);
 
+        verify(mockConnection, times(2)).prepareStatement(preparedStatementsArgumentCapture.capture());
+        String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+
         // verify only one insert for missing partition 1
         verify(insertPs, times(1)).setInt(1, 1);
         verify(insertPs, times(1)).addBatch();
@@ -135,6 +163,15 @@ class FireboltMetadataServiceTest {
             .thenReturn(updatePs);
 
         metadataService.updateOffsets("t1", updates);
+
+        verify(mockConnection).prepareStatement(preparedStatementsArgumentCapture.capture());
+        String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(0);
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"t1\" AND topic_partition = ?", updateStatement);
+
+        verify(updatePs).setLong(1, 10L);
+        verify(updatePs).setInt(2, 0);
+        verify(updatePs).setLong(1, 20L);
+        verify(updatePs).setInt(2, 1);
 
         // verify parameters were bound and batch executed
         verify(updatePs, times(2)).addBatch();
@@ -177,6 +214,15 @@ class FireboltMetadataServiceTest {
             .thenReturn(updatePs);
         metadataService.updateOffsets("topicB", Map.of(1, 7L));
 
+        verify(mockConnection, times(3)).prepareStatement(preparedStatementsArgumentCapture.capture());
+        String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(2);
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"topicB\" AND topic_partition = ?", updateStatement);
+
+        verify(updatePs).setLong(1, 7L);
+        verify(updatePs).setInt(2, 1);
+        verify(updatePs).addBatch();
+        verify(updatePs).executeBatch();
+
         // Second SELECT result: two rows present: partition 0 -> 0, partition 1 -> 7
         when(selectPsSecond.executeQuery()).thenReturn(rsSecond);
         when(rsSecond.next()).thenReturn(true, true, false);
@@ -188,6 +234,7 @@ class FireboltMetadataServiceTest {
         assertEquals(2, second.size());
         long p1Offset = second.get(1);
         assertEquals(7L, p1Offset);
+        assertEquals( 0L, second.get(0));
 
         // verify no additional inserts triggered in second call
         // total insert invocations remain from the first call only
