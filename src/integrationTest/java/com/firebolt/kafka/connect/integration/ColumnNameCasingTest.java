@@ -24,10 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class ColumnNameCasingTest extends BaseIntegrationTest {
+public class ColumnNameCasingTest extends SchemaBaseIntegrationTest {
 
-    private static final String TABLE_NAME = "column_name_casing_table";
-    private static final String TOPIC_NAME = "column-name-casing-topic";
+    private static final String TABLE_NAME = generateTableName("column_name_casing_table");
+    private static final String TOPIC_NAME = generateTopicName("column-name-casing-topic");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, ColumnNameCaseRecord> producer;

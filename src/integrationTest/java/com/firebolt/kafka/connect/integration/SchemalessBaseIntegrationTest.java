@@ -75,10 +75,7 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
             cleanupSchemalessTestResources(tableName, topicName);
 
             // Create the test table with the provided schema
-            log.info("Creating Firebolt test table: {}", tableName);
-            String createTableSql = String.format(tableSchemaSupplier.get(), tableName);
-            fireboltDefaultDbClient.executeUpdate(createTableSql);
-            log.info("Created Firebolt test table with schema");
+            createTable(tableSchemaSupplier, tableName);
 
             // Create Kafka topic
             log.info("Creating Kafka topic: {}", topicName);
@@ -122,38 +119,12 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
      * @throws Exception if connector registration fails
      */
     protected void registerSchemalessJsonConnector(String connectorName, String topics, String topicToTableMappings, Map<String, String> connectorDefinitionOverride) throws Exception {
-        Map<String, Object> connectorConfig = new HashMap<>();
+        Map<String, Object> connectorConfig = createBasicConnectorDefinition(topics, topicToTableMappings);
 
-        // Kafka Connect core properties
-        connectorConfig.put("connector.class", "com.firebolt.kafka.connect.FireboltSinkConnector");
-        connectorConfig.put("tasks.max", "1");
-        connectorConfig.put("topics", topics);
-        connectorConfig.put("key.converter", "org.apache.kafka.connect.storage.StringConverter");
+        // this is not using any schema registry
         connectorConfig.put("value.converter", "org.apache.kafka.connect.json.JsonConverter");
         connectorConfig.put("value.converter.schemas.enable", "false");
-
         connectorConfig.put("schemas.enable", "false");
-
-        // JSON Schema converter configuration
-        connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
-
-        // Error handling configuration
-        connectorConfig.put("errors.tolerance", "all"); //to be able to test all error scenarios
-
-        // Firebolt connector specific properties
-        connectorConfig.put("jdbc.connection.url", getJdbcConnectionUrl());
-        connectorConfig.put("topic.to.table.mapping", topicToTableMappings);
-
-        // Add client credentials if system properties are set
-        String clientId = getClientId();
-        if (clientId != null) {
-            connectorConfig.put("firebolt.clientId", "${file:/etc/kafka-connect/secrets/secrets.properties:clientId}");
-        }
-
-        String clientSecret = getClientSecret();
-        if (clientSecret != null) {
-            connectorConfig.put("firebolt.clientSecret", "${file:/etc/kafka-connect/secrets/secrets.properties:clientSecret}");
-        }
 
         // before creating the configuration apply definition override
         if (connectorDefinitionOverride != null && !connectorDefinitionOverride.isEmpty()) {
@@ -183,31 +154,10 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
      * @return a new KafkaProducer configured for JSON Schema serialization
      */
     protected <T> Producer<String, T> initializeSchemalessJsonProducer(boolean includeNulls) {
-        Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        Properties props = createBasicProducerProperties(includeNulls);
+
+        // no schema, just string serialization
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.RETRIES_CONFIG, 3);
-        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-
-        // configuration for large messages
-        props.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, 48000000);
-        props.put("buffer.memory", "48000000");
-
-        // Configure null handling behavior
-        props.put("json.oneof.for.nullables", includeNulls);
-
-        if (!includeNulls) {
-            // Omit null fields entirely from JSON output
-            props.put("json.default.property.inclusion", "NON_NULL");
-        } else {
-            // Include null fields in JSON output as "field": null
-            props.put("json.default.property.inclusion", "ALWAYS");
-        }
-
-        props.put("json.write.dates.iso8601", true);
-        props.put("json.indent.output", false);
 
         Producer<String, T> producer = new KafkaProducer<>(props);
         log.info("Kafka JSON Schemaless producer initialized successfully with null handling: includeNulls={}", includeNulls);

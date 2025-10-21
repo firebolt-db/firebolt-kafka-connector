@@ -3,7 +3,6 @@ package com.firebolt.kafka.connect.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.clients.FireboltClient;
 import com.firebolt.kafka.connect.clients.KafkaConnectClient;
-import com.firebolt.kafka.connect.clients.SchemaRegistryClient;
 import com.firebolt.kafka.connect.integration.json.datatype.SimpleRecord;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import com.firebolt.kafka.connect.utils.ServiceHealthExtension;
@@ -14,8 +13,6 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.ZoneId;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +55,6 @@ public abstract class BaseIntegrationTest {
     
     protected static final String KAFKA_CONNECT_HOST = System.getenv().getOrDefault("KAFKA_CONNECT_URL", "http://localhost:8083");
     protected static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
-    protected static final String SCHEMA_REGISTRY_URL = System.getenv().getOrDefault("SCHEMA_REGISTRY_URL", "http://localhost:8081");
     protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(20);
 
     protected static final String DEFAULT_DATABASE_NAME = "integration_test_db";
@@ -75,7 +71,6 @@ public abstract class BaseIntegrationTest {
     protected String testConnectorName;
 
     protected FireboltClient fireboltDefaultDbClient;
-    protected SchemaRegistryClient schemaRegistryClient;
     protected KafkaConnectClient kafkaConnectClient;
 
     @BeforeEach
@@ -85,7 +80,6 @@ public abstract class BaseIntegrationTest {
         
         try {
             this.fireboltDefaultDbClient = FireboltClient.createFor(getDatabaseName());
-            this.schemaRegistryClient = new SchemaRegistryClient(SCHEMA_REGISTRY_URL, httpClient, objectMapper);
             this.kafkaConnectClient = new KafkaConnectClient(KAFKA_CONNECT_HOST, httpClient, objectMapper);
         } catch (SQLException e) {
             log.error("Failed to create FireboltClient: {}", e.getMessage(), e);
@@ -107,42 +101,42 @@ public abstract class BaseIntegrationTest {
             }
             fireboltDefaultDbClient = null;
         }
+    }
 
-        // Close Schema Registry client if it was created
-        if (schemaRegistryClient != null) {
-            log.debug("Closing Schema Registry client for test: {}", testName);
-            schemaRegistryClient.close();
-            schemaRegistryClient = null;
-        }
+    protected void createTable(Supplier<String> tableSchemaSupplier, String tableName) throws SQLException {
+        log.info("Creating Firebolt test table: {}", tableName);
+        String createTableSql = String.format(tableSchemaSupplier.get(), tableName);
+        fireboltDefaultDbClient.executeUpdate(createTableSql);
+        log.info("Created Firebolt test table with schema");
     }
 
     /**
      * Creates a Kafka topic with the specified name and options.
-     * 
+     *
      * @param topicName the name of the topic to create
      * @param options the topic configuration options (partitions, replication factor)
      * @throws RuntimeException if topic creation fails (except when topic already exists)
      */
     protected void createKafkaTopic(String topicName, TopicOptions options) {
         log.info("Creating Kafka topic '{}' with options: {}", topicName, options);
-        
+
         Properties adminProps = new Properties();
         adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
         adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
         adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 60000);
-        
+
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             NewTopic newTopic = new NewTopic(topicName, options.getPartitions(), options.getReplicationFactor())
                     .configs(Map.of("max.message.bytes", String.valueOf(50 * 1024 * 1024))); // allow 50 MB messages
             CreateTopicsResult result = adminClient.createTopics(java.util.Collections.singletonList(newTopic));
-            
+
             // Wait for the topic creation to complete
             result.all().get(60, TimeUnit.SECONDS);
-            
+
             log.info("Successfully created Kafka topic: {}", topicName);
             // Ensure topic is fully discoverable/ready across the cluster
             waitForTopicReady(topicName, Duration.ofSeconds(60));
-            
+
         } catch (ExecutionException e) {
             if (e.getCause() instanceof TopicExistsException) {
                 log.info("Topic '{}' already exists, skipping creation", topicName);
@@ -155,11 +149,11 @@ public abstract class BaseIntegrationTest {
             throw new RuntimeException("Failed to create Kafka topic: " + topicName, e);
         }
     }
-    
+
     /**
-     * Creates a Kafka topic with the specified name using default options 
+     * Creates a Kafka topic with the specified name using default options
      * (1 partition, replication factor 1).
-     * 
+     *
      * @param topicName the name of the topic to create
      * @throws RuntimeException if topic creation fails (except when topic already exists)
      */
@@ -204,30 +198,6 @@ public abstract class BaseIntegrationTest {
     }
     
     /**
-     * Gets the Schema Registry client for interacting with schema registry operations.
-     * 
-     * @return the SchemaRegistryClient instance
-     */
-    protected SchemaRegistryClient getSchemaRegistryClient() {
-        return schemaRegistryClient;
-    }
-    
-    /**
-     * Safely deletes a specific schema from the Schema Registry.
-     * This method is useful for test cleanup to remove schemas created during testing.
-     * 
-     * @param schemaName the name of the schema subject to delete
-     */
-    protected void safelyDeleteJsonSchema(String schemaName) {
-        try {
-            getSchemaRegistryClient().deleteSchema(schemaName);
-            log.debug("Deleted schema: {}", schemaName);
-        } catch (Exception e) {
-            log.warn("Failed to delete schema {}: {}", schemaName, e.getMessage());
-        }
-    }
-    
-    /**
      * Safely drops a Firebolt table to ensure clean state.
      * This method is useful for test setup to avoid table state conflicts
      * between different test runs.
@@ -244,46 +214,25 @@ public abstract class BaseIntegrationTest {
         }
     }
 
-    protected void registerJsonConnector(String connectorName, String topics, String topicToTableMappings) throws Exception {
-        registerJsonConnector(connectorName, topics, topicToTableMappings, Collections.emptyMap());
-    }
-
-    /**
-     * Registers a Kafka Connect connector for JSON Schema processing with Firebolt.
-     * This method creates a standard JSON Schema connector configuration suitable for most tests.
-     * 
-     * @param connectorName the name of the connector to create
-     * @param topics the Kafka topics to consume from (comma-separated if multiple)
-     * @param topicToTableMappings the topic-to-table mappings (e.g., "topic1:table1,topic2:table2")
-     * @throws Exception if connector registration fails
-     */
-    protected void registerJsonConnector(String connectorName, String topics, String topicToTableMappings, Map<String, String> connectorDefinitionOverride) throws Exception {
+    protected Map<String, Object> createBasicConnectorDefinition(String topics, String topicToTableMappings) {
         Map<String, Object> connectorConfig = new HashMap<>();
-        
+
         // Kafka Connect core properties
         connectorConfig.put("connector.class", "com.firebolt.kafka.connect.FireboltSinkConnector");
         connectorConfig.put("tasks.max", "1");
         connectorConfig.put("topics", topics);
         connectorConfig.put("key.converter", "org.apache.kafka.connect.storage.StringConverter");
-        connectorConfig.put("value.converter", "io.confluent.connect.json.JsonSchemaConverter");
-        
-        // Schema Registry configuration
-        connectorConfig.put("value.converter.schema.registry.url", "http://schema-registry:8081");
-        connectorConfig.put("value.converter.auto.register.schemas", "false");
-
-        connectorConfig.put("value.converter.schemas.enable", "true");
-        connectorConfig.put("schemas.enable", "true");
 
         // JSON Schema converter configuration
         connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
 
         // Error handling configuration
         connectorConfig.put("errors.tolerance", "all"); //to be able to test all error scenarios
-        
+
         // Firebolt connector specific properties
         connectorConfig.put("jdbc.connection.url", getJdbcConnectionUrl());
         connectorConfig.put("topic.to.table.mapping", topicToTableMappings);
-        
+
         // Add client credentials if system properties are set
         String clientId = getClientId();
         if (clientId != null) {
@@ -295,50 +244,13 @@ public abstract class BaseIntegrationTest {
             connectorConfig.put("firebolt.clientSecret", "${file:/etc/kafka-connect/secrets/secrets.properties:clientSecret}");
         }
 
-        // before creating the configuration apply definition override
-        if (connectorDefinitionOverride != null && !connectorDefinitionOverride.isEmpty()) {
-            log.info("Applying the connector definition override");
-            connectorConfig.putAll(connectorDefinitionOverride);
-        }
-
-        // Create the connector
-        createConnectorAndWaitForItToStart(connectorName, topicToTableMappings, connectorConfig);
+        return connectorConfig;
     }
 
-    protected void createConnectorAndWaitForItToStart(String connectorName, String topicToTableMappings, Map<String, Object> connectorConfig) throws IOException {
-        // Create the connector
-        createConnector(connectorName, connectorConfig);
-        kafkaConnectClient.waitForConnectorRunning(connectorName, DEFAULT_TIMEOUT);
-
-        log.info("✅ Connector '{}' registered and running with topic-to-table mapping: {}",
-                connectorName, topicToTableMappings);
-    }
-
-
-    /**
-     * Initializes a Kafka producer for JSON Schema serialization with default null handling (nulls included).
-     * This method creates a producer configured for JSON Schema with proper schema registry integration.
-     * 
-     * @param <T> the type of the record values to be produced
-     * @return a new KafkaProducer configured for JSON Schema serialization
-     */
-    protected <T> Producer<String, T> initializeJsonProducer() {
-        return initializeJsonProducer(true); // Default: include nulls in JSON
-    }
-    
-    /**
-     * Initializes a Kafka producer for JSON Schema serialization with configurable null handling.
-     * This method creates a producer configured for JSON Schema with proper schema registry integration.
-     *
-     * @param <T> the type of the record values to be produced
-     * @param includeNulls true to include null values in JSON serialization, false to omit them
-     * @return a new KafkaProducer configured for JSON Schema serialization
-     */
-    protected <T> Producer<String, T> initializeJsonProducer(boolean includeNulls) {
+    protected Properties createBasicProducerProperties(boolean includeNulls) {
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer");
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
@@ -347,15 +259,9 @@ public abstract class BaseIntegrationTest {
         props.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, 48000000);
         props.put("buffer.memory", "48000000");
 
-        // Schema Registry configuration
-        props.put("schema.registry.url", SCHEMA_REGISTRY_URL);
-        props.put("auto.register.schemas", "false");
-        props.put("use.latest.version", "true");
-        props.put("latest.compatibility.strict", "false");
-
         // Configure null handling behavior
         props.put("json.oneof.for.nullables", includeNulls);
-        
+
         if (!includeNulls) {
             // Omit null fields entirely from JSON output
             props.put("json.default.property.inclusion", "NON_NULL");
@@ -367,9 +273,16 @@ public abstract class BaseIntegrationTest {
         props.put("json.write.dates.iso8601", true);
         props.put("json.indent.output", false);
 
-        Producer<String, T> producer = new KafkaProducer<>(props);
-        log.info("Kafka JSON Schema producer initialized successfully with null handling: includeNulls={}", includeNulls);
-        return producer;
+        return props;
+    }
+
+    protected void createConnectorAndWaitForItToStart(String connectorName, String topicToTableMappings, Map<String, Object> connectorConfig) throws IOException {
+        // Create the connector
+        createConnector(connectorName, connectorConfig);
+        kafkaConnectClient.waitForConnectorRunning(connectorName, DEFAULT_TIMEOUT);
+
+        log.info("✅ Connector '{}' registered and running with topic-to-table mapping: {}",
+                connectorName, topicToTableMappings);
     }
 
     /**
@@ -501,95 +414,6 @@ public abstract class BaseIntegrationTest {
         this.testConnectorName = connectorType + "-connector-" + testId;
     }
 
-    /**
-     * Centralized cleanup method for test resources.
-     * This method handles cleanup of connector, Firebolt table, Kafka topic, and schema registry.
-     * 
-     * @param tableName The name of the Firebolt table to drop
-     * @param topicName The name of the Kafka topic to delete
-     * @param schemaSubject The name of the schema registry subject to delete
-     */
-    protected void cleanupTestResources(String tableName, String topicName, String schemaSubject) {
-        // Clean up connector
-        safelyDeleteConnector(testConnectorName);
-        
-        // Clean up Firebolt table
-        safelyDropTable(tableName);
-
-        // Clean up Kafka topic
-        safelyDeleteKafkaTopic(topicName);
-        
-        // Clean up schema registry
-        safelyDeleteJsonSchema(schemaSubject);
-    }
-
-    /**
-     * Centralized setup method for test resources.
-     * This method handles setup of Firebolt table, Kafka topic, schema registry, and Kafka Connect connector.
-     * 
-     * @param topicName The name of the Kafka topic to create
-     * @param tableName The name of the Firebolt table to create
-     * @param schemaSubject The name of the schema registry subject to register
-     * @param tableSchemaSupplier Supplier that provides the Firebolt table schema definition
-     * @param jsonSchemaSupplier Supplier that provides the JSON schema definition for schema registry
-     */
-    protected void setupTestResources(
-            String topicName, 
-            String tableName, 
-            String schemaSubject,
-            java.util.function.Supplier<String> tableSchemaSupplier,
-            java.util.function.Supplier<String> jsonSchemaSupplier) {
-       setupTestResources(topicName, tableName, schemaSubject, tableSchemaSupplier, jsonSchemaSupplier, Collections.emptyMap());
-    }
-
-    /**
-     * Centralized setup method for test resources.
-     * This method handles setup of Firebolt table, Kafka topic, schema registry, and Kafka Connect connector.
-     *
-     * @param topicName The name of the Kafka topic to create
-     * @param tableName The name of the Firebolt table to create
-     * @param schemaSubject The name of the schema registry subject to register
-     * @param tableSchemaSupplier Supplier that provides the Firebolt table schema definition
-     * @param jsonSchemaSupplier Supplier that provides the JSON schema definition for schema registry
-     */
-    protected void setupTestResources(
-            String topicName,
-            String tableName,
-            String schemaSubject,
-            java.util.function.Supplier<String> tableSchemaSupplier,
-            java.util.function.Supplier<String> jsonSchemaSupplier,
-            Map<String, String> connectorDefinitionOverride) {
-
-        try {
-            // Clean up any existing resources from previous test runs
-            cleanupTestResources(tableName, topicName, schemaSubject);
-
-            // Create the test table with the provided schema
-            log.info("Creating Firebolt test table: {}", tableName);
-            String createTableSql = String.format(tableSchemaSupplier.get(), tableName);
-            fireboltDefaultDbClient.executeUpdate(createTableSql);
-            log.info("Created Firebolt test table with schema");
-
-            // Create Kafka topic
-            log.info("Creating Kafka topic: {}", topicName);
-            createKafkaTopic(topicName);
-
-            // Register JSON schema
-            log.info("Registering JSON schema for subject: {}", schemaSubject);
-            String jsonSchema = jsonSchemaSupplier.get();
-            int schemaId = getSchemaRegistryClient().registerSchema(schemaSubject, jsonSchema, "JSON");
-            log.info("Successfully registered JSON schema with ID: {}", schemaId);
-
-            // Register the Kafka Connect connector
-            log.info("Registering Kafka Connect connector: {}", testConnectorName);
-            registerJsonConnector(testConnectorName, topicName, topicName + ":" + tableName, connectorDefinitionOverride);
-
-        } catch (Exception e) {
-            log.error("Failed to set up test resources: {}", e.getMessage());
-            throw new RuntimeException("Test resources setup failed", e);
-        }
-    }
-
     protected static String getJdbcConnectionUrl() {
         String systemPropertyUrl = System.getProperty("jdbc.connection.url");
         if (systemPropertyUrl != null && !systemPropertyUrl.trim().isEmpty()) {
@@ -709,11 +533,6 @@ public abstract class BaseIntegrationTest {
         } catch (InterruptedException e) {
             // do nothing
         }
-    }
-
-    protected int dateToEpochDays(java.util.Date date) {
-        long normalized = date.toInstant().atZone(ZoneId.of("UTC")).toLocalDate().toEpochDay();
-        return Math.toIntExact(normalized);
     }
 
 }

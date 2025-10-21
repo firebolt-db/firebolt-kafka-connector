@@ -26,10 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class DlqReporterIntegrationTest extends BaseIntegrationTest {
+public class DlqReporterIntegrationTest extends SchemaBaseIntegrationTest {
 
-    private static final String TABLE_NAME = "dlq_it_table";
-    private static final String TOPIC_NAME = "dlq-it-topic";
+    private static final String TABLE_NAME = generateTableName("dlq_it_table");
+    private static final String TOPIC_NAME = generateTopicName("dlq-it-topic");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private String dlqTopicName;
