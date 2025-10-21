@@ -105,7 +105,7 @@ class FireboltMetadataServiceTest {
 
         // second prepared statement is the insert
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topicName, topic_partition, partition_offset) VALUES (t1, ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (t1, ?, -1)", insertStatement);
 
         // verify batch insert invoked for two missing rows
         verify(insertPs).setInt(1, 0);
@@ -143,7 +143,7 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection, times(2)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topicName, topic_partition, partition_offset) VALUES (t1, ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (t1, ?, -1)", insertStatement);
 
         // verify only one insert for missing partition 1
         verify(insertPs, times(1)).setInt(1, 1);

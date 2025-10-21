@@ -78,7 +78,7 @@ public class FireboltMetadataService {
                 return results;
             }
 
-            String insertSql = String.format("INSERT INTO \"%s\" (topicName, topic_partition, partition_offset) VALUES (%s, ?, %d)",
+            String insertSql = String.format("INSERT INTO \"%s\" (topic, topic_partition, partition_offset) VALUES (%s, ?, %d)",
                     METADATA_TABLE_NAME, topicName, DEFAULT_OFFSET);
             try (PreparedStatement insertPs = connection.prepareStatement(insertSql)) {
                 for (Integer partition : topicPartitions) {
