@@ -59,7 +59,7 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
         producer = initializeJsonProducer();
         Map<Integer, Long> initialMeta = readMetadataOffsets(TOPIC_NAME);
         assertTrue(initialMeta.isEmpty(), "Metadata offsets should be empty initially");
-        
+
         // Create test records
         SimpleRecord record1 = new SimpleRecord(1, "value1");
         SimpleRecord record2 = new SimpleRecord(2, "value2");
