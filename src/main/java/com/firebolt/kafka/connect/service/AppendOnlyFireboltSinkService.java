@@ -103,7 +103,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
-        return new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig()), lastPartitionOffsets, errorReporter, errorToleranceAll);
+        return new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig()), fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition
@@ -117,8 +117,6 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         log.info("Fetching the last committed offsets");
 
-        // kafka metadata service
-        // Fallback: until metadata service is implemented, default to -1L for managed partitions
         return fireboltMetadataService.getLastOffsets(topicName, assignedTopicPartitions.get(topicName));
     }
 

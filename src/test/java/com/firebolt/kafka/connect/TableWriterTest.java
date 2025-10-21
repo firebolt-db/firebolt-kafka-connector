@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect;
 
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import com.firebolt.kafka.connect.service.FireboltMetadataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.when;
 public class TableWriterTest {
 
     private static final String TABLE_NAME = "test_table";
+    private static final String TOPIC_NAME = "test-topic";
 
     private static final Integer PARTITION_0 = 0;
     private static final Integer PARTITION_1 = 1;
@@ -69,6 +71,9 @@ public class TableWriterTest {
     @Mock
     private InsertPreparedStatement mockInsertPrepareStatement;
 
+    @Mock
+    private FireboltMetadataService mockFireboltMetadataService;
+
     private TableWriter tableWriter;
 
     @BeforeEach
@@ -87,7 +92,7 @@ public class TableWriterTest {
         lastPartitionOffset.put(PARTITION_0,  -1L);
         lastPartitionOffset.put(PARTITION_1,  -1L);
         lastPartitionOffset.put(PARTITION_2,  -1L);
-        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
+        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
         when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockInsertPrepareStatement);
 
         doNothing().when(mockInsertPrepareStatement).addRecords(anyList());

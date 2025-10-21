@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect;
 
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import com.firebolt.kafka.connect.service.FireboltMetadataService;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,8 @@ public class TableWriter {
 
     private InsertPreparedStatementProvider insertPreparedStatementProvider;
     private ErrorReporter errorReporter;
+    private FireboltMetadataService fireboltMetadataService;
+    private String topicName;
     private boolean errorToleranceAll;
 
     /**
@@ -44,14 +47,16 @@ public class TableWriter {
 
     private Optional<String> postProcessingScript;
 
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-        this(tableSchema, connectionSupplier, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll, postProcessingScript);
+    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+        this(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
+        this.fireboltMetadataService = fireboltMetadataService;
+        this.topicName = topicName;
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
         this.errorReporter = errorReporter;
@@ -95,6 +100,7 @@ public class TableWriter {
                 processedPartitionOffsets.put(partition, offset);
             }
         });
+
     }
 
     private Connection getConnection() throws SQLException {

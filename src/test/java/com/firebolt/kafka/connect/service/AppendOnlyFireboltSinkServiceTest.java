@@ -81,10 +81,10 @@ public class AppendOnlyFireboltSinkServiceTest {
     private PreparedStatement mockPreparedStatement;
 
     @Captor
-    private ArgumentCaptor<List<FireboltRecord>> tableARecordListCaptor;
+    private ArgumentCaptor<List> tableARecordListCaptor;
 
     @Captor
-    private ArgumentCaptor<List<FireboltRecord>> tableBRecordListCaptor;
+    private ArgumentCaptor<List> tableBRecordListCaptor;
 
     private AppendOnlyFireboltSinkService service;
     private Map<String, TableWriter> tableWriterMap;
