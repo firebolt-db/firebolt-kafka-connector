@@ -40,25 +40,14 @@ public class InsertPreparedStatementWithPostProcessing extends InsertPreparedSta
         List<AbstractFireboltRecord> batchIdFireboltRecords = fireboltRecords.stream()
                 .map(fireboltRecord -> new BatchIdFireboltRecord(fireboltRecord, batchId))
                 .collect(Collectors.toList());
-        connection.setAutoCommit(false);
 
-        try {
-            super.addRecords(batchIdFireboltRecords);
+        super.addRecords(batchIdFireboltRecords);
 
-            try (Statement statement = connection.createStatement()) {
-                log.info("Executing the post processing script");
-                String processedScript = processScript(postProcessingScript, batchId);
-                statement.execute(processedScript);
-            }
-
-        } catch (SQLException ex) {
-            log.error("There was an error so rolling back the transaction: ", ex.getMessage());
-            connection.rollback();
-            throw ex;
-        } finally {
-            connection.setAutoCommit(true);
+        try (Statement statement = connection.createStatement()) {
+            log.info("Executing the post processing script");
+            String processedScript = processScript(postProcessingScript, batchId);
+            statement.execute(processedScript);
         }
-
     }
 
     /**

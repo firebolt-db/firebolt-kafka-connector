@@ -71,15 +71,23 @@ public class TableWriter {
             return;
         }
 
-        // Auto-commit/commit will be managed by the service when exactly-once or post-processing scripts are enabled
-        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
-        insertPreparedStatement.addRecords(fireboltRecords);
+        try {
+            // Auto-commit/commit will be managed by the service when exactly-once or post-processing scripts are enabled
+            InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
+            insertPreparedStatement.addRecords(fireboltRecords);
 
-        // update the processed offsets in Kafka node
-        updateProcessedOffsets(fireboltRecords);
-        // Commit is only meaningful when exactly-once is enabled and the service set auto-commit to false.
-        if (!connection.getAutoCommit()) {
-            connection.commit();
+            // update the processed offsets in Kafka node
+            updateProcessedOffsets(fireboltRecords);
+            // Commit is only meaningful when exactly-once is enabled and the service set auto-commit to false.
+            if (!connection.getAutoCommit()) {
+                connection.commit();
+            }
+        } catch (SQLException ex) {
+            if (!connection.getAutoCommit()) {
+                log.error("There was an error so rolling back the transaction: {}", ex.getMessage());
+                connection.rollback();
+            }
+            throw ex;
         }
     }
 
