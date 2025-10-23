@@ -181,7 +181,7 @@ public class LoadTestRunner {
                     fireboltClient.dropTable(tableName);
                 }
 
-                if (testScenario.getConfluentCloudSettings().getExactlyOnce().equalsIgnoreCase("true")) {
+                if (Boolean.parseBoolean(testScenario.getConfluentCloudSettings().getExactlyOnce())) {
                     log.info("Dropping the table {}", KAFKA_METADATA_TABLE);
                     fireboltClient.dropTable(KAFKA_METADATA_TABLE);
                 }
