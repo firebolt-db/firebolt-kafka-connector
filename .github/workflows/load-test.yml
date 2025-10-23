@@ -16,6 +16,14 @@ on:
       confluent_cluster_id:
         description: 'Confluent Cluster ID (leave empty to use repository default)'
         required: false
+      exactly_once_enabled:
+        description: 'Enable exactly-once semantics in Kafka connector (true/false)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
       message_sizes:
         description: 'Message sizes to test (comma separated: 100,500,1000)'
         required: false
@@ -72,7 +80,8 @@ jobs:
             -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
             -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '100,500' }}" \
             -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
-            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}"
+            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}" \
+            -Dconfig.exactly.once.enabled="${{ github.event.inputs.exactly_once_enabled || 'false' }}" \
         env:
           # Additional environment variables if needed
           GRADLE_OPTS: "-Xmx2g"

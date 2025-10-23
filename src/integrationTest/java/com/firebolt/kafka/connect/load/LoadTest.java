@@ -149,6 +149,7 @@ public class LoadTest {
                 .schemaRegistryApiSecret(System.getProperty("confluent.schema.registry.api.secret"))
                 .cloudResourceApiKey(System.getProperty("confluent.cloud.resource.api.key"))
                 .cloudResourceApiSecret(System.getProperty("confluent.cloud.resource.api.secret"))
+                .exactlyOnce(System.getProperty("config.exactly.once.enabled"))
                 .build();
     }
 

@@ -51,6 +51,8 @@ public class LoadTestRunner {
 
     private TestScenario testScenario;
 
+    private static final String KAFKA_METADATA_TABLE = "KafkaSinkConnectorMetadata";
+
     public LoadTestRunner(TestScenario testScenario) {
         this.testScenario = testScenario;
     }
@@ -179,6 +181,11 @@ public class LoadTestRunner {
                     fireboltClient.dropTable(tableName);
                 }
 
+                if (testScenario.getConfluentCloudSettings().getExactlyOnce().equalsIgnoreCase("true")) {
+                    log.info("Dropping the table {}", KAFKA_METADATA_TABLE);
+                    fireboltClient.dropTable(KAFKA_METADATA_TABLE);
+                }
+
                 return loadTestRunResult;
             }
         }
@@ -199,6 +206,7 @@ public class LoadTestRunner {
         String fireboltClientSecret = testScenario.getFireboltSettings().getClientSecret();
         String kafkaApiKey = testScenario.getConfluentCloudSettings().getKafkaApiKey();
         String kafkaApiSecret = testScenario.getConfluentCloudSettings().getKafkaApiSecret();
+        String exactlyOnce = testScenario.getConfluentCloudSettings().getExactlyOnce();
         
 
         Map<String, String> connectorConfig = new HashMap<>();
@@ -227,6 +235,7 @@ public class LoadTestRunner {
         connectorConfig.put("errors.tolerance", "all");
         connectorConfig.put("errors.deadletterqueue.topic.name", "dlq-topic-firebolt");
         connectorConfig.put("errors.deadletterqueue.context.headers.enable", "true");
+        connectorConfig.put("exactlyOnce", exactlyOnce);
 
         return connectorConfig;
     }

@@ -27,4 +27,6 @@ public class ConfluentCloudSettings {
 
     private String cloudResourceApiKey;
     private String cloudResourceApiSecret;
+
+    private String exactlyOnce;
 }
