@@ -27,6 +27,8 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
     private static final String TABLE_NAME = generateTableName("exactly_once_schema_table");
     private static final String TOPIC_NAME = generateTopicName("exactly-once-schema-topic");
     private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
+    private static final Integer PARTITION_0 = 0;
+    private static final Integer PARTITION_1 = 1;
 
     private Producer<String, SimpleRecord> producer;
 
@@ -55,14 +57,16 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
     @Test
     void updatesMetadataAndIngestsRows() throws Exception {
         producer = initializeJsonProducer();
+        Map<Integer, Long> initialMeta = readMetadataOffsets(TOPIC_NAME);
+        assertTrue(initialMeta.isEmpty(), "Metadata offsets should be empty initially");
         
         // Create test records
         SimpleRecord record1 = new SimpleRecord(1, "value1");
         SimpleRecord record2 = new SimpleRecord(2, "value2");
         
         // Send records to different partitions
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 0, "key" + record1.getId(), record1));
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 1, "key" + record2.getId(), record2));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + record1.getId(), record1));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_1, "key" + record2.getId(), record2));
         producer.flush();
 
         waitForDataInFirebolt(TABLE_NAME, 2);
@@ -81,10 +85,11 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
         // Create test records
         SimpleRecord record1 = new SimpleRecord(10, "duplicate_test_1");
         SimpleRecord record2 = new SimpleRecord(11, "duplicate_test_2");
-        
+        SimpleRecord record3 = new SimpleRecord(12, "duplicate_test_3");
+
         // Send 2 records on partition 0
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 0, "key" + record1.getId(), record1));
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 0, "key" + record2.getId(), record2));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + record1.getId(), record1));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + record2.getId(), record2));
         producer.flush();
 
         waitForDataInFirebolt(TABLE_NAME, 2);
@@ -97,13 +102,20 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
         // reset offsets
         stopConnectorResetOffsetsAndRestartConnector();
 
-        // wait a bit and validate no duplicates
-        sleepForMillis(3000);
-
+        // validate offsets are preserved in metadata table
         Map<Integer, Long> metadataOffsets2 = readMetadataOffsets(TOPIC_NAME);
         assertEquals(2, metadataOffsets2.size());
         assertEquals(1L, metadataOffsets2.get(0));
         assertEquals(-1L, metadataOffsets2.get(1));
+
+        // wait a bit and validate no duplicates
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + record3.getId(), record3));
+        waitForDataInFirebolt(TABLE_NAME, 3);
+
+        Map<Integer, Long> metadataOffsets3 = readMetadataOffsets(TOPIC_NAME);
+        assertEquals(2, metadataOffsets3.size());
+        assertEquals(2L, metadataOffsets3.get(0));
+        assertEquals(-1L, metadataOffsets3.get(1));
     }
 
     @Test
@@ -113,8 +125,8 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
         SimpleRecord record1 = new SimpleRecord(100, "partition_0_record");
         SimpleRecord record2 = new SimpleRecord(200, "partition_1_record");
         
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 0, "key" + record1.getId(), record1));
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 1, "key" + record2.getId(), record2));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + record1.getId(), record1));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_1, "key" + record2.getId(), record2));
         producer.flush();
         
         waitForDataInFirebolt(TABLE_NAME, 2);
@@ -126,7 +138,7 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
 
         // send new data only to partition 1
         SimpleRecord record3 = new SimpleRecord(201, "partition_1_new_record");
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 1, "key" + record3.getId(), record3)); // new
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_1, "key" + record3.getId(), record3)); // new
         producer.flush();
         
         waitForDataInFirebolt(TABLE_NAME, 3);
@@ -143,7 +155,7 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
         
         // Initial data
         SimpleRecord initialRecord = new SimpleRecord(300, "initial_record");
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 0, "key" + initialRecord.getId(), initialRecord));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + initialRecord.getId(), initialRecord));
         producer.flush();
         
         waitForDataInFirebolt(TABLE_NAME, 1);
@@ -154,7 +166,7 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
 
         // Send new data
         SimpleRecord newRecord = new SimpleRecord(301, "new_record");
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 0, "key" + newRecord.getId(), newRecord));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + newRecord.getId(), newRecord));
         producer.flush();
         
         waitForDataInFirebolt(TABLE_NAME, 2);
@@ -165,7 +177,7 @@ public class ExactlyOnceSchemaIntegrationTest extends SchemaBaseIntegrationTest 
 
         // Send truly new data
         SimpleRecord finalRecord = new SimpleRecord(302, "final_record");
-        producer.send(new ProducerRecord<>(TOPIC_NAME, 0, "key" + finalRecord.getId(), finalRecord));
+        producer.send(new ProducerRecord<>(TOPIC_NAME, PARTITION_0, "key" + finalRecord.getId(), finalRecord));
         producer.flush();
         
         waitForDataInFirebolt(TABLE_NAME, 3);

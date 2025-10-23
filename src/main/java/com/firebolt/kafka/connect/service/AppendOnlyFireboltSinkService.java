@@ -114,6 +114,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
+        // create a dedicated connection for the table writer
         Connection tableWriterConnection = fireboltDbService.createConnection(config.getJdbcConfig());
         FireboltMetadataService tableWriterFireboltMetadataService = null;
         if (config.isExactlyOnce()) {
@@ -127,7 +128,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
             }
         }
         Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
-        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        return tableWriterProvider.get(tableSchema, connectionSupplier, tableWriterFireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition

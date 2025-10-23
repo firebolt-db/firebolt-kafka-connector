@@ -64,7 +64,7 @@ public class KafkaConnectClient {
         try (Response response = httpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String body = response.body() != null ? response.body().string() : "";
-                throw new IOException("Failed to resume connector: " + response.code() + " - " + body);
+                throw new IOException("Failed to update connector to " + state + " state: " + response.code() + " - " + body);
             }
         }
     }
