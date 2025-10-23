@@ -8,6 +8,8 @@ import com.firebolt.kafka.connect.TableWriter;
 import com.firebolt.kafka.connect.convert.RecordConverterFactory;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import com.google.common.annotations.VisibleForTesting;
+
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -17,6 +19,7 @@ import java.util.Map;
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import lombok.SneakyThrows;
@@ -43,13 +46,14 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private Map<String, TableWriter> tableWriterMap;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
+    private TableWriterProvider tableWriterProvider;
 
     AppendOnlyFireboltSinkService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
-        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll);
+        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll, new TableWriterProvider());
     }
 
     @VisibleForTesting
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll, TableWriterProvider tableWriterProvider) {
         this.config = sinkConfig;
         this.fireboltDbService = fireboltDbService;
         this.recordConverterFactory = recordConverterFactory;
@@ -60,6 +64,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         if (this.config.isExactlyOnce()) {
             this.fireboltMetadataService = new FireboltMetadataService(fireboltDbService, config.getJdbcConfig());
         }
+        this.tableWriterProvider = tableWriterProvider;
     }
 
     @Override
@@ -103,7 +108,8 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
-        return new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig()), fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
+        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition
@@ -184,4 +190,12 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * For easier testing
+     */
+    static class TableWriterProvider {
+        public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+            return new TableWriter(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        }
+    }
 }

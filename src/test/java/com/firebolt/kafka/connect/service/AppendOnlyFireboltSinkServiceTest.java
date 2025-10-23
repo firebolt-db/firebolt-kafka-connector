@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import com.firebolt.kafka.connect.service.AppendOnlyFireboltSinkService.TableWriterProvider;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -69,7 +70,7 @@ public class AppendOnlyFireboltSinkServiceTest {
     private RecordConverterFactory mockConverterFactory;
 
     @Mock
-    private ErrorReporter errorReporter;
+    private ErrorReporter mockErrorReporter;
 
     @Mock
     private Connection mockConnection;
@@ -79,6 +80,9 @@ public class AppendOnlyFireboltSinkServiceTest {
 
     @Mock
     private PreparedStatement mockPreparedStatement;
+
+    @Mock
+    private TableWriterProvider mockTableWriterProvider;
 
     @Captor
     private ArgumentCaptor<List> tableARecordListCaptor;
@@ -94,7 +98,7 @@ public class AppendOnlyFireboltSinkServiceTest {
         MockitoAnnotations.openMocks(this);
 
         tableWriterMap = new HashMap<>();
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), errorReporter, false);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, false, mockTableWriterProvider);
 
         when(mockSinkConfig.isExactlyOnce()).thenReturn(false);
         when(mockSinkConfig.getTableNameForTopic(TOPIC_A)).thenReturn(TABLE_A);
@@ -110,7 +114,7 @@ public class AppendOnlyFireboltSinkServiceTest {
     @Test
     void shouldReportConversionFailureViaErrorReporter() throws Exception {
         //rebuild service with error tolerance enabled
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), errorReporter, true);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, true, mockTableWriterProvider);
         SinkRecord badRecord = buildRecord(TOPIC_A, 0, 1L);
         Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
 
@@ -122,7 +126,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         assertDoesNotThrow(() -> service.processRecord(java.util.List.of(badRecord), schemas));
 
-        verify(errorReporter, times(1)).report(eq(badRecord), any(Exception.class));
+        verify(mockErrorReporter, times(1)).report(eq(badRecord), any(Exception.class));
     }
 
     @Test
@@ -139,7 +143,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         assertDoesNotThrow(() -> service.processRecord(java.util.List.of(ok), schemas));
 
-        verifyNoInteractions(errorReporter);
+        verifyNoInteractions(mockErrorReporter);
         verify(writerA, times(1)).insertRecords(anyList());
     }
 
@@ -206,9 +210,18 @@ public class AppendOnlyFireboltSinkServiceTest {
         when(mockSinkConfig.isExactlyOnce()).thenReturn(false);
 
         // Pre-create writer to intercept offsets passed to processRecordsForTopic
-        TableWriter writerA = mock(TableWriter.class);
-        when(writerA.getProcessedPartitionOffsets()).thenReturn(Map.of());
-        tableWriterMap.put(TABLE_A, writerA);
+        TableWriter writer = mock(TableWriter.class);
+        when(writer.getProcessedPartitionOffsets()).thenReturn(Map.of(0, -1L));
+        when(mockTableWriterProvider.get(
+                eq(mockSchemaTableA),
+                any(),
+                any(),
+                eq(TOPIC_A),
+                eq(Map.of(0, -1L)),
+                eq(mockErrorReporter),
+                eq(false),
+                any()
+        )).thenReturn(writer);
 
         SinkRecord recA = buildRecord(TOPIC_A, 0, 1L);
         Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
@@ -218,8 +231,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         assertDoesNotThrow(() -> service.processRecord(List.of(recA), schemas));
 
-        // since not exactly once, offsets for assigned partition 0 should default to -1
-        verify(writerA).insertRecords(tableARecordListCaptor.capture());
+        verify(writer).insertRecords(tableARecordListCaptor.capture());
         List<FireboltRecord> tableARecords = tableARecordListCaptor.getValue();
         assertEquals(1, tableARecords.size());
         assertEquals(List.of(convertedA), tableARecords);
@@ -233,19 +245,21 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         // Build a fresh service instance so that constructor wires metadata service
         // Use the shared tableWriterMap so that our mocked writer registration is effective
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0)), errorReporter, false);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0)), mockErrorReporter, false, mockTableWriterProvider);
 
         // Inject a mock FireboltMetadataService and stub its behavior
-        Field f = AppendOnlyFireboltSinkService.class.getDeclaredField("fireboltMetadataService");
-        f.setAccessible(true);
-        FireboltMetadataService real = (FireboltMetadataService) f.get(service);
-        FireboltMetadataService spyMetadata = spy(real);
-        f.set(service, spyMetadata);
-
-        TableWriter writerA = mock(TableWriter.class);
-        when(writerA.getProcessedPartitionOffsets()).thenReturn(Map.of(0, 10L));
-        doNothing().when(writerA).insertRecords(anyList());
-        tableWriterMap.put(TABLE_A, writerA);
+        TableWriter writer = mock(TableWriter.class);
+        when(writer.getProcessedPartitionOffsets()).thenReturn(Map.of(0, 10L));
+        when(mockTableWriterProvider.get(
+                eq(mockSchemaTableA),
+                any(),
+                any(),
+                eq(TOPIC_A),
+                eq(Map.of(0, 10L)),
+                eq(mockErrorReporter),
+                eq(false),
+                any()
+        )).thenReturn(writer);
 
         // Prepare two records: one below and one above the saved offset (10)
         SinkRecord below = buildRecord(TOPIC_A, 0, 9L);
@@ -258,9 +272,9 @@ public class AppendOnlyFireboltSinkServiceTest {
         when(mockConverterFactory.convert(above)).thenReturn(convertedAbove);
 
         assertDoesNotThrow(() -> service.processRecord(List.of(below, above), schemas));
-        verify(spyMetadata, times(0)).getLastOffsets(TOPIC_A, Set.of(0));
+
         verify(mockConverterFactory, times(1)).convert(any(SinkRecord.class));
-        verify(writerA).insertRecords(tableARecordListCaptor.capture());
+        verify(writer).insertRecords(tableARecordListCaptor.capture());
         assertEquals(1, tableARecordListCaptor.getValue().size());
         assertEquals(List.of(convertedAbove), tableARecordListCaptor.getValue());
     }
@@ -296,7 +310,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
     @Test
     void shouldFilterOutRecordsThatCannotBeConvertedWhenErrorToleranceIsAll() throws Exception {
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), errorReporter, true);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, true, mockTableWriterProvider);
         // two topics
         SinkRecord recA1 = buildRecord(TOPIC_A, 0, 1L);
         SinkRecord recA2 = buildRecord(TOPIC_A, 0, 2L);
@@ -355,7 +369,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         verify(writerA).getProcessedPartitionOffsets();
         verifyNoMoreInteractions(writerA);
-        verifyNoInteractions(errorReporter);
+        verifyNoInteractions(mockErrorReporter);
     }
 
     @Test
