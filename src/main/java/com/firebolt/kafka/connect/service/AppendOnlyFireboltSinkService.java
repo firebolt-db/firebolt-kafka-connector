@@ -58,6 +58,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         this.fireboltDbService = fireboltDbService;
         this.recordConverterFactory = recordConverterFactory;
         this.tableWriterMap = tableWriterMap;
+        this.assignedTopicPartitions = topicPartitions;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
         try {
