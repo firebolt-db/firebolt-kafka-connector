@@ -91,4 +91,11 @@ public class SinkConfig {
         String tol = config.get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG);
         return tol != null && tol.equalsIgnoreCase("all");
     }
+
+    /**
+     * Returns true if the connector should push messages to firebolt exactly once. When false it will do at-least once semantics.
+     */
+    public boolean isExactlyOnce() {
+        return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
+    }
 }

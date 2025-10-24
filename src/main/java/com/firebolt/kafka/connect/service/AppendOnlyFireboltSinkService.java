@@ -8,6 +8,8 @@ import com.firebolt.kafka.connect.TableWriter;
 import com.firebolt.kafka.connect.convert.RecordConverterFactory;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import com.google.common.annotations.VisibleForTesting;
+
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -16,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.sql.SQLException;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import lombok.SneakyThrows;
@@ -34,24 +38,33 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private SinkConfig config;
     private RecordConverterFactory recordConverterFactory;
     private FireboltDbService fireboltDbService;
+    private FireboltMetadataService fireboltMetadataService;
+
+    private Map<String, Set<Integer>> assignedTopicPartitions;
 
     // a map between a table name and the writer for that map
     private Map<String, TableWriter> tableWriterMap;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
+    private TableWriterProvider tableWriterProvider;
 
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, ErrorReporter errorReporter, boolean errorToleranceAll) {
-        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), errorReporter, errorToleranceAll);
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
+        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll, new TableWriterProvider());
     }
 
     @VisibleForTesting
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, ErrorReporter errorReporter, boolean errorToleranceAll) {
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll, TableWriterProvider tableWriterProvider) {
         this.config = sinkConfig;
         this.fireboltDbService = fireboltDbService;
         this.recordConverterFactory = recordConverterFactory;
         this.tableWriterMap = tableWriterMap;
+        this.assignedTopicPartitions = topicPartitions;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
+        if (this.config.isExactlyOnce()) {
+            this.fireboltMetadataService = new FireboltMetadataService(fireboltDbService, config.getJdbcConfig());
+        }
+        this.tableWriterProvider = tableWriterProvider;
     }
 
     @Override
@@ -66,7 +79,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         log.debug("Grouped {} records into {} topic combinations", records.size(), recordsByTopic.size());
 
-        // Process each topic/partition group separately
+        // Process each topic separately
         for (Map.Entry<String, List<SinkRecord>> entry : recordsByTopic.entrySet()) {
             String topic = entry.getKey();
             List<SinkRecord> groupedRecords = entry.getValue();
@@ -74,20 +87,43 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
             String tableName = config.getTableNameForTopic(topic);
             TableSchema tableSchema = tableSchemas.get(tableName);
             if (tableSchema == null) {
-                log.warn("Did not find table schema for topic {}. Ignoring the record", topic);
+                log.error("Did not find table schema for topic {}. Ignoring the record", topic);
                 continue;
             }
 
-            TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> initializeTableWriter(tableSchema));
+            if (!assignedTopicPartitions.containsKey(topic)) {
+                log.error("The topic {} does not have any assigned partition to this instance of Kafka Connect.", topic);
+                continue;
+            }
+
+            TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> createTableWriter(topic, tableSchema));
 
             List<AbstractFireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
             tableWriter.insertRecords(fireboltRecords);
         }
     }
 
-    private TableWriter initializeTableWriter(TableSchema tableSchema) {
+    private TableWriter createTableWriter(String topicName, TableSchema tableSchema) {
+        log.info("Creating the table writer for {}", tableSchema.getTableName());
         Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
-        return new TableWriter(tableSchema, () -> fireboltDbService.createConnection(config.getJdbcConfig()), errorReporter, errorToleranceAll, postProcessingScript);
+
+        Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
+        Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
+        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+    }
+
+    // if exactly once is configured, then we need to fetch the saved offsets for each of the partition
+    private Map<Integer, Long> getLastPartitionOffsets(String topicName) {
+        if (!config.isExactlyOnce()) {
+            // we will always pass -1 for the partitions that we managed. This means that when it starts fresh the table writer will not ignore any messages
+            return assignedTopicPartitions.get(topicName)
+                    .stream()
+                    .collect(Collectors.toMap(partitionId -> partitionId, partitionId -> -1L));
+        }
+
+        log.info("Fetching the last committed offsets");
+
+        return fireboltMetadataService.getLastOffsets(topicName, assignedTopicPartitions.get(topicName));
     }
 
     /**
@@ -154,4 +190,12 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * For easier testing
+     */
+    static class TableWriterProvider {
+        public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+            return new TableWriter(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        }
+    }
 }

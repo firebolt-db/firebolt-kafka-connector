@@ -1,5 +1,12 @@
 package com.firebolt.kafka.connect;
 
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import com.firebolt.kafka.connect.service.FireboltMetadataService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -9,17 +16,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -34,6 +35,11 @@ import static org.mockito.Mockito.when;
 public class TableWriterTest {
 
     private static final String TABLE_NAME = "test_table";
+    private static final String TOPIC_NAME = "test-topic";
+
+    private static final Integer PARTITION_0 = 0;
+    private static final Integer PARTITION_1 = 1;
+    private static final Integer PARTITION_2 = 2;
 
     @Mock
     private TableSchema mockTableSchema;
@@ -65,6 +71,9 @@ public class TableWriterTest {
     @Mock
     private InsertPreparedStatement mockInsertPrepareStatement;
 
+    @Mock
+    private FireboltMetadataService mockFireboltMetadataService;
+
     private TableWriter tableWriter;
 
     @BeforeEach
@@ -79,19 +88,27 @@ public class TableWriterTest {
         // by default connection is not closed
         when(mockConnection.isClosed()).thenReturn(false);
 
-        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, new HashMap<>(), mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
+        Map<Integer, Long> lastPartitionOffset = new HashMap<>();
+        lastPartitionOffset.put(PARTITION_0,  -1L);
+        lastPartitionOffset.put(PARTITION_1,  -1L);
+        lastPartitionOffset.put(PARTITION_2,  -1L);
+        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
         when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockInsertPrepareStatement);
 
         doNothing().when(mockInsertPrepareStatement).addRecords(anyList());
     }
 
     @Test
-    void shouldInitializeWithEmptyProcessedPartitionOffsets() {
-        assertNotNull(tableWriter.getProcessedPartitionOffsets());
-        assertTrue(tableWriter.getProcessedPartitionOffsets().isEmpty());
+    void shouldInitializeWithDefaultProcessedPartitionOffsets() {
+        Map<Integer, Long> processedPartitionOffsets = tableWriter.getProcessedPartitionOffsets();
+        assertNotNull(processedPartitionOffsets);
+        assertFalse(processedPartitionOffsets.isEmpty());
+        assertEquals(-1L, processedPartitionOffsets.get(0));
+        assertEquals(-1L, processedPartitionOffsets.get(1));
+        assertEquals(-1L, processedPartitionOffsets.get(2));
 
         // should not be able to modify the offsets outside the class
-        assertThrows(RuntimeException.class, () -> tableWriter.getProcessedPartitionOffsets().put(1, 1L));
+        assertThrows(RuntimeException.class, () -> processedPartitionOffsets.put(1, 1L));
     }
 
     @Test
@@ -132,8 +149,10 @@ public class TableWriterTest {
         verify(mockConnectionSupplier).get();
 
         Map<Integer, Long> offsets = tableWriter.getProcessedPartitionOffsets();
-        assertEquals(1, offsets.size());
+        assertEquals(3, offsets.size());
         assertEquals(102L, offsets.get(0));
+        assertEquals(-1L, offsets.get(1));
+        assertEquals(-1L, offsets.get(2));
     }
 
 
