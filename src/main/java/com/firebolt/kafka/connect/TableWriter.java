@@ -29,11 +29,6 @@ public class TableWriter {
     // when this table writer is created we should fetch the offsets from the metadata table
     private Map<Integer, Long> processedPartitionOffsets;
 
-    /**
-     * A supplier that can give us a new connection, in case the current one is closed
-     */
-    private Supplier<Connection> connectionSupplier;
-
     private InsertPreparedStatementProvider insertPreparedStatementProvider;
     private ErrorReporter errorReporter;
     private FireboltMetadataService fireboltMetadataService;
@@ -42,19 +37,21 @@ public class TableWriter {
 
     /**
      * A connection that will be used for pushing the records to firebolt table
+     * It is expected that this connection will always be open if this writer is used
+     * and it will be closed when the writer is closed and the writer is not used anymore
      */
     private Connection connection;
 
     private Optional<String> postProcessingScript;
 
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-        this(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll, postProcessingScript);
+    public TableWriter(TableSchema tableSchema, Connection connection, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+        this(tableSchema, connection, fireboltMetadataService, topicName, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+    TableWriter(TableSchema tableSchema, Connection connection, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
         this.tableSchema = tableSchema;
-        this.connectionSupplier = connectionSupplier;
+        this.connection = connection;
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
         this.errorReporter = errorReporter;
@@ -73,7 +70,7 @@ public class TableWriter {
 
         try {
             // Auto-commit/commit will be managed by the service when exactly-once or post-processing scripts are enabled
-            InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
+            InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(connection, tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
             insertPreparedStatement.addRecords(fireboltRecords);
 
             // update the processed offsets in Kafka node
@@ -116,19 +113,6 @@ public class TableWriter {
         if (fireboltMetadataService != null) {
             fireboltMetadataService.updateOffsets(topicName, processedPartitionOffsets);
         }
-    }
-
-    private Connection getConnection() throws SQLException {
-        if (connection == null) {
-            connection = connectionSupplier.get();
-        }
-
-        if (connection.isClosed()) {
-            log.warn("Connection is not open so create a new one");
-            connection = connectionSupplier.get();
-        }
-
-        return connection;
     }
 
     /**

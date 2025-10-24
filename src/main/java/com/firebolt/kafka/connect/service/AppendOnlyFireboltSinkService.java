@@ -127,8 +127,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
                 throw new RuntimeException(e);
             }
         }
-        Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
-        return tableWriterProvider.get(tableSchema, connectionSupplier, tableWriterFireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        return tableWriterProvider.get(tableSchema, tableWriterConnection, tableWriterFireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition
@@ -153,6 +152,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         // close all the table writers
         tableWriterMap.entrySet().forEach(entry -> entry.getValue().close());
+        tableWriterMap.clear();
 
         try {
             if (connection != null) {
@@ -220,8 +220,8 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
      * For easier testing
      */
     static class TableWriterProvider {
-        public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-            return new TableWriter(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        public TableWriter get(TableSchema tableSchema, Connection connection, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+            return new TableWriter(tableSchema, connection, fireboltMetadataService, topicName, processedPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
         }
     }
 }

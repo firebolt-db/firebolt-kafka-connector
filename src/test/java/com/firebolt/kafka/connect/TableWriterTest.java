@@ -60,9 +60,6 @@ public class TableWriterTest {
     private FireboltRecord mockFireboltRecord3;
 
     @Mock
-    private Supplier<Connection> mockConnectionSupplier;
-    
-    @Mock
     private Connection mockConnection;
     
     @Mock
@@ -83,8 +80,6 @@ public class TableWriterTest {
         when(mockTableSchema.getTableName()).thenReturn(TABLE_NAME);
         when(mockTableSchema.getColumns()).thenReturn(List.of(mockColumn1, mockColumn2));
 
-        // Setup default mock behaviors
-        when(mockConnectionSupplier.get()).thenReturn(mockConnection);
         // by default connection is not closed
         when(mockConnection.isClosed()).thenReturn(false);
 
@@ -92,7 +87,7 @@ public class TableWriterTest {
         lastPartitionOffset.put(PARTITION_0,  -1L);
         lastPartitionOffset.put(PARTITION_1,  -1L);
         lastPartitionOffset.put(PARTITION_2,  -1L);
-        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
+        tableWriter = new TableWriter(mockTableSchema, mockConnection, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
         when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockInsertPrepareStatement);
 
         doNothing().when(mockInsertPrepareStatement).addRecords(anyList());
@@ -124,7 +119,6 @@ public class TableWriterTest {
 
         when(mockConnection.isClosed()).thenReturn(false);
         assertDoesNotThrow(() -> tableWriter.insertRecords(List.of(mockFireboltRecord1, mockFireboltRecord2, mockFireboltRecord3)));
-        verify(mockConnectionSupplier).get();
 
         Map<Integer, Long> offsets = tableWriter.getProcessedPartitionOffsets();
         assertEquals(3, offsets.size());
@@ -146,7 +140,6 @@ public class TableWriterTest {
 
         when(mockConnection.isClosed()).thenReturn(false);
         assertDoesNotThrow(() -> tableWriter.insertRecords(List.of(mockFireboltRecord1, mockFireboltRecord2, mockFireboltRecord3)));
-        verify(mockConnectionSupplier).get();
 
         Map<Integer, Long> offsets = tableWriter.getProcessedPartitionOffsets();
         assertEquals(3, offsets.size());
@@ -162,7 +155,6 @@ public class TableWriterTest {
         assertDoesNotThrow(() -> tableWriter.insertRecords(emptyRecords));
 
         verify(mockInsertPrepareStatementProvider, never()).get(any(), any(), any(), anyBoolean(), any(Optional.class));
-        verify(mockConnectionSupplier, never()).get();
     }
 
     @Test
@@ -175,29 +167,6 @@ public class TableWriterTest {
     void shouldCreateNewConnectionWhenConnectionIsNull() throws SQLException {
         when(mockConnection.isClosed()).thenReturn(false);
         assertDoesNotThrow(() -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
-        verify(mockConnectionSupplier).get();
-    }
-
-    @Test
-    void shouldCreateNewConnectionWhenConnectionIsClosed() throws SQLException {
-        Connection mockSecondConnection = mock(Connection.class);
-        when(mockConnectionSupplier.get()).thenReturn(mockConnection, mockSecondConnection);
-
-        InsertPreparedStatement mockSecondInsertPreparedStatement = mock(InsertPreparedStatement.class);
-        when(mockInsertPrepareStatementProvider.get(mockSecondConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockSecondInsertPreparedStatement);
-
-        // do the first insert on the first connection
-        when(mockConnection.isClosed()).thenReturn(false);
-        assertDoesNotThrow(() -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
-        verify(mockInsertPrepareStatement).addRecords(List.of(mockFireboltRecord1));
-
-        // first connection was closed
-        when(mockConnection.isClosed()).thenReturn(true);
-        when(mockSecondConnection.isClosed()).thenReturn(false);
-
-        assertDoesNotThrow(() -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
-        verify(mockConnectionSupplier, times(2)).get();
-        verify(mockSecondInsertPreparedStatement).addRecords(List.of(mockFireboltRecord1));
     }
 
     @Test
@@ -211,7 +180,7 @@ public class TableWriterTest {
     @Test
     void shouldHandleNullConnectionInClose() throws SQLException {
         assertDoesNotThrow(() -> tableWriter.close());
-        verify(mockConnection, never()).close();
+        verify(mockConnection).close();
     }
 
     @Test
