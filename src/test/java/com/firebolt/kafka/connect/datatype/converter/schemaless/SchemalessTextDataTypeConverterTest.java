@@ -11,9 +11,16 @@ import org.mockito.MockitoAnnotations;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import org.mockito.ArgumentCaptor;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 public class SchemalessTextDataTypeConverterTest {
@@ -59,7 +66,7 @@ public class SchemalessTextDataTypeConverterTest {
         "'text[with]square[brackets]'",
         "'text{with}curly{braces}'",
         "'text\"with\"quotes'",
-        "''''text with single quotes''''",
+        "'''''text with single quotes'''''",
         "'text\nwith\nnewlines'",
         "'text\twith\ttabs'",
         "'text\rwith\rcarriage\rreturns'",
@@ -89,9 +96,8 @@ public class SchemalessTextDataTypeConverterTest {
         "     padded string     "
     })
     void testConvertAndSetWithValidStringValues(String stringValue) throws SQLException {
-        // Remove quotes from CSV source parameter for actual string value
         String actualValue = stringValue.substring(1, stringValue.length() - 1);
-        
+
         SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
                 .value(actualValue)
                 .build();
@@ -118,7 +124,6 @@ public class SchemalessTextDataTypeConverterTest {
                 .value("test value")
                 .build();
 
-        // Mock the statement to throw SQLException
         org.mockito.Mockito.doThrow(new SQLException("Database error"))
                 .when(mockStatement).setString(1, "test value");
 
@@ -131,7 +136,6 @@ public class SchemalessTextDataTypeConverterTest {
 
     @Test
     void testConvertAndSetWithLargeString() throws SQLException {
-        // Create a large string (1000 characters)
         StringBuilder largeString = new StringBuilder();
         for (int i = 0; i < 1000; i++) {
             largeString.append("A");
@@ -147,4 +151,66 @@ public class SchemalessTextDataTypeConverterTest {
         verify(mockStatement).setString(1, expectedValue);
     }
 
+    @Test
+    void testConvertAndSetWithMapValueSerializesAsJson() throws Exception {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("key", "v1");
+        value.put("num", 123);
+        Map<String, Object> nested = new LinkedHashMap<>();
+        nested.put("inner", true);
+        value.put("nested", nested);
+
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockStatement).setString(eq(1), jsonCaptor.capture());
+
+        String json = jsonCaptor.getValue();
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, Object> parsed = mapper.readValue(json, new TypeReference<Map<String, Object>>(){});
+        assertEquals("v1", parsed.get("key"));
+        assertEquals(123, parsed.get("num"));
+        Map<String, Object> parsedNested = mapper.convertValue(parsed.get("nested"), new TypeReference<Map<String, Object>>(){});
+        assertEquals(true, parsedNested.get("inner"));
+    }
+
+    @Test
+    void testConvertAndSetWithNullValueSetsLiteralNullString() throws SQLException {
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(null)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setString(1, "null");
+    }
+
+    @Test
+    void testConvertAndSetWithNonMapIntegerSetsStringValue() throws SQLException {
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(42)
+                .build();
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn);
+
+        verify(mockStatement).setString(1, "42");
+    }
+
+    @Test
+    void testConvertAndSetWithSelfReferentialMapThrowsColumnConversionFailedException() {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("self", value);
+
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(value)
+                .build();
+
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, testColumn)
+        );
+    }
 }
