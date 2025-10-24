@@ -625,6 +625,7 @@ tasks.register('runLoadTest', JavaExec) {
         println "   Confluent Cluster: ${System.getProperty('confluent.cluster.id', '[using default]')}"
         println "   Message Sizes: ${System.getProperty('loadtest.message.sizes', '[using default]')}"
         println "   Message Count: ${System.getProperty('loadtest.message.count', '[using default]')}"
+        println "   Exactly once: ${System.getProperty('config.exactly.once.enabled', '[using default]')}"
         println "   Table Schema: ${System.getProperty('loadtest.table.schema', '[using default]')}"
     }
 }
