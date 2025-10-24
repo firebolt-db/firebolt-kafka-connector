@@ -674,7 +674,7 @@ public class FireboltSinkTaskTest {
         schemas.put("another_table", new TableSchema("another_table"));
         
         try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.any()))
+            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), any()))
                 .thenReturn(schemas);
         } catch (Exception e) {
             // This shouldn't happen in the mock setup
@@ -686,7 +686,7 @@ public class FireboltSinkTaskTest {
         when(mockSinkConfig.getJdbcConfig()).thenReturn(mockJdbcConfig);
         
         try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.any()))
+            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), any()))
                 .thenThrow(new ConnectionFailedException("Schema discovery failed"));
         } catch (Exception e) {
             // This shouldn't happen in the mock setup
@@ -701,7 +701,7 @@ public class FireboltSinkTaskTest {
         
         // Return empty schemas (no tables found)
         try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.any()))
+            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), any()))
                 .thenReturn(Collections.emptyMap());
         } catch (Exception e) {
             // This shouldn't happen in the mock setup
@@ -722,7 +722,7 @@ public class FireboltSinkTaskTest {
         schemas.put("topic2_table", new TableSchema("topic2_table"));
         
         try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.any()))
+            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), any()))
                 .thenReturn(schemas);
         } catch (Exception e) {
             // This shouldn't happen in the mock setup
@@ -734,7 +734,7 @@ public class FireboltSinkTaskTest {
         // Just start the task, which is sufficient for testing put/flush operations
         try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
             mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class), ArgumentMatchers.any(), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
+            when(mockServiceProvider.getService(any(SinkConfig.class), any(), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
             
             fireboltSinkTask.start(validConfig);
             
