@@ -5,17 +5,15 @@ import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionF
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;
+import com.firebolt.kafka.connect.util.VersionUtil;
 import com.google.common.collect.Sets;
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -51,18 +49,7 @@ public class FireboltSinkTask extends SinkTask {
 
     @Override
     public String version() {
-        try {
-            Properties properties = new Properties();
-            try (InputStream input = getClass().getClassLoader().getResourceAsStream("version.properties")) {
-                if (input != null) {
-                    properties.load(input);
-                    return properties.getProperty("version", "unknown");
-                }
-            }
-        } catch (IOException e) {
-            log.warn("Failed to load version from properties file", e);
-        }
-        return "unknown";
+        return VersionUtil.getVersion();
     }
 
     @Override

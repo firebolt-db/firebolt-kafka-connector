@@ -1,16 +1,14 @@
 package com.firebolt.kafka.connect;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
 import com.firebolt.kafka.connect.config.TopicToTableValidator;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
+import com.firebolt.kafka.connect.util.VersionUtil;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -18,7 +16,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -51,18 +48,7 @@ public class FireboltSinkConnector extends SinkConnector {
 
     @Override
     public String version() {
-        try {
-            Properties properties = new Properties();
-            try (InputStream input = getClass().getClassLoader().getResourceAsStream("version.properties")) {
-                if (input != null) {
-                    properties.load(input);
-                    return properties.getProperty("version", "unknown");
-                }
-            }
-        } catch (IOException e) {
-            log.warn("Failed to load version from properties file", e);
-        }
-        return "unknown";
+        return VersionUtil.getVersion();
     }
 
     @Override

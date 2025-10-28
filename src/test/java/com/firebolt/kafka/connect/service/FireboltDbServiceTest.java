@@ -531,6 +531,31 @@ class FireboltDbServiceTest {
                 ));
             }
         }
+
+        @Test
+        void shouldIncludeAllRequiredHeadersInConnection() throws SQLException {
+            String connectionUrl = "jdbc:firebolt:test_database?engine=test_engine&account=test_account";
+            Connection mockConnection = mock(Connection.class);
+
+            try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
+                mockedDriverManager.when(() -> DriverManager.getConnection(eq(connectionUrl), any(Properties.class)))
+                        .thenReturn(mockConnection);
+                when(mockConnection.isValid(300)).thenReturn(true);
+
+                assertDoesNotThrow(() -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl)));
+                
+                // Verify that the connection is created with all required properties
+                mockedDriverManager.verify(() -> DriverManager.getConnection(
+                        eq(connectionUrl),
+                        argThat(props -> props.containsKey("merge_prepared_statement_batches") &&
+                               "true".equals(props.getProperty("merge_prepared_statement_batches")) &&
+                               props.containsKey("user_drivers") &&
+                               props.getProperty("user_drivers").startsWith("KafkaSink:"))
+                ));
+                
+                verify(mockConnection).isValid(300);
+            }
+        }
     }
 
     @Nested

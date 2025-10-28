@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.service;
 import com.firebolt.kafka.connect.JdbcConfig;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
+import com.firebolt.kafka.connect.util.VersionUtil;
 import org.apache.commons.lang3.StringUtils;
 import com.google.common.collect.Sets;
 import java.sql.Connection;
@@ -167,6 +168,7 @@ public class FireboltDbService {
 
         // always batch prepared statements
         props.put("merge_prepared_statement_batches", "true");
+        props.put("user_drivers", "KafkaSink:" + VersionUtil.getVersion());
 
         // Attempt to create the connection
         return DriverManager.getConnection(jdbcConfig.getJdbcConnectionUrl(), props);
