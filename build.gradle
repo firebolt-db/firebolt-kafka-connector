@@ -630,3 +630,78 @@ tasks.register('runLoadTest', JavaExec) {
     }
 }
 
+// Task to run LoadTest with all table schemas sequentially
+tasks.register('runLoadTestAll', Exec) {
+    group = "Load Testing"
+    description = "Runs LoadTest with all table schemas sequentially (8-column, 8-column-with-default-timestamp, 80-column)"
+    
+    // Define table schemas to test
+    def tableSchemas = ['8-column', '8-column-with-default-timestamp', '80-column']
+    def messageSizes = System.getProperty('loadtest.message.sizes', '100,500,1000,5000,10000')
+    def messageCount = System.getProperty('loadtest.message.count', '1000000')
+    def exactlyOnce = System.getProperty('config.exactly.once.enabled', 'false')
+    
+    doFirst {
+        println "🚀 Starting LoadTest All with the following configuration:"
+        println "   Table Schemas: ${tableSchemas.join(', ')}"
+        println "   Message Sizes: ${messageSizes}"
+        println "   Message Count: ${messageCount}"
+        println "   Exactly Once: ${exactlyOnce}"
+        println "   Firebolt JDBC URL: ${System.getProperty('firebolt.jdbc.url', '[using default]')}"
+        println "   Firebolt Client ID: ${System.getProperty('firebolt.client.id', '[using default]')}"
+        println "   Confluent Environment: ${System.getProperty('confluent.environment.id', '[using default]')}"
+        println "   Confluent Cluster: ${System.getProperty('confluent.cluster.id', '[using default]')}"
+        println ""
+    }
+    
+    // Build the command to run all tests sequentially
+    def command = ['bash', '-c', """
+        # Track overall results
+        TOTAL_SCHEMAS=${tableSchemas.size()}
+        COMPLETED_SCHEMAS=0
+        FAILED_SCHEMAS=()
+        
+        # Run tests for each table schema sequentially
+        for table_schema in ${tableSchemas.collect { "'$it'" }.join(' ')}; do
+            echo ""
+            echo "=========================================="
+            echo "🧪 Running Load Test for table schema: \$table_schema"
+            echo "Progress: \$((COMPLETED_SCHEMAS + 1))/\$TOTAL_SCHEMAS"
+            echo "=========================================="
+            
+            # Run the load test for this table schema
+            if ./gradlew runLoadTest \\
+              -Dloadtest.table.schema="\$table_schema" \\
+              -Dloadtest.message.sizes="${messageSizes}" \\
+              -Dloadtest.message.count="${messageCount}" \\
+              -Dconfig.exactly.once.enabled="${exactlyOnce}"; then
+              
+              echo "Load test completed successfully for table schema: \$table_schema"
+              COMPLETED_SCHEMAS=\$((COMPLETED_SCHEMAS + 1))
+            else
+              echo "Load test failed for table schema: \$table_schema"
+              FAILED_SCHEMAS+=("\$table_schema")
+              COMPLETED_SCHEMAS=\$((COMPLETED_SCHEMAS + 1))
+            fi
+        done
+        
+        # Final summary
+        echo ""
+        echo "=========================================="
+        echo "📊 LOAD TEST ALL - FINAL SUMMARY"
+        echo "=========================================="
+        echo "Total table schemas tested: \$TOTAL_SCHEMAS"
+        echo "Successfully completed: \$((TOTAL_SCHEMAS - \${#FAILED_SCHEMAS[@]}))"
+        echo "Failed: \${#FAILED_SCHEMAS[@]}"
+        
+        if [ \${#FAILED_SCHEMAS[@]} -gt 0 ]; then
+            echo "Failed table schemas: \${FAILED_SCHEMAS[*]}"
+            exit 1
+        else
+            echo "🎉 All load tests completed successfully!"
+        fi
+    """]
+    
+    commandLine command
+}
+

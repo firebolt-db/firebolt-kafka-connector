@@ -1,0 +1,138 @@
+name: Load Test All
+
+on:
+  workflow_dispatch:
+    inputs:
+      firebolt_jdbc_url:
+        description: 'Firebolt JDBC URL (e.g., jdbc:firebolt:db?account=acc&engine=eng&env=staging)'
+        required: true
+        default: 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging'
+      connector_plugin_id:
+        description: 'Confluent Firebolt Connector Plugin ID (leave empty to use repository default)'
+        required: false
+      confluent_environment_id:
+        description: 'Confluent Environment ID (leave empty to use repository default)'
+        required: false
+      confluent_cluster_id:
+        description: 'Confluent Cluster ID (leave empty to use repository default)'
+        required: false
+      exactly_once_enabled:
+        description: 'Enable exactly-once semantics in Kafka connector (true/false)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      message_sizes:
+        description: 'Message sizes to test (comma separated: 100,500,1000)'
+        required: false
+        default: '100,500,1000,5000,10000'
+      message_count:
+        description: 'Number of messages to produce and consume (default: 1,000,000)'
+        required: false
+        default: '1000000'
+
+jobs:
+  load-test-all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 720  # 12 hours max for all combinations
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          
+      - name: Run Load Test All Combinations
+        run: |
+          # Define table schemas and message sizes
+          TABLE_SCHEMAS=("8-column" "8-column-with-default-timestamp" "80-column")
+          MESSAGE_SIZES="${{ github.event.inputs.message_sizes || '100,500,1000,5000,10000' }}"
+          MESSAGE_COUNT="${{ github.event.inputs.message_count || '1000000' }}"
+          
+          echo "🚀 Starting Load Test All Combinations"
+          echo "Table schemas: ${TABLE_SCHEMAS[*]}"
+          echo "Message sizes: $MESSAGE_SIZES"
+          echo "Message count: $MESSAGE_COUNT"
+          echo "Exactly once: ${{ github.event.inputs.exactly_once_enabled || 'false' }}"
+          
+          # Track overall results
+          TOTAL_SCHEMAS=${#TABLE_SCHEMAS[@]}
+          COMPLETED_SCHEMAS=0
+          FAILED_SCHEMAS=()
+          
+          # Run tests for each table schema sequentially
+          for table_schema in "${TABLE_SCHEMAS[@]}"; do
+            echo ""
+            echo "=========================================="
+            echo "🧪 Running Load Test for table schema: $table_schema"
+            echo "Progress: $((COMPLETED_SCHEMAS + 1))/$TOTAL_SCHEMAS"
+            echo "=========================================="
+            
+            # Run the load test for this table schema
+            if ./gradlew runLoadTest \
+              -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url }}" \
+              -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
+              -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
+              -Dconfluent.environment.id="${{ github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}" \
+              -Dconfluent.cluster.id="${{ github.event.inputs.confluent_cluster_id || vars.CONFLUENT_CLUSTER_ID }}" \
+              -Dconfluent.firebolt.connector.plugin.id="${{ github.event.inputs.connector_plugin_id || vars.CONFLUENT_CONNECTOR_PLUGIN_ID }}" \
+              -Dconfluent.kafka.api.key="${{ secrets.CONFLUENT_KAFKA_API_KEY }}" \
+              -Dconfluent.kafka.api.secret="${{ secrets.CONFLUENT_KAFKA_API_SECRET }}" \
+              -Dconfluent.schema.registry.api.key="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_KEY }}" \
+              -Dconfluent.schema.registry.api.secret="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}" \
+              -Dconfluent.cloud.resource.api.key="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}" \
+              -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
+              -Dloadtest.message.sizes="$MESSAGE_SIZES" \
+              -Dloadtest.message.count="$MESSAGE_COUNT" \
+              -Dloadtest.table.schema="$table_schema" \
+              -Dconfig.exactly.once.enabled="${{ github.event.inputs.exactly_once_enabled || 'false' }}"; then
+              
+              echo "✅ Load test completed successfully for table schema: $table_schema"
+              COMPLETED_SCHEMAS=$((COMPLETED_SCHEMAS + 1))
+            else
+              echo "❌ Load test failed for table schema: $table_schema"
+              FAILED_SCHEMAS+=("$table_schema")
+              COMPLETED_SCHEMAS=$((COMPLETED_SCHEMAS + 1))
+            fi
+          done
+          
+          # Final summary
+          echo ""
+          echo "=========================================="
+          echo "📊 LOAD TEST ALL - FINAL SUMMARY"
+          echo "=========================================="
+          echo "Total table schemas tested: $TOTAL_SCHEMAS"
+          echo "Successfully completed: $((TOTAL_SCHEMAS - ${#FAILED_SCHEMAS[@]}))"
+          echo "Failed: ${#FAILED_SCHEMAS[@]}"
+          
+          if [ ${#FAILED_SCHEMAS[@]} -gt 0 ]; then
+            echo "Failed table schemas: ${FAILED_SCHEMAS[*]}"
+            exit 1
+          else
+            echo "🎉 All load tests completed successfully!"
+          fi
+        env:
+          # Additional environment variables if needed
+          GRADLE_OPTS: "-Xmx2g"
+          
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-all-results-${{ github.run_number }}
+          path: |
+            build/reports/
+            build/test-results/
+            *.log
+          retention-days: 30

@@ -216,7 +216,6 @@ public class LoadTestRunner {
         connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
         connectorConfig.put("value.converter.schema.registry.url", schemaRegistryUrl);
         connectorConfig.put("poll.interval.ms", "1000");
-        connectorConfig.put("consumer.override.max.poll.records", "6000");
         connectorConfig.put("value.converter.basic.auth.credentials.source", "USER_INFO");
         connectorConfig.put("value.converter.schema.registry.basic.auth.user.info", schemaApiKey+":"+schemaApiSecret);
         connectorConfig.put("fetch.max.bytes", "15000000");

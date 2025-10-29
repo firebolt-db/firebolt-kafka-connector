@@ -52,6 +52,11 @@ public class LoadTest {
         for (String messageSizeStr : messageSizes) {
             int messageSize = Integer.parseInt(messageSizeStr.trim());
             
+            // Get batch size from static configuration
+            int optimalBatchSize = BatchSizeConfig.getBatchSize(messageSize, tableSchema);
+            log.info("Using configured batch size of {} for message size {} bytes and table schema {}", 
+                    optimalBatchSize, messageSize, tableSchema);
+            
             TestScenario testScenario = TestScenario.builder()
                     .averageMessageSizeInBytes(messageSize)
                     .nrOfKafkaMessageToProduce(messageCount)
@@ -63,28 +68,10 @@ public class LoadTest {
                     .staticOutboundHostnames(STAGING_APIS)
                     .confluentCloudSettings(confluentCloudSettings)
                     .fireboltSettings(fireboltSettings)
+                    .connectorConfiguration(Map.of("consumer.override.max.poll.records", String.valueOf(optimalBatchSize)))
                     .deleteConnector(true)
                     .deleteTable(true)
                     .build();
-
-            // Add special configuration for larger message sizes
-            if (messageSize >= 10000) {
-                testScenario = TestScenario.builder()
-                        .averageMessageSizeInBytes(messageSize)
-                        .nrOfKafkaMessageToProduce(messageCount)
-                        .connectorName("load-test-connector-" + messageSize)
-                        .topicName("load-test-connector-" + messageSize)
-                        .fireboltIngestionWaitDuration(Duration.ofMinutes(60))
-                        .tableSchemaDefinitionFilePath(tableDefinitionFilePath)
-                        .jsonSchemaRegistryDefinitionFilePath(jsonSchemaDefinitionFilePathPath)
-                        .staticOutboundHostnames(STAGING_APIS)
-                        .confluentCloudSettings(confluentCloudSettings)
-                        .fireboltSettings(fireboltSettings)
-                        .connectorConfiguration(Map.of("consumer.override.max.poll.records", "3000"))
-                        .deleteConnector(true)
-                        .deleteTable(true)
-                        .build();
-            }
 
             log.info("Running test scenario for message size: {} bytes", messageSize);
             LoadTestRunner loadTestRunner = new LoadTestRunner(testScenario);
