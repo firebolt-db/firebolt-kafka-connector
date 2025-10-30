@@ -168,7 +168,7 @@ public class FireboltDbService {
 
         // always batch prepared statements
         props.put("merge_prepared_statement_batches", "true");
-        props.put("user_drivers", "KafkaSink:" + VersionUtil.getVersion());
+        props.put("user_clients", "KafkaSink:" + VersionUtil.getVersion());
 
         // Attempt to create the connection
         return DriverManager.getConnection(jdbcConfig.getJdbcConnectionUrl(), props);

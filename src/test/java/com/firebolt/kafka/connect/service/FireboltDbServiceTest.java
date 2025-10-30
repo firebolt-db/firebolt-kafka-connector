@@ -549,8 +549,8 @@ class FireboltDbServiceTest {
                         eq(connectionUrl),
                         argThat(props -> props.containsKey("merge_prepared_statement_batches") &&
                                "true".equals(props.getProperty("merge_prepared_statement_batches")) &&
-                               props.containsKey("user_drivers") &&
-                               props.getProperty("user_drivers").startsWith("KafkaSink:"))
+                               props.containsKey("user_clients") &&
+                               props.getProperty("user_clients").startsWith("KafkaSink:"))
                 ));
                 
                 verify(mockConnection).isValid(300);
