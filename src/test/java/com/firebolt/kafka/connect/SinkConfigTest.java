@@ -3,10 +3,14 @@ package com.firebolt.kafka.connect;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class SinkConfigTest {
 
@@ -382,5 +388,137 @@ public class SinkConfigTest {
         assertFalse(result);
     }
 
-    
+    // =========================
+    // POST-PROCESSING SCRIPT TESTS
+    // =========================
+
+    @Test
+    void shouldReturnEmptyWhenNoPostProcessingConfig() {
+        SinkConfig config = new SinkConfig(Map.of());
+        Optional<String> result = config.getPostProcessingScript("any_table");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldReturnEmptyWhenPostProcessingConfigIsBlank() {
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", "   "));
+        Optional<String> result = config.getPostProcessingScript("any_table");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldReturnScriptWhenUsingInlineScript() {
+        String json = "{\"mappings\":[{\"table\":\"orders\",\"script\":\"UPDATE \\\"orders\\\" SET processed = true\"}]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        Optional<String> result = config.getPostProcessingScript("orders");
+        assertTrue(result.isPresent());
+        assertEquals("UPDATE \"orders\" SET processed = true", result.get());
+    }
+
+    @Test
+    void shouldReturnScriptFromFileWhenUsingScriptFile(@TempDir Path tempDir) throws IOException {
+        // Create a temporary script file
+        Path scriptFile = tempDir.resolve("test_script.sql");
+        String scriptContent = "UPDATE \"items\" SET status = 'processed' WHERE created_at < NOW() - INTERVAL '1 day'";
+        Files.writeString(scriptFile, scriptContent);
+
+        String json = "{\"mappings\":[{\"table\":\"items\",\"scriptFile\":\"" + scriptFile.toString() + "\"}]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        Optional<String> result = config.getPostProcessingScript("items");
+        assertTrue(result.isPresent());
+        assertEquals(scriptContent, result.get());
+    }
+
+    @Test
+    void shouldThrowExceptionWhenScriptFileDoesNotExist() {
+        String json = "{\"mappings\":[{\"table\":\"items\",\"scriptFile\":\"/non/existent/file.sql\"}]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> config.getPostProcessingScript("items"));
+        assertTrue(exception.getMessage().contains("Script file does not exist"));
+    }
+
+    @Test
+    void shouldThrowExceptionWhenCannotReadScriptFile(@TempDir Path tempDir) throws IOException {
+        // Create a file that cannot be read (simulate permission issue)
+        Path scriptFile = tempDir.resolve("unreadable.sql");
+        Files.writeString(scriptFile, "some content");
+        // Make file unreadable (this might not work on all systems, but worth testing)
+        scriptFile.toFile().setReadable(false);
+
+        String json = "{\"mappings\":[{\"table\":\"items\",\"scriptFile\":\"" + scriptFile.toString() + "\"}]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> config.getPostProcessingScript("items"));
+        assertTrue(exception.getMessage().contains("Failed to read script file"));
+    }
+
+    @Test
+    void shouldReturnEmptyWhenTableNotFound() {
+        String json = "{\"mappings\":[{\"table\":\"orders\",\"script\":\"UPDATE \\\"orders\\\" SET processed = true\"}]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        Optional<String> result = config.getPostProcessingScript("nonexistent_table");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldHandleMixedMappingsWithScriptAndScriptFile(@TempDir Path tempDir) throws IOException {
+        // Create a temporary script file
+        Path scriptFile = tempDir.resolve("items_script.sql");
+        String scriptContent = "DELETE FROM \"items\" WHERE stale = true";
+        Files.writeString(scriptFile, scriptContent);
+
+        String json = "{\"mappings\":[" +
+                "{\"table\":\"orders\",\"script\":\"UPDATE \\\"orders\\\" SET processed = true\"}," +
+                "{\"table\":\"items\",\"scriptFile\":\"" + scriptFile.toString() + "\"}" +
+                "]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        // Test script mapping
+        Optional<String> ordersResult = config.getPostProcessingScript("orders");
+        assertTrue(ordersResult.isPresent());
+        assertEquals("UPDATE \"orders\" SET processed = true", ordersResult.get());
+
+        // Test scriptFile mapping
+        Optional<String> itemsResult = config.getPostProcessingScript("items");
+        assertTrue(itemsResult.isPresent());
+        assertEquals(scriptContent, itemsResult.get());
+    }
+
+    @Test
+    void shouldHandleEmptyMappingsArray() {
+        String json = "{\"mappings\":[]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        Optional<String> result = config.getPostProcessingScript("any_table");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldHandleInvalidJson() {
+        String json = "{\"mappings\":[{\"table\":\"orders\",\"script\":\"UPDATE \\\"orders\\\" SET processed = true\"}"; // Missing closing brace
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        Optional<String> result = config.getPostProcessingScript("orders");
+        assertTrue(result.isEmpty()); // Should return empty on JSON parsing error
+    }
+
+    @Test
+    void shouldThrowExceptionWhenNeitherScriptNorScriptFileSpecified() {
+        // This should not happen due to validation, but test defensive programming
+        String json = "{\"mappings\":[{\"table\":\"orders\"}]}";
+        SinkConfig config = new SinkConfig(Map.of("post.processing.script", json));
+
+        // This will throw an IllegalStateException in getScriptContent
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+            () -> config.getPostProcessingScript("orders"));
+        assertTrue(exception.getMessage().contains("Neither script nor scriptFile is specified"));
+    }
+
+
 } 

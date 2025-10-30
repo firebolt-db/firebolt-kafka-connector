@@ -54,3 +54,8 @@ logs
 #Firebolt Core
 src/integrationTest/docker/kafka-connect-3.9.1/firebolt-core
 src/integrationTest/docker/kafka-connect-4.0/firebolt-core
+
+#Integration test scripts (generated during test execution)
+src/integrationTest/docker/kafka-connect-cloud/scripts/*.sql
+src/integrationTest/docker/kafka-connect-3.9.1/scripts/*.sql
+src/integrationTest/docker/kafka-connect-4.0/scripts/*.sql

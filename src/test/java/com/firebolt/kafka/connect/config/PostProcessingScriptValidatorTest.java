@@ -69,6 +69,32 @@ class PostProcessingScriptValidatorTest {
     }
 
     @Test
+    void shouldRejectMissingBothScriptAndScriptFile() {
+        String missingBoth = "{\"mappings\":[{\"table\":\"t\"}]}";
+        String emptyBoth = "{\"mappings\":[{\"table\":\"t\",\"script\":\"   \",\"scriptFile\":\"   \"}]}";
+        assertThrows(ConfigException.class, () -> validator.ensureValid("post.processing.script", missingBoth));
+        assertThrows(ConfigException.class, () -> validator.ensureValid("post.processing.script", emptyBoth));
+    }
+
+    @Test
+    void shouldRejectBothScriptAndScriptFile() {
+        String bothSpecified = "{\"mappings\":[{\"table\":\"t\",\"script\":\"UPDATE t SET c=1\",\"scriptFile\":\"/path/to/script.sql\"}]}";
+        assertThrows(ConfigException.class, () -> validator.ensureValid("post.processing.script", bothSpecified));
+    }
+
+    @Test
+    void shouldAcceptScriptFileOnly() {
+        String scriptFileOnly = "{\"mappings\":[{\"table\":\"t\",\"scriptFile\":\"/path/to/script.sql\"}]}";
+        assertDoesNotThrow(() -> validator.ensureValid("post.processing.script", scriptFileOnly));
+    }
+
+    @Test
+    void shouldAcceptScriptOnly() {
+        String scriptOnly = "{\"mappings\":[{\"table\":\"t\",\"script\":\"UPDATE t SET c=1\"}]}";
+        assertDoesNotThrow(() -> validator.ensureValid("post.processing.script", scriptOnly));
+    }
+
+    @Test
     void shouldAcceptValidSingleMapping() {
         String json = "{\"mappings\":[{\"table\":\"orders\",\"script\":\"UPDATE \\\"orders\\\" SET processed = true\"}]}";
         assertDoesNotThrow(() -> validator.ensureValid("post.processing.script", json));
@@ -77,6 +103,12 @@ class PostProcessingScriptValidatorTest {
     @Test
     void shouldAcceptValidMultipleMappings() {
         String json = "{\"mappings\":[{\"table\":\"orders\",\"script\":\"UPDATE \\\"orders\\\" SET processed = true\"},{\"table\":\"items\",\"script\":\"DELETE FROM \\\"items\\\" WHERE stale = true\"}]}";
+        assertDoesNotThrow(() -> validator.ensureValid("post.processing.script", json));
+    }
+
+    @Test
+    void shouldAcceptMixedMappingsWithScriptAndScriptFile() {
+        String json = "{\"mappings\":[{\"table\":\"orders\",\"script\":\"UPDATE \\\"orders\\\" SET processed = true\"},{\"table\":\"items\",\"scriptFile\":\"/path/to/items_script.sql\"}]}";
         assertDoesNotThrow(() -> validator.ensureValid("post.processing.script", json));
     }
 }

@@ -3,6 +3,10 @@ package com.firebolt.kafka.connect;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,7 +71,7 @@ public class SinkConfig {
             if (!CollectionUtils.isEmpty(mappings)) {
                 return mappings.stream()
                         .filter(mapping -> tableName.equals(mapping.getTable()))
-                        .map(PostProcessingConfig.Mapping::getScript)
+                        .map(this::getScriptContent)
                         .findFirst();
             }
         } catch (JsonProcessingException e) {
@@ -75,6 +79,38 @@ public class SinkConfig {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Gets the script content from either the inline script or script file.
+     * 
+     * @param mapping the mapping containing either script or scriptFile
+     * @return the script content
+     */
+    private String getScriptContent(PostProcessingConfig.Mapping mapping) {
+        if (StringUtils.isNotBlank(mapping.getScript())) {
+            log.debug("Using inline script for table: {}", mapping.getTable());
+            return mapping.getScript();
+        }
+        
+        if (StringUtils.isNotBlank(mapping.getScriptFile())) {
+            try {
+                Path scriptPath = Paths.get(mapping.getScriptFile());
+                log.info("Attempting to read script file: {} (absolute path: {})", mapping.getScriptFile(), scriptPath.toAbsolutePath());
+                if (!Files.exists(scriptPath)) {
+                    log.error("Script file does not exist: {} (absolute path: {})", mapping.getScriptFile(), scriptPath.toAbsolutePath());
+                    throw new RuntimeException("Script file does not exist: " + mapping.getScriptFile());
+                }
+                String scriptContent = Files.readString(scriptPath);
+                log.info("Successfully read script file: {} (content length: {} chars)", mapping.getScriptFile(), scriptContent.length());
+                return scriptContent;
+            } catch (IOException e) {
+                log.error("Failed to read script file: {} (absolute path: {})", mapping.getScriptFile(), Paths.get(mapping.getScriptFile()).toAbsolutePath(), e);
+                throw new RuntimeException("Failed to read script file: " + mapping.getScriptFile(), e);
+            }
+        }
+        
+        throw new IllegalStateException("Neither script nor scriptFile is specified for table: " + mapping.getTable());
     }
 
     // Utility method to get any config value

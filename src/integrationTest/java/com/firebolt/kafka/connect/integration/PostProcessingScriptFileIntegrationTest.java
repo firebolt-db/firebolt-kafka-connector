@@ -3,6 +3,10 @@ package com.firebolt.kafka.connect.integration;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.firebolt.kafka.connect.PostProcessingConfig;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -26,20 +30,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @Slf4j
-public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegrationTest {
+public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("post_processing_table");
-    private static final String TOPIC_NAME = generateTopicName("post-processing-topic");
+    private static final String TABLE_NAME = generateTableName("post_processing_file_table");
+    private static final String TOPIC_NAME = generateTopicName("post-processing-file-topic");
 
-    private static final String TARGET_TABLE_NAME = generateTableName("target_table_post_processing");
+    private static final String TARGET_TABLE_NAME = generateTableName("target_table_post_processing_file");
 
     private Producer<String, String> producer;
+    private Path scriptFile;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
         super.setUp(testInfo);
 
-        generateUniqueConnectorName("post-processing-test");
+        generateUniqueConnectorName("post-processing-file-test");
 
         // setup target table
         String createTargetTableSql = String.format(targetTableSchema().get(), TARGET_TABLE_NAME);
@@ -48,6 +53,9 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
         } catch (SQLException e) {
             fail("Cannot create the target table");
         }
+
+        // Create the SQL script file
+        scriptFile = createScriptFile();
 
         Map<String, String> connectorOverrideProperties = new HashMap<>();
         connectorOverrideProperties.put(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG, preparePostProcessingScript());
@@ -61,6 +69,34 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
             producer.close();
         }
 
+        // Clean up the script file if it was created
+        // Delete from all directories where it was copied
+        if (scriptFile != null) {
+            try {
+                // Convert container path back to host path
+                // Container path: /etc/kafka-connect/scripts/filename.sql
+                // Delete the file from all possible scripts directories
+                if (scriptFile.toString().startsWith("/etc/kafka-connect/scripts")) {
+                    String fileName = scriptFile.getFileName().toString();
+                    Path[] possibleScriptsDirs = {
+                        Paths.get("src/integrationTest/docker/kafka-connect-cloud/scripts"),
+                        Paths.get("src/integrationTest/docker/kafka-connect-3.9.1/scripts"),
+                        Paths.get("src/integrationTest/docker/kafka-connect-4.0/scripts")
+                    };
+                    
+                    for (Path scriptsDir : possibleScriptsDirs) {
+                        Path hostFile = scriptsDir.resolve(fileName);
+                        if (Files.exists(hostFile)) {
+                            Files.delete(hostFile);
+                            log.info("Deleted script file: {}", hostFile);
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                log.warn("Failed to delete script file: {}", e.getMessage());
+            }
+        }
+
         safelyDropTable(TARGET_TABLE_NAME);
 
         cleanupSchemalessTestResources(TABLE_NAME, TOPIC_NAME);
@@ -68,8 +104,76 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
         super.tearDown();
     }
 
+    /**
+     * Creates a temporary SQL script file that will be used for post-processing.
+     * The file is created in a location accessible to the Kafka Connect Docker container.
+     * All docker-compose setups mount ./scripts at /etc/kafka-connect/scripts
+     * The file is copied into all possible script directories to ensure it's available
+     * regardless of which Kafka Connect setup is being used.
+     * 
+     * @return Path to the created script file (as it should be accessed from within the container)
+     */
+    private Path createScriptFile() {
+        try {
+            // Copy the script file into all possible script directories
+            Path[] possibleScriptsDirs = {
+                Paths.get("src/integrationTest/docker/kafka-connect-cloud/scripts"),
+                Paths.get("src/integrationTest/docker/kafka-connect-3.9.1/scripts"),
+                Paths.get("src/integrationTest/docker/kafka-connect-4.0/scripts")
+            };
+
+            // Create a unique script file name to avoid conflicts between test runs
+            String scriptFileName = "post_processing_script_" + System.currentTimeMillis() + "_" + 
+                                    Thread.currentThread().getId() + ".sql";
+
+            // Write the SQL script content
+            String scriptContent = String.format(
+                    "INSERT INTO \"%s\" (processed) \n" +
+                    "SELECT id::TEXT || UPPER(value)\n" +
+                    "FROM \"%s\" where batch_id='${firebolt_param.batch_id}';",
+                    TARGET_TABLE_NAME, TABLE_NAME);
+
+            // Copy the script file into all directories
+            for (Path scriptsDir : possibleScriptsDirs) {
+                // Ensure the directory exists
+                if (!Files.exists(scriptsDir)) {
+                    Files.createDirectories(scriptsDir);
+                    log.info("Created scripts directory: {}", scriptsDir.toAbsolutePath());
+                }
+
+                Path hostScriptFile = scriptsDir.resolve(scriptFileName);
+                Files.writeString(hostScriptFile, scriptContent);
+                log.info("Created post-processing script file on host: {}", hostScriptFile.toAbsolutePath());
+            }
+
+            // Return the path as it should be accessed from within the Docker container
+            // All docker-compose setups mount ./scripts at /etc/kafka-connect/scripts
+            Path containerPath = Paths.get("/etc/kafka-connect/scripts", scriptFileName);
+            log.info("Script file path inside container will be: {} (copied to all script directories)", containerPath);
+            
+            return containerPath;
+        } catch (IOException e) {
+            log.error("Failed to create script file", e);
+            fail("Failed to create script file: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private String preparePostProcessingScript() {
+        PostProcessingConfig postProcessingConfig = new PostProcessingConfig(
+                List.of(
+                        new PostProcessingConfig.Mapping(TABLE_NAME, null, scriptFile.toString())
+                ));
+        try {
+            return objectMapper.writeValueAsString(postProcessingConfig);
+        } catch (JsonProcessingException e) {
+            fail("Failed to serialize the post processing config");
+            return null;
+        }
+    }
+
     @Test
-    void testPostProcessingScript() throws Exception {
+    void testPostProcessingScriptFromFile() throws Exception {
         producer = initializeSchemalessJsonProducer();
 
         List<SimpleRecord> testRecords = Arrays.asList(
@@ -86,7 +190,7 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
         // check that all the records have the expected value
         verifyPostProcessingScript(testRecords);
 
-        // check that all the values are in the target table
+        // check that all the values are in the target table (validating script file execution)
         verifyTargetTableResults(testRecords);
     }
 
@@ -102,10 +206,9 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
                 "\"processed\" TEXT NOT NULL)";
     }
 
-
     private void publishMessages(List<SimpleRecord> records) throws Exception {
         for (SimpleRecord record : records) {
-            String key = "post-processing-script-test-key-" + record.getId();
+            String key = "post-processing-script-file-test-key-" + record.getId();
             ProducerRecord<String, String> producerRecord =
                     new ProducerRecord<>(TOPIC_NAME, key, objectMapper.writeValueAsString(record));
 
@@ -143,30 +246,13 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
                 SimpleRecord expected = expectedRecords.get(recordIndex);
                 String expectedValue = expected.getId() + expected.getValue().toUpperCase();
 
-                assertEquals(expectedValue, rs.getString("processed"));
+                assertEquals(expectedValue, rs.getString("processed"),
+                        "Processed value doesn't match expected for record " + recordIndex);
                 recordIndex++;
             }
 
             assertEquals(expectedRecords.size(), recordIndex,
                     "Expected to verify " + expectedRecords.size() + " records, but only found " + recordIndex);
-        }
-    }
-
-    private String preparePostProcessingScript() {
-        // the script will concatenate the id and upper case the text and will create just one column
-        String script =
-                "INSERT INTO %s (processed) \n" +
-                        "SELECT id::TEXT || UPPER(value)\n" +
-                        "FROM %s where batch_id=\'${firebolt_param.batch_id}\';";
-        PostProcessingConfig postProcessingConfig = new PostProcessingConfig(
-                List.of(
-                        new PostProcessingConfig.Mapping(TABLE_NAME, String.format(script, TARGET_TABLE_NAME, TABLE_NAME), null)
-                ));
-        try {
-            return objectMapper.writeValueAsString(postProcessingConfig);
-        } catch (JsonProcessingException e) {
-            fail("Failed to serialized the post processing config");
-            return null;
         }
     }
 

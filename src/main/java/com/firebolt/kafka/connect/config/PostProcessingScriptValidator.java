@@ -1,6 +1,5 @@
 package com.firebolt.kafka.connect.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.PostProcessingConfig;
 import java.util.List;
@@ -41,8 +40,16 @@ public class PostProcessingScriptValidator implements ConfigDef.Validator {
                     if (StringUtils.isBlank(mapping.getTable())) {
                         throw new ConfigException(name, value, "Each mapping requires non-empty 'table'");
                     }
-                    if (StringUtils.isBlank(mapping.getScript())) {
-                        throw new ConfigException(name, value, "Each mapping requires non-empty 'script'");
+                    
+                    boolean hasScript = StringUtils.isNotBlank(mapping.getScript());
+                    boolean hasScriptFile = StringUtils.isNotBlank(mapping.getScriptFile());
+                    
+                    if (!hasScript && !hasScriptFile) {
+                        throw new ConfigException(name, value, "Each mapping requires either 'script' or 'scriptFile' to be specified");
+                    }
+                    
+                    if (hasScript && hasScriptFile) {
+                        throw new ConfigException(name, value, "Each mapping cannot have both 'script' and 'scriptFile' specified - use only one");
                     }
                 });
             }

@@ -32,7 +32,7 @@ public class ConnectorConfigDefinition {
     // Optional post processing SQL script(s) to run per table after insert
     // JSON format: { "mappings" : [ { "table" : "<table>", "script" : "<sql>" } ] }
     public static final String POST_PROCESSING_SCRIPT_CONFIG = "post.processing.script";
-    public static final String POST_PROCESSING_SCRIPT_DOC = "Optional post-processing SQL to run after insert per table. JSON format: {\"mappings\":[{\"table\":\"<table>\",\"script\":\"<sql>\"}]}";
+    public static final String POST_PROCESSING_SCRIPT_DOC = "Optional post-processing SQL to run after insert per table. JSON format: {\"mappings\":[{\"table\":\"<table>\",\"script\":\"<sql>\"}]} or {\"mappings\":[{\"table\":\"<table>\",\"scriptFile\":\"<path/to/script.sql>\"}]}. Either 'script' or 'scriptFile' must be specified for each mapping, but not both.";
     public static final String POST_PROCESSING_SCRIPT_DEFAULT = null;
 
     // =========================
