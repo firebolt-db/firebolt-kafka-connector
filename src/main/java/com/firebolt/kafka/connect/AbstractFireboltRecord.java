@@ -19,6 +19,12 @@ public interface AbstractFireboltRecord {
 
     Set<String> getColumnNames();
 
+    /**
+     * Returns the set of column names that has a null value for the
+     * @return
+     */
+    Set<String> getColumnNamesWithNullValues();
+
     KafkaMessageColumnValue getColumnValue(String columnName);
 
     SinkRecord getSinkRecord();

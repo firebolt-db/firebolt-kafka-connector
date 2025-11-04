@@ -39,6 +39,11 @@ public class LoadTest {
                 tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-80-column-table-schema.txt";
                 jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-80-column-registry.txt";
                 break;
+            case "400-column":
+                tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-400-column-table-schema.txt";
+                jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-400-column-registry.txt";
+                break;
+
             case "8-column-with-default-timestamp":
             default:
                 tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-8-column-with-default-timestamp-table-schema.txt";
