@@ -98,4 +98,20 @@ public class SinkConfig {
     public boolean isExactlyOnce() {
         return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
     }
+
+    /**
+     * Returns the maximum query size in bytes. If 0 or negative, there is no limit.
+     */
+    public long getMaxQuerySize() {
+        String maxQuerySizeStr = config.get(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG);
+        if (maxQuerySizeStr == null || maxQuerySizeStr.trim().isEmpty()) {
+            return ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_DEFAULT;
+        }
+        try {
+            return Long.parseLong(maxQuerySizeStr);
+        } catch (NumberFormatException e) {
+            log.warn("Invalid maxQuerySize value: {}. Using default: {}", maxQuerySizeStr, ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_DEFAULT);
+            return ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_DEFAULT;
+        }
+    }
 }

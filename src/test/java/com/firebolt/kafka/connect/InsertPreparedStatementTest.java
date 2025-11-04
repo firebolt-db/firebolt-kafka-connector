@@ -83,7 +83,7 @@ public class InsertPreparedStatementTest {
         when(mockTableSchema.getColumns()).thenReturn(List.of(mockColumn1, mockColumn2));
         doNothing().when(errorReporter).report(any(), any());
 
-        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, false);
+        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, false, 0);
     }
 
     @Test
@@ -134,7 +134,7 @@ public class InsertPreparedStatementTest {
     @Test
     void shouldReportSingleRecordTooLargeViaErrorReporter() throws Exception {
         // Use a new InsertPreparedStatement with error tolerance enabled
-        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, true);
+        insertPreparedStatement = new InsertPreparedStatement(mockConnection, mockTableSchema, errorReporter, true, 0);
 
         List<AbstractFireboltRecord> records = new ArrayList<>();
         records.add(buildRecord(TABLE_NAME, 1, 1234L, mapOf(

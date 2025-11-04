@@ -348,5 +348,81 @@ public class SinkConfigTest {
         assertFalse(result);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "1000, 1000",
+        "0, 0",
+        "1048576, 1048576",
+        "300, 300"
+    })
+    void testGetMaxQuerySizeWithValidValues(String value, long expected) {
+        configMap.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, value);
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        long result = testConfig.getMaxQuerySize();
+
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void testGetMaxQuerySizeWhenOmittedDefaultsToZero() {
+        configMap.remove(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG);
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        long result = testConfig.getMaxQuerySize();
+
+        assertEquals(0L, result);
+    }
+
+    @Test
+    void testGetMaxQuerySizeWithNullValueDefaultsToZero() {
+        configMap.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, null);
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        long result = testConfig.getMaxQuerySize();
+
+        assertEquals(0L, result);
+    }
+
+    @Test
+    void testGetMaxQuerySizeWithEmptyStringDefaultsToZero() {
+        configMap.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "");
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        long result = testConfig.getMaxQuerySize();
+
+        assertEquals(0L, result);
+    }
+
+    @Test
+    void testGetMaxQuerySizeWithWhitespaceDefaultsToZero() {
+        configMap.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "   ");
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        long result = testConfig.getMaxQuerySize();
+
+        assertEquals(0L, result);
+    }
+
+    @Test
+    void testGetMaxQuerySizeWithInvalidNumberDefaultsToZero() {
+        configMap.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "not-a-number");
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        long result = testConfig.getMaxQuerySize();
+
+        assertEquals(0L, result);
+    }
+
+    @Test
+    void testGetMaxQuerySizeWithNegativeValue() {
+        configMap.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "-1");
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        long result = testConfig.getMaxQuerySize();
+
+        assertEquals(-1L, result);
+    }
+
     
 } 

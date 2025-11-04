@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeFactoryProvider;
@@ -9,6 +10,7 @@ import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionF
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -31,12 +33,14 @@ public class InsertPreparedStatement {
     private TableSchema tableSchema;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
+    private long maxQuerySize;
 
-    public InsertPreparedStatement(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll) {
+    public InsertPreparedStatement(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, long maxQuerySize) {
         this.connection = connection;
         this.tableSchema = tableSchema;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
+        this.maxQuerySize = maxQuerySize;
     }
 
     public void addRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
@@ -51,6 +55,18 @@ public class InsertPreparedStatement {
     }
 
     private void addRecordsInternal(List<AbstractFireboltRecord> fireboltRecords, Map<String, String> validColumnNames) throws SQLException {
+        // If maxQuerySize is set, split records into batches based on query size
+        if (maxQuerySize > 0) {
+            List<List<AbstractFireboltRecord>> batches = splitIntoBatchesByQuerySize(fireboltRecords, validColumnNames);
+            for (List<AbstractFireboltRecord> batch : batches) {
+                executeBatch(batch, validColumnNames);
+            }
+        } else {
+            executeBatch(fireboltRecords, validColumnNames);
+        }
+    }
+
+    private void executeBatch(List<AbstractFireboltRecord> fireboltRecords, Map<String, String> validColumnNames) throws SQLException {
         try (PreparedStatement preparedStatement = createPreparedStatement(tableSchema, validColumnNames.keySet())) {
 
             // Execute batch insert
@@ -89,8 +105,8 @@ public class InsertPreparedStatement {
                     // simple strategy for now. Split the rows in two and try each half again
                     int leftSide = fireboltRecords.size() / 2;
                     log.warn("Batch size was too big so will split the records in smaller batches {} & {}", leftSide, fireboltRecords.size()-leftSide);
-                    addRecordsInternal(fireboltRecords.subList(0,leftSide), validColumnNames);
-                    addRecordsInternal(fireboltRecords.subList(leftSide,fireboltRecords.size()), validColumnNames);
+                    executeBatch(fireboltRecords.subList(0,leftSide), validColumnNames);
+                    executeBatch(fireboltRecords.subList(leftSide,fireboltRecords.size()), validColumnNames);
                 }
             } finally {
                 // Clear batch
@@ -228,5 +244,124 @@ public class InsertPreparedStatement {
                 recordColumnNames.size(), validColumns.size(), tableSchema.getTableName(), validColumns.entrySet());
 
         return validColumns;
+    }
+
+    /**
+     * Splits records into batches based on the maximum query size limit.
+     * Each batch will be a separate INSERT statement concatenated with semicolons.
+     * 
+     * @param fireboltRecords the records to split
+     * @param validColumnNames the valid column names for calculating query size
+     * @return list of batches, where each batch respects the maxQuerySize limit
+     */
+    private List<List<AbstractFireboltRecord>> splitIntoBatchesByQuerySize(List<AbstractFireboltRecord> fireboltRecords, Map<String, String> validColumnNames) {
+        String insertSQLTemplate = buildInsertSQL(tableSchema, validColumnNames.keySet());
+        long templateSizeBytes = insertSQLTemplate.length();
+
+        List<List<AbstractFireboltRecord>> batches = new ArrayList<>();
+        List<AbstractFireboltRecord> currentBatch = new ArrayList<>();
+        long currentBatchSize = 0;
+        // we leave a certain overhead so that queries will not exceed max size
+        long actualMaxQuerySizeBytes = (long) (maxQuerySize * 0.95);
+        List<String> attributeNames = new ArrayList<>(validColumnNames.values());
+
+        for (AbstractFireboltRecord record : fireboltRecords) {
+            long recordParameterSize = calculateParameterSize(record, attributeNames);
+            // Each INSERT statement: template + parameters
+            long recordQuerySize = templateSizeBytes + recordParameterSize;
+
+            // If adding this record would exceed the limit and we have records in the current batch, start a new batch
+            if (!currentBatch.isEmpty() && currentBatchSize + recordQuerySize > actualMaxQuerySizeBytes) {
+                batches.add(currentBatch);
+                currentBatch = new ArrayList<>();
+                currentBatchSize = 0;
+            }
+
+            currentBatch.add(record);
+            currentBatchSize += recordQuerySize;
+        }
+
+        // Add the last batch if it has records
+        if (!currentBatch.isEmpty()) {
+            batches.add(currentBatch);
+        }
+
+        if (batches.size() > 1) {
+            log.info("Split {} records into {} batches based on maxQuerySize limit of {} bytes", 
+                    fireboltRecords.size(), batches.size(), maxQuerySize);
+        }
+
+        return batches;
+    }
+
+    /**
+     * Calculates the estimated byte size of parameter values for a record.
+     * This estimates how the parameters would be serialized in the final SQL query.
+     * 
+     * @param record the record to calculate parameter size for
+     * @param attributeNames the list of attribute names to calculate size for
+     * @return estimated byte size of the parameter values
+     */
+    private long calculateParameterSize(AbstractFireboltRecord record, List<String> attributeNames) {
+        long totalSize = 0;
+        
+        for (String attributeName : attributeNames) {
+            KafkaMessageColumnValue kafkaMessageColumnValue = record.getColumnValue(attributeName);
+
+            if (kafkaMessageColumnValue == null || kafkaMessageColumnValue.getValue() == null) {
+                // NULL is typically 4 bytes but since we don't deduct the '?' it's actually 3 bytes
+                totalSize += 3;
+            } else {
+                Object value = kafkaMessageColumnValue.getValue();
+                totalSize += estimateValueSize(value);
+            }
+        }
+
+        return totalSize;
+    }
+
+    /**
+     * Estimates the byte size of a value when serialized in SQL.
+     * 
+     * @param value the value to estimate
+     * @return estimated byte size
+     */
+    private long estimateValueSize(Object value) {
+        if (value instanceof String) {
+            String str = (String) value;
+            // Estimate: string bytes + escaped characters (rough estimate: 10% overhead)
+            return (long)(str.getBytes(java.nio.charset.StandardCharsets.UTF_8).length * 1.1);
+        }
+
+        int length = String.valueOf(value).getBytes(StandardCharsets.UTF_8).length;
+        if (value instanceof Number) {
+            // Numbers are represented as strings in SQL
+            return length;
+        }
+
+        if (value instanceof Boolean) {
+            // Boolean: "true" or "false"
+            return 5;
+        }
+
+        if (value instanceof byte[]) {
+            // Byte arrays are typically hex-encoded: each byte becomes 2 hex chars
+            return ((byte[]) value).length * 2L;
+        }
+
+        if (value instanceof java.util.Map) {
+            // Maps are serialized as JSON strings
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                String json = mapper.writeValueAsString(value);
+                return json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            } catch (Exception e) {
+                // Fallback: estimate based on toString()
+                return length;
+            }
+        }
+
+        // Fallback: estimate based on toString()
+        return length;
     }
 }

@@ -37,11 +37,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -98,12 +97,14 @@ public class AppendOnlyFireboltSinkServiceTest {
         MockitoAnnotations.openMocks(this);
 
         tableWriterMap = new HashMap<>();
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, false, mockTableWriterProvider);
-
+        
         when(mockSinkConfig.isExactlyOnce()).thenReturn(false);
+        when(mockSinkConfig.isErrorToleranceAll()).thenReturn(false);
         when(mockSinkConfig.getTableNameForTopic(TOPIC_A)).thenReturn(TABLE_A);
         when(mockSinkConfig.getTableNameForTopic(TOPIC_B)).thenReturn(TABLE_B);
         when(mockSinkConfig.getJdbcConfig()).thenReturn(null);
+        
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, mockTableWriterProvider);
 
         when(mockDbService.createConnection(any())).thenReturn(mockConnection);
 
@@ -114,7 +115,8 @@ public class AppendOnlyFireboltSinkServiceTest {
     @Test
     void shouldReportConversionFailureViaErrorReporter() throws Exception {
         //rebuild service with error tolerance enabled
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, true, mockTableWriterProvider);
+        when(mockSinkConfig.isErrorToleranceAll()).thenReturn(true);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, mockTableWriterProvider);
         SinkRecord badRecord = buildRecord(TOPIC_A, 0, 1L);
         Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
 
@@ -151,6 +153,7 @@ public class AppendOnlyFireboltSinkServiceTest {
     void shouldReturnWhenNoRecords() {
         assertDoesNotThrow(() -> service.processRecord(List.of(), Map.of()));
         verify(mockSinkConfig, times(1)).isExactlyOnce();
+        verify(mockSinkConfig, times(1)).isErrorToleranceAll();
         verifyNoMoreInteractions(mockSinkConfig);
         verifyNoInteractions(mockDbService, mockConverterFactory);
     }
@@ -219,7 +222,7 @@ public class AppendOnlyFireboltSinkServiceTest {
                 eq(TOPIC_A),
                 eq(Map.of(0, -1L)),
                 eq(mockErrorReporter),
-                eq(false),
+                any(),
                 any()
         )).thenReturn(writer);
 
@@ -245,7 +248,7 @@ public class AppendOnlyFireboltSinkServiceTest {
 
         // Build a fresh service instance so that constructor wires metadata service
         // Use the shared tableWriterMap so that our mocked writer registration is effective
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0)), mockErrorReporter, false, mockTableWriterProvider);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0)), mockErrorReporter, mockTableWriterProvider);
 
         // Inject a mock FireboltMetadataService and stub its behavior
         TableWriter writer = mock(TableWriter.class);
@@ -257,7 +260,7 @@ public class AppendOnlyFireboltSinkServiceTest {
                 eq(TOPIC_A),
                 eq(Map.of(0, 10L)),
                 eq(mockErrorReporter),
-                eq(false),
+                any(),
                 any()
         )).thenReturn(writer);
 
@@ -310,7 +313,8 @@ public class AppendOnlyFireboltSinkServiceTest {
 
     @Test
     void shouldFilterOutRecordsThatCannotBeConvertedWhenErrorToleranceIsAll() throws Exception {
-        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, true, mockTableWriterProvider);
+        when(mockSinkConfig.isErrorToleranceAll()).thenReturn(true);
+        service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, mockConverterFactory, tableWriterMap, Map.of(TOPIC_A, Set.of(0), TOPIC_B, Set.of(0)), mockErrorReporter, mockTableWriterProvider);
         // two topics
         SinkRecord recA1 = buildRecord(TOPIC_A, 0, 1L);
         SinkRecord recA2 = buildRecord(TOPIC_A, 0, 2L);

@@ -128,7 +128,7 @@ public class FireboltSinkTask extends SinkTask {
                 fireboltSinkService.close();
             }
 
-            this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig, this.assignedTopicPartitions, this.errorReporter, this.errorToleranceAll);
+            this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig, this.assignedTopicPartitions, this.errorReporter);
 
             log.info("Successfully opened Firebolt Sink Task for topics: {} mapped to tables: {}",
                     assignedTopics, topicToTableMapping.values());

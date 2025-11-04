@@ -41,10 +41,10 @@ public class FireboltSinkServiceProvider {
      * @return a new FireboltSinkService implementation
      * @throws IllegalArgumentException if the sink connector type is not supported
      */
-    public FireboltSinkService getService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
+    public FireboltSinkService getService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter) {
         if (sinkConfig == null) {
             throw new IllegalArgumentException("Configuration properties cannot be null");
         }
-        return new AppendOnlyFireboltSinkService(sinkConfig, topicPartitions, errorReporter, errorToleranceAll);
+        return new AppendOnlyFireboltSinkService(sinkConfig, topicPartitions, errorReporter);
     }
 }

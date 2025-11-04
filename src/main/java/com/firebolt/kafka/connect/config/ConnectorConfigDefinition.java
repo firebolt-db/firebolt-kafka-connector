@@ -42,6 +42,10 @@ public class ConnectorConfigDefinition {
     public static final String EXACTLY_ONCE_MAPPING_DOC = "By default this will be set to false. When set to true, then the kafka message will be ingested exactly-once in Firebolt. When the flag is false, the kafka message will be ingested at least once";
     public static final Boolean EXACTLY_ONCE_MAPPING_DEFAULT = Boolean.FALSE;
 
+    public static final String FIREBOLT_MAX_QUERY_SIZE_CONFIG = "maxQuerySize";
+    public static final String FIREBOLT_MAX_QUERY_SIZE_DOC = "Maximum size in bytes for the final SQL query when batching inserts. If the query would exceed this size, records will be split into smaller batches. Each batch is an INSERT statement concatenated with semicolons. The size is calculated from the prepared statement template and the parameter values. Default is no limit (0 or negative value).";
+    public static final Long FIREBOLT_MAX_QUERY_SIZE_DEFAULT = 0L;
+
     // =========================
     // ERROR HANDLING CONFIGURATION (delegated from Kafka Connect worker)
     // =========================
@@ -84,6 +88,11 @@ public class ConnectorConfigDefinition {
                         EXACTLY_ONCE_MAPPING_DEFAULT,
                         ConfigDef.Importance.HIGH,
                         EXACTLY_ONCE_MAPPING_DOC)
+                .define(FIREBOLT_MAX_QUERY_SIZE_CONFIG,
+                        ConfigDef.Type.LONG,
+                        FIREBOLT_MAX_QUERY_SIZE_DEFAULT,
+                        ConfigDef.Importance.MEDIUM,
+                        FIREBOLT_MAX_QUERY_SIZE_DOC)
 
                 // Table Configuration
                 .define(TOPIC_TO_TABLE_MAPPING_CONFIG,

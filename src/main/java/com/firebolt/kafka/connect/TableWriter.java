@@ -39,6 +39,7 @@ public class TableWriter {
     private FireboltMetadataService fireboltMetadataService;
     private String topicName;
     private boolean errorToleranceAll;
+    private long maxQuerySize;
 
     /**
      * A connection that will be used for pushing the records to firebolt table
@@ -47,12 +48,12 @@ public class TableWriter {
 
     private Optional<String> postProcessingScript;
 
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-        this(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll, postProcessingScript);
+    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, Optional<String> postProcessingScript, SinkConfig config) {
+        this(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, postProcessingScript, config);
     }
 
     @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, Optional<String> postProcessingScript, SinkConfig config) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
         this.fireboltMetadataService = fireboltMetadataService;
@@ -60,8 +61,9 @@ public class TableWriter {
         this.processedPartitionOffsets = processedPartitionOffsets;
         this.insertPreparedStatementProvider = insertPreparedStatementProvider;
         this.errorReporter = errorReporter;
-        this.errorToleranceAll = errorToleranceAll;
+        this.errorToleranceAll = config.isErrorToleranceAll();
         this.postProcessingScript = postProcessingScript;
+        this.maxQuerySize = config.getMaxQuerySize();
     }
 
     public void insertRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
@@ -71,7 +73,7 @@ public class TableWriter {
             return;
         }
 
-        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
+        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript, maxQuerySize);
         insertPreparedStatement.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
@@ -120,9 +122,9 @@ public class TableWriter {
      * For easier testing
      */
     static class InsertPreparedStatementProvider {
-        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-            return postProcessingScript == null || postProcessingScript.isEmpty() ? new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll)
-                    : new InsertPreparedStatementWithPostProcessing(connection, tableSchema, errorReporter, errorToleranceAll, postProcessingScript.get());
+        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript, long maxQuerySize) {
+            return postProcessingScript == null || postProcessingScript.isEmpty() ? new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll, maxQuerySize)
+                    : new InsertPreparedStatementWithPostProcessing(connection, tableSchema, errorReporter, errorToleranceAll, postProcessingScript.get(), maxQuerySize);
         }
     }
 }

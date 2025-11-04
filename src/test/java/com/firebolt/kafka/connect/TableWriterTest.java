@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -74,6 +75,9 @@ public class TableWriterTest {
     @Mock
     private FireboltMetadataService mockFireboltMetadataService;
 
+    @Mock
+    private SinkConfig mockSinkConfig;
+
     private TableWriter tableWriter;
 
     @BeforeEach
@@ -87,13 +91,15 @@ public class TableWriterTest {
         when(mockConnectionSupplier.get()).thenReturn(mockConnection);
         // by default connection is not closed
         when(mockConnection.isClosed()).thenReturn(false);
+        when(mockSinkConfig.isErrorToleranceAll()).thenReturn(false);
+        when(mockSinkConfig.getMaxQuerySize()).thenReturn(0L);
 
         Map<Integer, Long> lastPartitionOffset = new HashMap<>();
         lastPartitionOffset.put(PARTITION_0,  -1L);
         lastPartitionOffset.put(PARTITION_1,  -1L);
         lastPartitionOffset.put(PARTITION_2,  -1L);
-        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), false, Optional.empty());
-        when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockInsertPrepareStatement);
+        tableWriter = new TableWriter(mockTableSchema, mockConnectionSupplier, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockInsertPrepareStatementProvider, ErrorReporter.nullErrorReporter(), Optional.empty(), mockSinkConfig);
+        when(mockInsertPrepareStatementProvider.get(mockConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty(), 0)).thenReturn(mockInsertPrepareStatement);
 
         doNothing().when(mockInsertPrepareStatement).addRecords(anyList());
     }
@@ -161,7 +167,7 @@ public class TableWriterTest {
         List<AbstractFireboltRecord> emptyRecords = Collections.emptyList();
         assertDoesNotThrow(() -> tableWriter.insertRecords(emptyRecords));
 
-        verify(mockInsertPrepareStatementProvider, never()).get(any(), any(), any(), anyBoolean(), any(Optional.class));
+        verify(mockInsertPrepareStatementProvider, never()).get(any(), any(), any(), anyBoolean(), any(Optional.class), anyLong());
         verify(mockConnectionSupplier, never()).get();
     }
 
@@ -184,7 +190,7 @@ public class TableWriterTest {
         when(mockConnectionSupplier.get()).thenReturn(mockConnection, mockSecondConnection);
 
         InsertPreparedStatement mockSecondInsertPreparedStatement = mock(InsertPreparedStatement.class);
-        when(mockInsertPrepareStatementProvider.get(mockSecondConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty())).thenReturn(mockSecondInsertPreparedStatement);
+        when(mockInsertPrepareStatementProvider.get(mockSecondConnection, mockTableSchema, ErrorReporter.nullErrorReporter(), false, Optional.empty(), 0)).thenReturn(mockSecondInsertPreparedStatement);
 
         // do the first insert on the first connection
         when(mockConnection.isClosed()).thenReturn(false);

@@ -26,8 +26,8 @@ public class InsertPreparedStatementWithPostProcessing extends InsertPreparedSta
 
     private String postProcessingScript;
 
-    public InsertPreparedStatementWithPostProcessing(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, String postProcessingScript) {
-        super(connection, tableSchema, errorReporter, errorToleranceAll);
+    public InsertPreparedStatementWithPostProcessing(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, String postProcessingScript, long maxQuerySize) {
+        super(connection, tableSchema, errorReporter, errorToleranceAll, maxQuerySize);
         this.postProcessingScript = postProcessingScript;
     }
 

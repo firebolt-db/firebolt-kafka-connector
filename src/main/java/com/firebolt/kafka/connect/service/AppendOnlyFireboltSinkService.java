@@ -48,19 +48,19 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private boolean errorToleranceAll;
     private TableWriterProvider tableWriterProvider;
 
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
-        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll, new TableWriterProvider());
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter) {
+        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, new TableWriterProvider());
     }
 
     @VisibleForTesting
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll, TableWriterProvider tableWriterProvider) {
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, TableWriterProvider tableWriterProvider) {
         this.config = sinkConfig;
         this.fireboltDbService = fireboltDbService;
         this.recordConverterFactory = recordConverterFactory;
         this.tableWriterMap = tableWriterMap;
         this.assignedTopicPartitions = topicPartitions;
         this.errorReporter = errorReporter;
-        this.errorToleranceAll = errorToleranceAll;
+        this.errorToleranceAll = sinkConfig.isErrorToleranceAll();
         if (this.config.isExactlyOnce()) {
             this.fireboltMetadataService = new FireboltMetadataService(fireboltDbService, config.getJdbcConfig());
         }
@@ -109,7 +109,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
         Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
-        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, postProcessingScript, config);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition
@@ -194,8 +194,8 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
      * For easier testing
      */
     static class TableWriterProvider {
-        public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-            return new TableWriter(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, Optional<String> postProcessingScript, SinkConfig config) {
+            return new TableWriter(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, errorReporter, postProcessingScript, config);
         }
     }
 }

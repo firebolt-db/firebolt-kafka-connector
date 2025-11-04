@@ -54,6 +54,15 @@ class ConnectorConfigDefinitionTest {
             assertTrue(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_DOC.contains("Firebolt account"));
             assertNull(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_DEFAULT);
         }
+
+        @Test
+        void shouldHaveCorrectMaxQuerySizeConfig() {
+            assertEquals("maxQuerySize", ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG);
+            assertNotNull(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_DOC);
+            assertTrue(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_DOC.contains("Maximum size"));
+            assertTrue(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_DOC.contains("bytes"));
+            assertEquals(0L, ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_DEFAULT);
+        }
     }
 
     @Nested
@@ -72,12 +81,13 @@ class ConnectorConfigDefinitionTest {
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG));
+            assertTrue(configDef.names().contains(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG));
         }
 
         @Test
         void shouldHaveCorrectNumberOfConfigProperties() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
-            assertEquals(7, configDef.names().size());
+            assertEquals(8, configDef.names().size());
         }
 
         @Test
@@ -98,6 +108,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG).type);
             assertEquals(ConfigDef.Type.STRING,
                 configDef.configKeys().get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG).type);
+            assertEquals(ConfigDef.Type.LONG,
+                configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG).type);
         }
 
         @Test
@@ -118,6 +130,8 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG).importance);
             assertEquals(ConfigDef.Importance.MEDIUM,
                 configDef.configKeys().get(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG).importance);
+            assertEquals(ConfigDef.Importance.MEDIUM,
+                configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG).importance);
         }
     }
 
@@ -221,6 +235,50 @@ class ConnectorConfigDefinitionTest {
                 .anyMatch(v -> !v.errorMessages().isEmpty());
             assertTrue(hasExactlyOnceErrors, "Expected validation errors for invalid exactlyOnce value");
         }
+
+        @Test
+        void shouldAcceptValidMaxQuerySize() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "1000");
+
+            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+        }
+
+        @Test
+        void shouldAcceptZeroMaxQuerySize() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "0");
+
+            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+        }
+
+        @Test
+        void shouldAcceptNegativeMaxQuerySize() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "-1");
+
+            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+        }
+
+        @Test
+        void shouldAcceptLargeMaxQuerySize() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "1048576");
+
+            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+        }
+
+        @Test
+        void shouldRejectInvalidMaxQuerySize() {
+            Map<String, String> config = createValidConfig();
+            config.put(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG, "not-a-number");
+
+            var result = ConnectorConfigDefinition.CONFIG_DEF.validate(config);
+            boolean hasMaxQuerySizeErrors = result.stream()
+                .filter(v -> ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG.equals(v.name()))
+                .anyMatch(v -> !v.errorMessages().isEmpty());
+            assertTrue(hasMaxQuerySizeErrors, "Expected validation errors for invalid maxQuerySize value");
+        }
     }
 
     @Nested
@@ -240,6 +298,13 @@ class ConnectorConfigDefinitionTest {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
             Object defaultValue = configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).defaultValue;
             assertEquals(Boolean.FALSE, defaultValue);
+        }
+
+        @Test
+        void shouldDefaultMaxQuerySizeToZeroWhenNotProvided() {
+            ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
+            Object defaultValue = configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_MAX_QUERY_SIZE_CONFIG).defaultValue;
+            assertEquals(0L, defaultValue);
         }
     }
 
