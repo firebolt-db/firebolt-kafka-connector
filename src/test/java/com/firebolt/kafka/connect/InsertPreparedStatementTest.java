@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect;
 
 import com.firebolt.jdbc.exception.ExceptionType;
-import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeFactoryProvider;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -21,17 +20,13 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Mockito;
-import org.mockito.MockedStatic;
+ 
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+ 
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverterFactory;
-import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
+ 
+ 
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -244,6 +239,54 @@ public class InsertPreparedStatementTest {
         verify(mockPreparedStatement).executeBatch();
     }
 
+    @Test
+    void shouldOnlyUseColumnsWithAtLeastOneNonNullValueForPreparedStatement() throws SQLException {
+        // Build two records where NAME is present but null in all records
+        Map<String, SchemaKafkaMessageColumnValue> values1 = new HashMap<>();
+        values1.put("id", SchemaKafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build());
+        values1.put("NAME", SchemaKafkaMessageColumnValue.builder().value(null).schemaType(Schema.Type.STRING).build());
+
+        Map<String, SchemaKafkaMessageColumnValue> values2 = new HashMap<>();
+        values2.put("id", SchemaKafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT32).build());
+        values2.put("NAME", SchemaKafkaMessageColumnValue.builder().value(null).schemaType(Schema.Type.STRING).build());
+
+        List<AbstractFireboltRecord> records = List.of(
+                buildRecord(TABLE_NAME, 0, 1L, values1),
+                buildRecord(TABLE_NAME, 0, 2L, values2)
+        );
+
+        assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
+
+        // Verify prepared statement only includes the column with at least one non-null value ("id")
+        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO \"test_table\" (\"id\") VALUES (?)")));
+        verify(mockPreparedStatement, times(2)).addBatch();
+        verify(mockPreparedStatement).executeBatch();
+    }
+
+    @Test
+    void willUseAllTheColumnsAsLongAsAtLeastOneHas() throws SQLException {
+        // Build two records where NAME is present but null in all records
+        Map<String, SchemaKafkaMessageColumnValue> values1 = new HashMap<>();
+        values1.put("id", SchemaKafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build());
+        values1.put("NAME", SchemaKafkaMessageColumnValue.builder().value("some name").schemaType(Schema.Type.STRING).build());
+
+        Map<String, SchemaKafkaMessageColumnValue> values2 = new HashMap<>();
+        values2.put("id", SchemaKafkaMessageColumnValue.builder().value(2).schemaType(Schema.Type.INT32).build());
+        values2.put("NAME", SchemaKafkaMessageColumnValue.builder().value(null).schemaType(Schema.Type.STRING).build());
+
+        List<AbstractFireboltRecord> records = List.of(
+                buildRecord(TABLE_NAME, 0, 1L, values1),
+                buildRecord(TABLE_NAME, 0, 2L, values2)
+        );
+
+        assertDoesNotThrow(() -> insertPreparedStatement.addRecords(records));
+
+        // Verify prepared statement only includes the column with at least one non-null value ("id")
+        verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO \"test_table\" (\"id\", \"NAME\") VALUES (?, ?)", "INSERT INTO \"test_table\" (\"NAME\", \"id\") VALUES (?, ?)")));
+        verify(mockPreparedStatement, times(2)).addBatch();
+        verify(mockPreparedStatement).executeBatch();
+    }
+
     private static FireboltRecord buildRecord(String tableName, int partition, long offset,
                                               Map<String, SchemaKafkaMessageColumnValue> values) {
         return new FireboltRecord(
@@ -266,6 +309,10 @@ public class InsertPreparedStatementTest {
 
     private static ArgumentMatcher<String> sqlContains(String expected) {
         return sql -> sql != null && sql.contains(expected);
+    }
+
+    private static ArgumentMatcher<String> sqlContains(String expected1, String expected2) {
+        return sql -> sql != null && (sql.contains(expected1) || sql.contains(expected2));
     }
 }
 

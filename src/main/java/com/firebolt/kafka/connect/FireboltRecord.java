@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.Getter;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -60,6 +61,14 @@ public class FireboltRecord implements AbstractFireboltRecord {
     @Override
     public Set<String> getColumnNames() {
         return columnValues.keySet();
+    }
+
+    @Override
+    public Set<String> getColumnNamesWithNullValues() {
+        return columnValues.entrySet().stream()
+                .filter(entry -> entry.getValue() == null || entry.getValue().getValue() == null)
+                .map(entry -> entry.getKey())
+                .collect(Collectors.toSet());
     }
 
     @Override
