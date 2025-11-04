@@ -56,7 +56,15 @@ public class InsertPreparedStatementWithPostProcessing extends InsertPreparedSta
             connection.rollback();
             throw ex;
         } finally {
-            connection.setAutoCommit(true);
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                log.error("Failed to commit the transaction. Will rollback");
+                connection.rollback();
+
+                // rethrow the original exception
+                throw e;
+            }
         }
 
     }

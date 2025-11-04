@@ -31,11 +31,6 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
@@ -339,6 +334,19 @@ public class FireboltSinkTaskTest {
         FireboltException fireboltException = mock(FireboltException.class);
         when(fireboltException.getType()).thenReturn(ExceptionType.TOO_MANY_REQUESTS);
         doThrow(fireboltException).when(mockSinkService).processRecord(any(), any());
+
+        assertThrows(RetriableException.class, () -> fireboltSinkTask.put(testRecords));
+    }
+
+    @Test
+    void shouldThrowRetriableWhenCommitConflictDetected() throws SQLException {
+        // Start and open the task
+        startAndOpenTask();
+
+        // Mock service to throw a FireboltException with a conflict message in the cause
+        FireboltException conflictException = mock(FireboltException.class);
+        when(conflictException.getType()).thenReturn(ExceptionType.CONFLICT);
+        doThrow(conflictException).when(mockSinkService).processRecord(any(), any());
 
         assertThrows(RetriableException.class, () -> fireboltSinkTask.put(testRecords));
     }
