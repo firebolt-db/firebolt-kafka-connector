@@ -18,7 +18,6 @@ public class SchemalessIntegerDataTypeConverter extends NumericDataTypeConverter
             return;
         }
 
-        // all ints are converted to long
         if (value instanceof Long) {
             Long longValue = (Long) value;
             if (longValue >= Integer.MIN_VALUE && longValue<= Integer.MAX_VALUE) {
