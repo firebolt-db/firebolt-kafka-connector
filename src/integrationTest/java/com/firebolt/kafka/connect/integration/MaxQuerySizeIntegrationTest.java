@@ -124,41 +124,6 @@ public class MaxQuerySizeIntegrationTest extends SchemaBaseIntegrationTest {
     }
 
     /**
-     * Sets up test resources (table, topic, schema) without creating the connector.
-     * This allows tests to publish records first, then create the connector.
-     */
-    private void setupTestResourcesWithoutConnector(
-            String topicName,
-            String tableName,
-            String schemaSubject,
-            java.util.function.Supplier<String> tableSchemaSupplier,
-            java.util.function.Supplier<String> jsonSchemaSupplier) {
-        try {
-            // Clean up any existing resources from previous test runs
-            cleanupTestResources(tableName, topicName, schemaSubject);
-
-            // Create the test table with the provided schema
-            createTable(tableSchemaSupplier, tableName);
-
-            // Create Kafka topic
-            log.info("Creating Kafka topic: {}", topicName);
-            createKafkaTopic(topicName);
-
-            // Register JSON schema
-            log.info("Registering JSON schema for subject: {}", schemaSubject);
-            String jsonSchema = jsonSchemaSupplier.get();
-            int schemaId = getSchemaRegistryClient().registerSchema(schemaSubject, jsonSchema, "JSON");
-            log.info("Successfully registered JSON schema with ID: {}", schemaId);
-
-            // Note: Connector will be created later in the test
-
-        } catch (Exception e) {
-            log.error("Failed to set up test resources: {}", e.getMessage());
-            throw new RuntimeException("Test resources setup failed", e);
-        }
-    }
-
-    /**
      * Counts the number of INSERT queries executed for a given table within a time range.
      *
      * @param tableName the name of the table
