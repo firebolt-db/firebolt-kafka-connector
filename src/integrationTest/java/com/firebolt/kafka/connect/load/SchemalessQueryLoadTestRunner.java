@@ -189,16 +189,16 @@ public class SchemalessQueryLoadTestRunner {
         connectorConfig.put("consumer.override.max.poll.records", "10000");
         // Set fetch.max.bytes to 5MB (5 * 1024 * 1024 = 5242880 bytes)
         // This is the primary constraint - consumer will fetch up to 5MB regardless of record count
-        connectorConfig.put("fetch.max.bytes", "5242880");
-        connectorConfig.put("consumer.override.fetch.max.bytes", "5242880");
+        connectorConfig.put("fetch.max.bytes", "3000000");
+        connectorConfig.put("consumer.override.fetch.max.bytes", "3000000");
         connectorConfig.put("key.converter", "org.apache.kafka.connect.storage.StringConverter");
         connectorConfig.put("value.converter", "org.apache.kafka.connect.json.JsonConverter");
         connectorConfig.put("value.converter.schemas.enable", "false");
         connectorConfig.put("schemas.enable", "false");
         // Set max.partition.fetch.bytes to 5MB to be consistent with fetch.max.bytes
-        connectorConfig.put("max.partition.fetch.bytes", "5242880");
+        connectorConfig.put("max.partition.fetch.bytes", "3000000");
         connectorConfig.put("producer.override.max.request.size", "10485760");
-        connectorConfig.put("consumer.override.max.partition.fetch.bytes", "5242880");
+        connectorConfig.put("consumer.override.max.partition.fetch.bytes", "3000000");
         connectorConfig.put("connector.class", "com.firebolt.kafka.connect.FireboltSinkConnector");
         connectorConfig.put("tasks.max", "1");
         connectorConfig.put("kafka.api.key", kafkaApiKey);
