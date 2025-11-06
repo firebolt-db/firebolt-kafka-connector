@@ -16,23 +16,24 @@ on:
       confluent_cluster_id:
         description: 'Confluent Cluster ID (leave empty to use repository default)'
         required: false
-      message_sizes:
-        description: 'Message sizes to test (comma separated: 100,500,1000)'
+      query:
+        description: 'SQL query to fetch records from Firebolt (REQUIRED for schemaless query load test)'
+        required: true
+      post_processing_script:
+        description: 'Post-processing SQL script (default: select 1)'
         required: false
-        default: '100,500,1000,5000,10000'
-      message_count:
-        description: 'Number of messages to produce and consume (default: 1,000,000)'
-        required: false
-        default: '1000000'
+        default: 'select 1'
       table_schema:
-        description: 'Table schema to test (8-column, 80-column, 8-column-with-default-timestamp)'
+        description: 'Table schema file path (optional - if not provided, assumes table exists)'
         required: false
-        default: '8-column'
-        type: choice
-        options:
-          - '8-column'
-          - '8-column-with-default-timestamp'
-          - '80-column'
+      connector_name:
+        description: 'Connector name (default: schemaless-query-load-test)'
+        required: false
+        default: 'schemaless-query-load-test'
+      topic_name:
+        description: 'Topic name (default: schemaless-query-load-test-topic)'
+        required: false
+        default: 'schemaless-query-load-test-topic'
 
 
 jobs:
@@ -55,9 +56,9 @@ jobs:
         with:
           cache-read-only: false
           
-      - name: Run Load Test
+      - name: Run Schemaless Query Load Test
         run: |
-          ./gradlew runLoadTest \
+          ./gradlew runSchemalessQueryLoadTest \
             -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url }}" \
             -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
             -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
@@ -70,9 +71,11 @@ jobs:
             -Dconfluent.schema.registry.api.secret="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}" \
             -Dconfluent.cloud.resource.api.key="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}" \
             -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
-            -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '100,500' }}" \
-            -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
-            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}"
+            -Dloadtest.query="${{ github.event.inputs.query }}" \
+            -Dloadtest.post.processing.script="${{ github.event.inputs.post_processing_script || 'select 1' }}" \
+            -Dloadtest.table.schema="${{ github.event.inputs.table_schema }}" \
+            -Dloadtest.connector.name="${{ github.event.inputs.connector_name || 'schemaless-query-load-test' }}" \
+            -Dloadtest.topic.name="${{ github.event.inputs.topic_name || 'schemaless-query-load-test-topic' }}"
         env:
           # Additional environment variables if needed
           GRADLE_OPTS: "-Xmx2g"

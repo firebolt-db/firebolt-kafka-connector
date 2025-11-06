@@ -629,3 +629,36 @@ tasks.register('runLoadTest', JavaExec) {
     }
 }
 
+// Task to run the SchemalessQueryLoadTest with system properties
+tasks.register('runSchemalessQueryLoadTest', JavaExec) {
+    group = "Load Testing"
+    description = "Runs the SchemalessQueryLoadTest with query-based record fetching in schemaless mode"
+    
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    mainClass = 'com.firebolt.kafka.connect.load.SchemalessQueryLoadTest'
+    
+    // Pass all system properties to the JVM
+    systemProperties System.properties
+    
+    // Set JVM arguments for better performance and logging
+    jvmArgs = [
+        '-Xmx4g',
+        '-Xms1g',
+        '-XX:+UseG1GC',
+        '-XX:MaxGCPauseMillis=200'
+    ]
+    
+    doFirst {
+        println "🚀 Starting SchemalessQueryLoadTest with the following configuration:"
+        println "   Firebolt JDBC URL: ${System.getProperty('firebolt.jdbc.url', '[using default]')}"
+        println "   Firebolt Client ID: ${System.getProperty('firebolt.client.id', '[using default]')}"
+        println "   Confluent Environment: ${System.getProperty('confluent.environment.id', '[using default]')}"
+        println "   Confluent Cluster: ${System.getProperty('confluent.cluster.id', '[using default]')}"
+        println "   Query: ${System.getProperty('loadtest.query', '[REQUIRED]')}"
+        println "   Post-processing Script: ${System.getProperty('loadtest.post.processing.script', 'select 1 (default)')}"
+        println "   Table Schema: ${System.getProperty('loadtest.table.schema', '[optional]')}"
+        println "   Connector Name: ${System.getProperty('loadtest.connector.name', 'schemaless-query-load-test (default)')}"
+        println "   Topic Name: ${System.getProperty('loadtest.topic.name', 'schemaless-query-load-test-topic (default)')}"
+    }
+}
+

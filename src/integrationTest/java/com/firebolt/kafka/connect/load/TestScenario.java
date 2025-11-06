@@ -59,9 +59,28 @@ public class TestScenario {
     @Builder.Default
     private boolean deleteTable = false;
 
+    /**
+     * Whether to use schemaless mode (no schema registry)
+     */
+    @Builder.Default
+    private boolean schemaless = false;
+
+    /**
+     * Query to fetch records from Firebolt (instead of generating them)
+     * If provided, records will be fetched from this query and published to Kafka
+     */
+    private String recordFetchQuery;
+
+    /**
+     * Post-processing script to run after insert
+     * JSON format: { "mappings" : [ { "table" : "<table>", "script" : "<sql>" } ] }
+     */
+    private String postProcessingScript;
+
     @Override
     public String toString() {
-        return String.format("TestScenario[connector='%s', messages=%d, messageSize=%d bytes]", 
-            connectorName, nrOfKafkaMessageToProduce, averageMessageSizeInBytes);
+        return String.format("TestScenario[connector='%s', messages=%d, messageSize=%d bytes, schemaless=%s, query=%s]", 
+            connectorName, nrOfKafkaMessageToProduce, averageMessageSizeInBytes, schemaless, 
+            recordFetchQuery != null ? "provided" : "none");
     }
 }
