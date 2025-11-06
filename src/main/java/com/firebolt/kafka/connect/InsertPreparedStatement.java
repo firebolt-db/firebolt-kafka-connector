@@ -7,6 +7,7 @@ import com.firebolt.kafka.connect.datatype.converter.ColumnDataTypeConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
+import com.google.common.collect.Sets;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.Connection;
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.collections.CollectionUtils;
 
 /**
  * Insert into a table using prepared statements
@@ -43,11 +45,30 @@ public class InsertPreparedStatement {
         // since no schema evolution is supported, keep track of all the column names that are present in the records and filter out the ones that are not part of the table schema column names
         Set<String> columnNamesFromRecords = computeColumnNamesFromRecords(fireboltRecords);
 
+        // detect all the columns will null values across all records
+        Set<String> columnsWithNullValuesAcrossAllRecords = detectColumnsWithNullValuesAcrossAllRecords(fireboltRecords);
+
+        Set<String> columnsWithAtLeastOneRecordWithNonNullValues = Sets.difference(columnNamesFromRecords, columnsWithNullValuesAcrossAllRecords);
+
         // map of firebolt column names to record attribute name
-        Map<String, String> validColumnNames = filterValidColumns(columnNamesFromRecords, tableSchema);
+        Map<String, String> validColumnNames = filterValidColumns(columnsWithAtLeastOneRecordWithNonNullValues, tableSchema);
+
+        if (CollectionUtils.isEmpty(validColumnNames.keySet())) {
+            log.warn("There are not columns that have at least one non-null value and a matching column name in the table.");
+            return;
+        }
 
         // create the prepared statement and add the records
         addRecordsInternal(fireboltRecords, validColumnNames);
+    }
+
+
+    private Set<String> detectColumnsWithNullValuesAcrossAllRecords(List<AbstractFireboltRecord> fireboltRecords) {
+        Set<String> intersection = new HashSet<>(fireboltRecords.get(0).getColumnNamesWithNullValues());
+        for (int i = 1; i < fireboltRecords.size(); i++) {
+            intersection.retainAll(fireboltRecords.get(i).getColumnNamesWithNullValues());
+        }
+        return intersection;
     }
 
     private void addRecordsInternal(List<AbstractFireboltRecord> fireboltRecords, Map<String, String> validColumnNames) throws SQLException {

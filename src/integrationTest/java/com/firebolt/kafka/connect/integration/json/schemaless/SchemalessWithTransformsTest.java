@@ -66,6 +66,7 @@ public class SchemalessWithTransformsTest extends SchemalessBaseIntegrationTest 
         super.tearDown();
     }
 
+
     @Test
     void canProcessIntegersWithTransforms() throws Exception {
         producer = initializeSchemalessJsonProducer();
@@ -87,6 +88,7 @@ public class SchemalessWithTransformsTest extends SchemalessBaseIntegrationTest 
 
         waitForDataInFirebolt(TABLE_NAME, testRecords.size());
 
+
         verifyIntegerRecordsInFirebolt(testRecords);
     }
 
@@ -101,6 +103,7 @@ public class SchemalessWithTransformsTest extends SchemalessBaseIntegrationTest 
 
     private void publishMessages(List<TestRecord> records) throws Exception {
         for (TestRecord record : records) {
+
             String key = "integer-test-key-" + record.getRecordId();
             ProducerRecord<String, String> producerRecord =
                     new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
@@ -118,6 +121,7 @@ public class SchemalessWithTransformsTest extends SchemalessBaseIntegrationTest 
         producer.flush();
     }
 
+
     private void verifyIntegerRecordsInFirebolt(List<TestRecord> expectedRecords) throws SQLException {
         // Count total records
         int actualCount = fireboltDefaultDbClient.countRows(TABLE_NAME);
@@ -126,6 +130,7 @@ public class SchemalessWithTransformsTest extends SchemalessBaseIntegrationTest 
 
         // Verify specific records by recordId
         String selectQuery = String.format(
+
                 "SELECT \"recordId\", \"colInteger\", \"colShort\", \"colByte\"  " +
                         "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
 
@@ -135,6 +140,7 @@ public class SchemalessWithTransformsTest extends SchemalessBaseIntegrationTest 
             while (rs.next()) {
                 assertTrue(recordIndex < expectedRecords.size(),
                         "More records found in database than expected");
+
 
                 TestRecord expected = expectedRecords.get(recordIndex);
 
