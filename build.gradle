@@ -41,6 +41,16 @@ repositories {
     }
 }
 
+// Optional: allow using a local Firebolt JDBC jar instead of the Maven artifact
+def localFireboltJdbc = project.findProperty('localFireboltJdbc')
+if (localFireboltJdbc) {
+    def localFireboltFile = file(localFireboltJdbc)
+    if (!localFireboltFile.exists()) {
+        throw new GradleException("localFireboltJdbc not found: ${localFireboltFile.absolutePath}")
+    }
+    logger.lifecycle("Using local Firebolt JDBC: ${localFireboltFile.absolutePath}")
+}
+
 dependencies {
     // Kafka Connect API - provided at runtime, needed for compilation
     compileOnly "org.apache.kafka:connect-api:${kafkaVersion}"
@@ -74,10 +84,14 @@ dependencies {
         exclude group: 'org.apache.logging.log4j'
     }
     
-    // Firebolt JDBC Driver - bundle this, exclude any Kafka and logging dependencies
-    implementation("io.firebolt:firebolt-jdbc:${fireboltJdbcVersion}") {
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
+    // Firebolt JDBC Driver - can be provided via -PlocalFireboltJdbc=/abs/path/to/firebolt-jdbc-<ver>.jar
+    if (localFireboltJdbc) {
+        implementation(files(localFireboltJdbc))
+    } else {
+        implementation("io.firebolt:firebolt-jdbc:${fireboltJdbcVersion}") {
+            exclude group: 'org.slf4j'
+            exclude group: 'org.apache.logging.log4j'
+        }
     }
     
     // JSON Processing - bundle these, exclude any Kafka and logging dependencies
