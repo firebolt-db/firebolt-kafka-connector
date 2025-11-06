@@ -7,6 +7,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -75,6 +77,38 @@ public class SchemalessIntegerDataTypeConverterTest {
         SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(null).build();
         assertThrows(ColumnConversionFailedException.class,
             () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "2147483648",
+            "-2147483649"
+    })
+    void outOfRangeLongThrows(long longValue) {
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(longValue).build();
+        assertThrows(ColumnConversionFailedException.class,
+            () -> converter.convertAndSet(mockStatement, 1, value, testColumn));
+    }
+
+    @Test
+    void acceptsByte() throws SQLException {
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value((byte) 10).build();
+        converter.convertAndSet(mockStatement, 1, value, testColumn);
+        verify(mockStatement).setInt(1, 10);
+    }
+
+    @Test
+    void acceptsShort() throws SQLException {
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value((short) 100).build();
+        converter.convertAndSet(mockStatement, 1, value, testColumn);
+        verify(mockStatement).setInt(1, 100);
+    }
+
+    @Test
+    void acceptsInteger() throws SQLException {
+        SchemaKafkaMessageColumnValue value = SchemaKafkaMessageColumnValue.builder().value(1000).build();
+        converter.convertAndSet(mockStatement, 1, value, testColumn);
+        verify(mockStatement).setInt(1, 1000);
     }
 }
 
