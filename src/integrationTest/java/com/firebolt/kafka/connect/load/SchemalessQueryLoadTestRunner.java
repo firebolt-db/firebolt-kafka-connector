@@ -306,7 +306,7 @@ public class SchemalessQueryLoadTestRunner {
                     try {
                         int count = fireboltClient.countRows(tableName);
                         log.debug("Current row count in table '{}': {}", tableName, count);
-                        return count > 0;
+                        return count == 25000;
                     } catch (SQLException e) {
                         log.debug("Error querying Firebolt table: {}", e.getMessage());
                         return false;
