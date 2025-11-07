@@ -83,7 +83,7 @@ public class InsertPreparedStatementWithPostProcessingTest {
         Pattern p = Pattern.compile("DELETE FROM some_tmp WHERE batch_id='[0-9a-fA-F-]{36}'");
         org.junit.jupiter.api.Assertions.assertTrue(p.matcher(executed).matches());
 
-        verify(connection, times(1)).setAutoCommit(true);
+        verify(connection, times(1)).commit();
     }
 
     @Test
@@ -106,7 +106,7 @@ public class InsertPreparedStatementWithPostProcessingTest {
 
         verify(connection, times(1)).setAutoCommit(false);
         verify(connection, times(1)).rollback();
-        verify(connection, times(1)).setAutoCommit(true);
+        verify(connection, times(1)).commit();
         Mockito.verifyNoInteractions(statement);
     }
 
@@ -133,7 +133,7 @@ public class InsertPreparedStatementWithPostProcessingTest {
     void willRollBackTransactionIfCommitFails() throws Exception {
         String postProcessingScript = "DELETE FROM some_tmp WHERE batch_id='${firebolt_param.batch_id}'";
 
-        Mockito.doThrow(new SQLException("commit failure")).when(connection).setAutoCommit(true);
+        Mockito.doThrow(new SQLException("commit failure")).when(connection).commit();
 
         InsertPreparedStatementWithPostProcessing subject = new InsertPreparedStatementWithPostProcessing(
                 connection, tableSchema, errorReporter, false, postProcessingScript
@@ -151,7 +151,7 @@ public class InsertPreparedStatementWithPostProcessingTest {
         // script was attempted before failing commit
         verify(statement, times(1)).execute(Mockito.argThat(sql -> sql.startsWith("DELETE FROM some_tmp")));
         verify(connection, times(1)).rollback();
-        verify(connection, times(1)).setAutoCommit(true);
+        verify(connection, times(1)).commit();
     }
 }
 
