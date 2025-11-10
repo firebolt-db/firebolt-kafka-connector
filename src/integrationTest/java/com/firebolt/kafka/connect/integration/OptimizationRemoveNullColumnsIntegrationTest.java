@@ -1,10 +1,10 @@
 package com.firebolt.kafka.connect.integration;
 
-import com.google.common.collect.Sets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -42,8 +42,6 @@ public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBase
         super.setUp(testInfo);
 
         generateUniqueConnectorName("optimization-remove-null-columns-test");
-
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, sparseTableSchema());
     }
 
     @AfterEach
@@ -58,7 +56,17 @@ public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBase
     }
 
     @Test
-    void testPostProcessingScript() throws Exception {
+    void testColumnRemovalIfAllValuesAreNullInBatch() throws Exception {
+        // Clean up any existing resources from previous test runs
+        cleanupSchemalessTestResources(TABLE_NAME, TOPIC_NAME);
+
+        // Create the test table with the provided schema
+        createTable(sparseTableSchema(), TABLE_NAME);
+
+        // Create Kafka topic
+        log.info("Creating Kafka topic: {}", TOPIC_NAME);
+        createKafkaTopic(TOPIC_NAME);
+
         producer = initializeSchemalessJsonProducer();
 
         List<RecordWithNullColumns> testRecords = Arrays.asList(
@@ -79,6 +87,8 @@ public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBase
         // publish the messages to kafka topic
         publishMessages(testRecords);
 
+        registerSchemalessJsonConnector(testConnectorName, TOPIC_NAME, TOPIC_NAME + ":" + TABLE_NAME, Collections.emptyMap());
+
         waitForDataInFirebolt(TABLE_NAME, testRecords.size());
 
         // check that all the values are in the target table
@@ -91,28 +101,26 @@ public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBase
                         "  AND status ='ENDED_SUCCESSFULLY' " +
                         "  AND query_text LIKE 'INSERT INTO%'" +
                         "  ORDER by start_time asc;");
+        assertTrue(resultSet.next());
 
-        while (resultSet.next()) {
-            String insertQuery = resultSet.getString("query_text");
-            log.info("Verifying query: {}", insertQuery);
-            Set<String> columnNamesFromInsertStatement = getColumnNameFromInsertStatement(insertQuery);
+        String insertQuery = resultSet.getString("query_text");
+        log.info("Verifying query: {}", insertQuery);
+        Set<String> columnNamesFromInsertStatement = getColumnNameFromInsertStatement(insertQuery);
 
-            // none of these columns should be present
-            assertFalse(columnNamesFromInsertStatement.contains("col11"));
-            assertFalse(columnNamesFromInsertStatement.contains("col12"));
-            assertFalse(columnNamesFromInsertStatement.contains("col13"));
-            assertFalse(columnNamesFromInsertStatement.contains("col14"));
-            assertFalse(columnNamesFromInsertStatement.contains("col15"));
-            assertFalse(columnNamesFromInsertStatement.contains("col16"));
+        // none of these columns should be present
+        assertFalse(columnNamesFromInsertStatement.contains("col11"));
+        assertFalse(columnNamesFromInsertStatement.contains("col12"));
+        assertFalse(columnNamesFromInsertStatement.contains("col13"));
+        assertFalse(columnNamesFromInsertStatement.contains("col14"));
+        assertFalse(columnNamesFromInsertStatement.contains("col15"));
+        assertFalse(columnNamesFromInsertStatement.contains("col16"));
 
-            // at least one of these columns should be present
-            assertTrue(columnNamesFromInsertStatement.contains("id"));
+        // at least one of these columns should be present
+        assertTrue(columnNamesFromInsertStatement.contains("id"));
 
-            Set<String> expected = Set.of("id", "col1", "col2", "col3", "col4", "col5", "col6", "col7", "col8", "col9", "col10");
+        Set<String> expected = Set.of("id", "col1", "col2", "col3", "col4", "col5", "col6", "col7", "col8", "col9", "col10");
 
-            assertTrue(Sets.intersection(columnNamesFromInsertStatement, expected).size() >= 2);
-            assertTrue(Sets.intersection(columnNamesFromInsertStatement, expected).size() <= 11);
-        }
+        assertEquals(expected, columnNamesFromInsertStatement);
     }
 
     private Set<String> getColumnNameFromInsertStatement(String insertStatement) {
