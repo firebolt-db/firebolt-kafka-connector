@@ -33,6 +33,7 @@ on:
           - '8-column'
           - '8-column-with-default-timestamp'
           - '80-column'
+          - '400-column'
 
 
 jobs:

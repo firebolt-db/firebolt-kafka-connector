@@ -130,6 +130,11 @@ public class InsertPreparedStatementWithPostProcessing extends InsertPreparedSta
         }
 
         @Override
+        public Set<String> getColumnNamesWithNullValues() {
+            return fireboltRecord.getColumnNamesWithNullValues();
+        }
+
+        @Override
         public KafkaMessageColumnValue getColumnValue(String columnName) {
             if (BATCH_ID_COLUMN_NAME.equals(columnName)) {
                 return SchemalessKafkaMessageColumnValue.builder().value(batchId).build();
