@@ -57,9 +57,6 @@ public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBase
 
     @Test
     void testColumnRemovalIfAllValuesAreNullInBatch() throws Exception {
-        // Clean up any existing resources from previous test runs
-        cleanupSchemalessTestResources(TABLE_NAME, TOPIC_NAME);
-
         // Create the test table with the provided schema
         createTable(sparseTableSchema(), TABLE_NAME);
 
