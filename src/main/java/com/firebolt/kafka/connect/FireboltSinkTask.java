@@ -288,8 +288,9 @@ public class FireboltSinkTask extends SinkTask {
         if (throwable instanceof FireboltException) {
             FireboltException fe = (FireboltException) throwable;
             ExceptionType type = fe.getType();
-            final List<ExceptionType> retriableExceptions = List.of(TOO_MANY_REQUESTS, CANCELED, ERROR);
+            final List<ExceptionType> retriableExceptions = List.of(TOO_MANY_REQUESTS, CANCELED, ERROR, CONFLICT);
             final List<ExceptionType> nonRetriableExceptions = List.of(UNAUTHORIZED, TYPE_NOT_SUPPORTED, TYPE_TRANSFORMATION_ERROR, REQUEST_BODY_TOO_LARGE, INVALID_REQUEST, RESOURCE_NOT_FOUND);
+
             if (nonRetriableExceptions.contains(type)) {
                 return false;
             }
@@ -300,4 +301,5 @@ public class FireboltSinkTask extends SinkTask {
 
         return false;
     }
-} 
+
+}
