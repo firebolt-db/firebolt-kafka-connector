@@ -227,6 +227,7 @@ public class LoadTestRunner {
         connectorConfig.put("errors.tolerance", "all");
         connectorConfig.put("errors.deadletterqueue.topic.name", "dlq-topic-firebolt");
         connectorConfig.put("errors.deadletterqueue.context.headers.enable", "true");
+        connectorConfig.put("optimize.inserts", "true");
 
         return connectorConfig;
     }
