@@ -1,13 +1,16 @@
 package com.firebolt.kafka.connect.integration.customer;
 
+import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
+import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.DateFormat;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,14 +31,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class Customer2IntegrationTest extends SchemalessBaseIntegrationTest {
+public class Customer2IntegrationTest extends SchemaBaseIntegrationTest {
 
     // All data types test constants
-    private static final String ALL_DATA_TYPES_TABLE_NAME = generateTableName("prepared_statement-table");
-    private static final String ALL_DATA_TYPES_TOPIC_NAME = generateTopicName("preapared-statement-topic");
+    private static final String ALL_DATA_TYPES_TABLE_NAME = generateTableName("prepared-statement-test-table");
+    private static final String ALL_DATA_TYPES_TOPIC_NAME = generateTopicName("prepared-statement-topic");
 
+    private static final String ALL_DATA_TYPES_SCHEMA_SUBJECT = ALL_DATA_TYPES_TOPIC_NAME + "-value";
 
-    private Producer<String, String> producer;
+    private Producer<String, TestRecord> producer;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -43,8 +47,11 @@ public class Customer2IntegrationTest extends SchemalessBaseIntegrationTest {
 
         generateUniqueConnectorName("prepared-statement-connector");
 
+        Map<String, String> connectorOverrideProperties = new HashMap<>();
+        connectorOverrideProperties.put("optimize.inserts", "true");
+
         // Setup test resources using centralized method
-        setupSchemalessTestResources(ALL_DATA_TYPES_TOPIC_NAME, ALL_DATA_TYPES_TABLE_NAME, allDataTypesTableSchema());
+        setupTestResources(ALL_DATA_TYPES_TOPIC_NAME, ALL_DATA_TYPES_TABLE_NAME, ALL_DATA_TYPES_SCHEMA_SUBJECT, allDataTypesTableSchema(), allDataTypesJsonSchema(), connectorOverrideProperties);
     }
 
     @AfterEach
@@ -55,7 +62,7 @@ public class Customer2IntegrationTest extends SchemalessBaseIntegrationTest {
         }
 
         // Clean up test resources
-        cleanupSchemalessTestResources(ALL_DATA_TYPES_TABLE_NAME, ALL_DATA_TYPES_TOPIC_NAME);
+        cleanupTestResources(ALL_DATA_TYPES_TABLE_NAME, ALL_DATA_TYPES_TOPIC_NAME, ALL_DATA_TYPES_SCHEMA_SUBJECT);
 
         super.tearDown();
     }
@@ -65,7 +72,7 @@ public class Customer2IntegrationTest extends SchemalessBaseIntegrationTest {
             "false, 'WITH null fields omitted from JSON entirely'"
     })
     void testAllDataTypesJsonSchemaSerializationAndKafkaConnectProcessing(boolean includeNulls, String testDescription) throws Exception {
-        producer =  initializeSchemalessJsonProducer(includeNulls);
+        producer =  initializeJsonProducer(includeNulls);
 
         // Generate 5 test messages with different data patterns
         List<TestRecord> testRecords = generateAllDataTypesTestRecords();
@@ -78,6 +85,95 @@ public class Customer2IntegrationTest extends SchemalessBaseIntegrationTest {
 
         // Verify data was written to Firebolt table
         verifyAllDataTypesRecordsInFirebolt(testRecords);
+    }
+
+    /**
+     * Registers JSON schema for AllDataTypesTestRecord.
+     */
+    private Supplier<String> allDataTypesJsonSchema() {
+        // Schema that matches the AllDataTypesTestRecord class structure
+        return () -> "{\n" +
+                "  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n" +
+                "  \"title\": \"All Data Types Test Record\",\n" +
+                "  \"type\": \"object\",\n" +
+                "  \"additionalProperties\": false,\n" +
+                "  \"properties\": {\n" +
+                "    \"colInteger\": {\n" +
+                "      \"type\": \"integer\",\n" +
+                "      \"connect.type\": \"int32\",\n" +
+                "      \"description\": \"Integer field (NOT NULL)\"\n" +
+                "    },\n" +
+                "    \"colBigint\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"integer\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Bigint field\"\n" +
+                "    },\n" +
+                "    \"colNumeric\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\n" +
+                "          \"type\": \"number\",\n" +
+                "          \"connect.type\": \"bytes\",\n" +
+                "          \"title\": \"org.apache.kafka.connect.data.Decimal\",\n" +
+                "          \"connect.parameters\": { \"scale\": \"9\", \"connect.decimal.precision\": \"38\" }\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    },\n" +
+                "    \"colReal\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float32\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Real field\"\n" +
+                "    },\n" +
+                "    \"colDoublePrecision\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Double precision field\"\n" +
+                "    },\n" +
+                "    \"colBoolean\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"boolean\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Boolean field\"\n" +
+                "    },\n" +
+                "    \"colText\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"string\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Text field\"\n" +
+                "    },\n" +
+                "    \"colTimestamp\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\"type\": \"string\", \"format\": \"date-time\"}\n" +
+                "      ],\n" +
+                "      \"description\": \"Timestamp field\"\n" +
+                "    },\n" +
+                "    \"colArrayTimestamp\": {\n" +
+                "      \"oneOf\": [\n" +
+                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
+                "        {\n" +
+                "          \"type\": \"array\",\n" +
+                "          \"items\": {\n" +
+                "            \"oneOf\": [\n" +
+                "              {\"type\": \"null\"},\n" +
+                "              {\"type\": \"string\", \"format\": \"date-time\"}\n" +
+                "            ]\n" +
+                "          }\n" +
+                "        }\n" +
+                "      ],\n" +
+                "      \"description\": \"Timestamp array field with nullable elements\"\n" +
+                "    }\n" +
+                "  },\n" +
+                "  \"required\": [\"colInteger\"]\n" +
+                "}";
     }
 
     private Supplier<String> allDataTypesTableSchema() {
@@ -169,8 +265,8 @@ public class Customer2IntegrationTest extends SchemalessBaseIntegrationTest {
      */
     private void publishAllDataTypesMessages(List<TestRecord> records) throws Exception {
         for (TestRecord record : records) {
-            ProducerRecord<String, String> producerRecord =
-                    new ProducerRecord<>(ALL_DATA_TYPES_TOPIC_NAME, String.valueOf(record.getColInteger()), mapper.writeValueAsString(record));
+            ProducerRecord<String, TestRecord> producerRecord =
+                    new ProducerRecord<>(ALL_DATA_TYPES_TOPIC_NAME, String.valueOf(record.getColInteger()), record);
 
             producer.send(producerRecord).get(); // Wait for each message to be sent
         }
@@ -247,7 +343,7 @@ public class Customer2IntegrationTest extends SchemalessBaseIntegrationTest {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public class TestRecord {
+    public static class TestRecord {
         // Numeric types
         private Integer colInteger;           // colInteger INTEGER NOT NULL
         private Long colBigint;              // colBigint BIGINT
