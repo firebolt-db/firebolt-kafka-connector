@@ -49,7 +49,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private TableWriterProvider tableWriterProvider;
 
     AppendOnlyFireboltSinkService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
-        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll, new TableWriterProvider());
+        this(sinkConfig, new FireboltDbService(sinkConfig), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll, new TableWriterProvider());
     }
 
     @VisibleForTesting
