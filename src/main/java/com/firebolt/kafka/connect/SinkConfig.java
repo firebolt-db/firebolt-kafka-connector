@@ -48,12 +48,8 @@ public class SinkConfig {
     }
 
     public JdbcConfig getJdbcConfig() {
-        String jdbcUrl = config.get(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG);
-        if (StringUtils.isNotBlank(jdbcUrl)) {
-            jdbcUrl = jdbcUrl + (isOptimizeInserts() ? "&merge_prepared_statement_batches_v2=true" : "");
-        }
         return JdbcConfig.builder()
-                .jdbcConnectionUrl(jdbcUrl)
+                .jdbcConnectionUrl(config.get(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG))
                 .clientId(Optional.ofNullable(config.get(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG)))
                 .clientSecret(Optional.ofNullable(config.get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG)))
                 .build();
