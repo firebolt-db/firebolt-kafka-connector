@@ -132,7 +132,7 @@ public class InsertPreparedStatement {
 
     private PreparedStatement createPreparedStatement(TableSchema tableSchema, Set<String> validColumnNames) throws SQLException {
         String insertSQL = buildInsertSQL(tableSchema, validColumnNames);
-        log.debug("Prepared insert SQL: {}", insertSQL);
+        log.info("Prepared insert SQL: {}", insertSQL);
 
         return connection.prepareStatement(insertSQL);
     }
