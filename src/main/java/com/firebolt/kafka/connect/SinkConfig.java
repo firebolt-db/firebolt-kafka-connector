@@ -98,4 +98,12 @@ public class SinkConfig {
     public boolean isExactlyOnce() {
         return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
     }
+
+    /**
+     * Returns true if insert operations should be optimized for better performance.
+     */
+    public boolean isOptimizeInserts() {
+        String value = config.get(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG);
+        return value != null && Boolean.parseBoolean(value);
+    }
 }

@@ -42,6 +42,10 @@ public class ConnectorConfigDefinition {
     public static final String EXACTLY_ONCE_MAPPING_DOC = "By default this will be set to false. When set to true, then the kafka message will be ingested exactly-once in Firebolt. When the flag is false, the kafka message will be ingested at least once";
     public static final Boolean EXACTLY_ONCE_MAPPING_DEFAULT = Boolean.FALSE;
 
+    public static final String OPTIMIZE_INSERTS_CONFIG = "optimize.inserts";
+    public static final String OPTIMIZE_INSERTS_DOC = "When set to true, optimizes insert operations for better performance. Default is false.";
+    public static final Boolean OPTIMIZE_INSERTS_DEFAULT = Boolean.FALSE;
+
     // =========================
     // ERROR HANDLING CONFIGURATION (delegated from Kafka Connect worker)
     // =========================
@@ -84,6 +88,11 @@ public class ConnectorConfigDefinition {
                         EXACTLY_ONCE_MAPPING_DEFAULT,
                         ConfigDef.Importance.HIGH,
                         EXACTLY_ONCE_MAPPING_DOC)
+                .define(OPTIMIZE_INSERTS_CONFIG,
+                        ConfigDef.Type.BOOLEAN,
+                        OPTIMIZE_INSERTS_DEFAULT,
+                        ConfigDef.Importance.MEDIUM,
+                        OPTIMIZE_INSERTS_DOC)
 
                 // Table Configuration
                 .define(TOPIC_TO_TABLE_MAPPING_CONFIG,

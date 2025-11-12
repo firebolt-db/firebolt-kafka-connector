@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.JdbcConfig;
+import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +30,12 @@ public class FireboltDbService {
     // JDBC property names
     private static final String JDBC_CLIENT_ID = "client_id";
     private static final String JDBC_CLIENT_SECRET = "client_secret";
+
+    private final SinkConfig sinkConfig;
+
+    public FireboltDbService(SinkConfig sinkConfig) {
+        this.sinkConfig = sinkConfig;
+    }
 
     /**
      * Discovers schemas for all specified tables.
@@ -165,8 +172,12 @@ public class FireboltDbService {
             props.setProperty(JDBC_CLIENT_SECRET, clientSecret.get());
         }
 
-        // always batch prepared statements
-        props.put("merge_prepared_statement_batches", "true");
+        // Set merge prepared statement batches based on optimize.inserts config
+        if (sinkConfig != null && sinkConfig.isOptimizeInserts()) {
+            props.put("merge_prepared_statement_batches_v2", "true");
+        } else {
+            props.put("merge_prepared_statement_batches", "true");
+        }
         props.put("compress_request_payload", "true");
 
         // Attempt to create the connection
