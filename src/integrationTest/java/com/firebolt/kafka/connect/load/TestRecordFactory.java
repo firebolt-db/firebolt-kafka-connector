@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TestRecordFactory {
 
     // this string will be stored on 10 bytes in Java as well as Firebolt
-    private static final String SAMPLE_UNICODE_STRING = "ĀĦƁȒʤ";
+    private static final String SAMPLE_UNICODE_STRING = "abcdefghgj";
 
     /**
      * The approximate size in bytes of the message that will be generated.
