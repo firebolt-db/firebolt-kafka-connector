@@ -3,10 +3,6 @@ package com.firebolt.kafka.connect.integration;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.firebolt.kafka.connect.PostProcessingConfig;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -37,8 +33,9 @@ public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseInteg
 
     private static final String TARGET_TABLE_NAME = generateTableName("target_table_post_processing_file");
 
+    private static final String SCRIPT_FILE_PATH = "/etc/kafka-connect/scripts/post_processing_script.sql";
+
     private Producer<String, String> producer;
-    private Path scriptFile;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -54,9 +51,6 @@ public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseInteg
             fail("Cannot create the target table");
         }
 
-        // Create the SQL script file
-        scriptFile = createScriptFile();
-
         Map<String, String> connectorOverrideProperties = new HashMap<>();
         connectorOverrideProperties.put(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG, preparePostProcessingScript());
 
@@ -69,34 +63,6 @@ public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseInteg
             producer.close();
         }
 
-        // Clean up the script file if it was created
-        // Delete from all directories where it was copied
-        if (scriptFile != null) {
-            try {
-                // Convert container path back to host path
-                // Container path: /etc/kafka-connect/scripts/filename.sql
-                // Delete the file from all possible scripts directories
-                if (scriptFile.toString().startsWith("/etc/kafka-connect/scripts")) {
-                    String fileName = scriptFile.getFileName().toString();
-                    Path[] possibleScriptsDirs = {
-                        Paths.get("src/integrationTest/docker/kafka-connect-cloud/scripts"),
-                        Paths.get("src/integrationTest/docker/kafka-connect-3.9.1/scripts"),
-                        Paths.get("src/integrationTest/docker/kafka-connect-4.0/scripts")
-                    };
-                    
-                    for (Path scriptsDir : possibleScriptsDirs) {
-                        Path hostFile = scriptsDir.resolve(fileName);
-                        if (Files.exists(hostFile)) {
-                            Files.delete(hostFile);
-                            log.info("Deleted script file: {}", hostFile);
-                        }
-                    }
-                }
-            } catch (IOException e) {
-                log.warn("Failed to delete script file: {}", e.getMessage());
-            }
-        }
-
         safelyDropTable(TARGET_TABLE_NAME);
 
         cleanupSchemalessTestResources(TABLE_NAME, TOPIC_NAME);
@@ -104,65 +70,10 @@ public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseInteg
         super.tearDown();
     }
 
-    /**
-     * Creates a temporary SQL script file that will be used for post-processing.
-     * The file is created in a location accessible to the Kafka Connect Docker container.
-     * All docker-compose setups mount ./scripts at /etc/kafka-connect/scripts
-     * The file is copied into all possible script directories to ensure it's available
-     * regardless of which Kafka Connect setup is being used.
-     * 
-     * @return Path to the created script file (as it should be accessed from within the container)
-     */
-    private Path createScriptFile() {
-        try {
-            // Copy the script file into all possible script directories
-            Path[] possibleScriptsDirs = {
-                Paths.get("src/integrationTest/docker/kafka-connect-cloud/scripts"),
-                Paths.get("src/integrationTest/docker/kafka-connect-3.9.1/scripts"),
-                Paths.get("src/integrationTest/docker/kafka-connect-4.0/scripts")
-            };
-
-            // Create a unique script file name to avoid conflicts between test runs
-            String scriptFileName = "post_processing_script_" + System.currentTimeMillis() + "_" + 
-                                    Thread.currentThread().getId() + ".sql";
-
-            // Write the SQL script content
-            String scriptContent = String.format(
-                    "INSERT INTO \"%s\" (processed) \n" +
-                    "SELECT id::TEXT || UPPER(value)\n" +
-                    "FROM \"%s\" where batch_id='${firebolt_param.batch_id}';",
-                    TARGET_TABLE_NAME, TABLE_NAME);
-
-            // Copy the script file into all directories
-            for (Path scriptsDir : possibleScriptsDirs) {
-                // Ensure the directory exists
-                if (!Files.exists(scriptsDir)) {
-                    Files.createDirectories(scriptsDir);
-                    log.info("Created scripts directory: {}", scriptsDir.toAbsolutePath());
-                }
-
-                Path hostScriptFile = scriptsDir.resolve(scriptFileName);
-                Files.writeString(hostScriptFile, scriptContent);
-                log.info("Created post-processing script file on host: {}", hostScriptFile.toAbsolutePath());
-            }
-
-            // Return the path as it should be accessed from within the Docker container
-            // All docker-compose setups mount ./scripts at /etc/kafka-connect/scripts
-            Path containerPath = Paths.get("/etc/kafka-connect/scripts", scriptFileName);
-            log.info("Script file path inside container will be: {} (copied to all script directories)", containerPath);
-            
-            return containerPath;
-        } catch (IOException e) {
-            log.error("Failed to create script file", e);
-            fail("Failed to create script file: " + e.getMessage());
-            return null;
-        }
-    }
-
     private String preparePostProcessingScript() {
         PostProcessingConfig postProcessingConfig = new PostProcessingConfig(
                 List.of(
-                        new PostProcessingConfig.Mapping(TABLE_NAME, null, scriptFile.toString())
+                        new PostProcessingConfig.Mapping(TABLE_NAME, null, SCRIPT_FILE_PATH)
                 ));
         try {
             return objectMapper.writeValueAsString(postProcessingConfig);
