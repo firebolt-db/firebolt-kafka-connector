@@ -106,6 +106,11 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private TableWriter createTableWriter(String topicName, TableSchema tableSchema) {
         log.info("Creating the table writer for {}", tableSchema.getTableName());
         Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
+        if (postProcessingScript.isPresent()) {
+            log.info("Post-processing script found for table {} (length: {} chars)", tableSchema.getTableName(), postProcessingScript.get().length());
+        } else {
+            log.info("No post-processing script configured for table {}", tableSchema.getTableName());
+        }
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
         Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());

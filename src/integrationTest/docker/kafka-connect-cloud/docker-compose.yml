@@ -95,6 +95,7 @@ services:
       - ./plugins:/etc/kafka-connect/jars
       - ./configs:/etc/kafka-connect/configs
       - ./secrets:/etc/kafka-connect/secrets:ro
+      - ./scripts:/etc/kafka-connect/scripts
     networks:
       - kafka-network
 

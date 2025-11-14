@@ -26,12 +26,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @Slf4j
-public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegrationTest {
+public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("post_processing_table");
-    private static final String TOPIC_NAME = generateTopicName("post-processing-topic");
+    private static final String TABLE_NAME = generateTableName("post_processing_file_table");
+    private static final String TOPIC_NAME = generateTopicName("post-processing-file-topic");
 
-    private static final String TARGET_TABLE_NAME = generateTableName("target_table_post_processing");
+    private static final String TARGET_TABLE_NAME = generateTableName("target_table_post_processing_file");
+
+    private static final String SCRIPT_FILE_PATH = "/etc/kafka-connect/scripts/post_processing_script.sql";
 
     private Producer<String, String> producer;
 
@@ -39,7 +41,7 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
     protected void setUp(TestInfo testInfo) {
         super.setUp(testInfo);
 
-        generateUniqueConnectorName("post-processing-test");
+        generateUniqueConnectorName("post-processing-file-test");
 
         // setup target table
         String createTargetTableSql = String.format(targetTableSchema().get(), TARGET_TABLE_NAME);
@@ -68,8 +70,21 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
         super.tearDown();
     }
 
+    private String preparePostProcessingScript() {
+        PostProcessingConfig postProcessingConfig = new PostProcessingConfig(
+                List.of(
+                        new PostProcessingConfig.Mapping(TABLE_NAME, null, SCRIPT_FILE_PATH)
+                ));
+        try {
+            return objectMapper.writeValueAsString(postProcessingConfig);
+        } catch (JsonProcessingException e) {
+            fail("Failed to serialize the post processing config");
+            return null;
+        }
+    }
+
     @Test
-    void testPostProcessingScript() throws Exception {
+    void testPostProcessingScriptFromFile() throws Exception {
         producer = initializeSchemalessJsonProducer();
 
         List<SimpleRecord> testRecords = Arrays.asList(
@@ -86,7 +101,7 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
         // check that all the records have the expected value
         verifyPostProcessingScript(testRecords);
 
-        // check that all the values are in the target table
+        // check that all the values are in the target table (validating script file execution)
         verifyTargetTableResults(testRecords);
     }
 
@@ -102,10 +117,9 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
                 "\"processed\" TEXT NOT NULL)";
     }
 
-
     private void publishMessages(List<SimpleRecord> records) throws Exception {
         for (SimpleRecord record : records) {
-            String key = "post-processing-script-test-key-" + record.getId();
+            String key = "post-processing-script-file-test-key-" + record.getId();
             ProducerRecord<String, String> producerRecord =
                     new ProducerRecord<>(TOPIC_NAME, key, objectMapper.writeValueAsString(record));
 
@@ -143,30 +157,13 @@ public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegra
                 SimpleRecord expected = expectedRecords.get(recordIndex);
                 String expectedValue = expected.getId() + expected.getValue().toUpperCase();
 
-                assertEquals(expectedValue, rs.getString("processed"));
+                assertEquals(expectedValue, rs.getString("processed"),
+                        "Processed value doesn't match expected for record " + recordIndex);
                 recordIndex++;
             }
 
             assertEquals(expectedRecords.size(), recordIndex,
                     "Expected to verify " + expectedRecords.size() + " records, but only found " + recordIndex);
-        }
-    }
-
-    private String preparePostProcessingScript() {
-        // the script will concatenate the id and upper case the text and will create just one column
-        String script =
-                "INSERT INTO %s (processed) \n" +
-                        "SELECT id::TEXT || UPPER(value)\n" +
-                        "FROM %s where batch_id=\'${firebolt_param.batch_id}\';";
-        PostProcessingConfig postProcessingConfig = new PostProcessingConfig(
-                List.of(
-                        new PostProcessingConfig.Mapping(TABLE_NAME, String.format(script, TARGET_TABLE_NAME, TABLE_NAME), null)
-                ));
-        try {
-            return objectMapper.writeValueAsString(postProcessingConfig);
-        } catch (JsonProcessingException e) {
-            fail("Failed to serialized the post processing config");
-            return null;
         }
     }
 

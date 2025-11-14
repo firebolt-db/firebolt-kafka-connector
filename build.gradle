@@ -119,7 +119,7 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
-    
+
     // Lombok
     compileOnly "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
@@ -410,7 +410,8 @@ task deployToKafkaConnect {
     doLast {
         def jarFile = jar.archiveFile.get().asFile
         def jarName = jar.archiveFileName.get()
-        
+        def scriptsSourceDir = file('src/integrationTest/resources/scripts/')
+
         // Copy to Kafka Connect 3.9.1 plugins directory
         def pluginsDir391 = file('src/integrationTest/docker/kafka-connect-3.9.1/plugins/')
         pluginsDir391.mkdirs()
@@ -434,11 +435,39 @@ task deployToKafkaConnect {
             from jarFile
             into pluginsDirCloud
         }
+
+        // Copy all script files from resources/scripts to all docker script directories
+        def scriptsDir391 = file('src/integrationTest/docker/kafka-connect-3.9.1/scripts/')
+        def scriptsDir40 = file('src/integrationTest/docker/kafka-connect-4.0/scripts/')
+        def scriptsDirCloud = file('src/integrationTest/docker/kafka-connect-cloud/scripts/')
+        
+        scriptsDir391.mkdirs()
+        scriptsDir40.mkdirs()
+        scriptsDirCloud.mkdirs()
+
+        copy {
+            from scriptsSourceDir
+            into scriptsDir391
+        }
+
+        copy {
+            from scriptsSourceDir
+            into scriptsDir40
+        }
+
+        copy {
+            from scriptsSourceDir
+            into scriptsDirCloud
+        }
         
         println "✅ Deployed ${jarName} to:"
         println "   📁 src/integrationTest/docker/kafka-connect-3.9.1/plugins/"
         println "   📁 src/integrationTest/docker/kafka-connect-4.0/plugins/"
         println "   📁 src/integrationTest/docker/kafka-connect-cloud/plugins/"
+        println "✅ Deployed scripts from resources/scripts to:"
+        println "   📁 src/integrationTest/docker/kafka-connect-3.9.1/scripts/"
+        println "   📁 src/integrationTest/docker/kafka-connect-4.0/scripts/"
+        println "   📁 src/integrationTest/docker/kafka-connect-cloud/scripts/"
     }
 }
 
