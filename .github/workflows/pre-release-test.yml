@@ -1,0 +1,32 @@
+name: Pre Release Tests
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    name: Build and Unit Tests
+    uses: ./.github/workflows/build.yml
+
+  core-integration-3-9-1:
+    name: Core Integration Tests (3.9.1)
+    needs: build
+    uses: ./.github/workflows/core-integration-tests.yml
+    with:
+      kafka_connect_version: '3.9.1'
+
+  core-integration-4-0:
+    name: Core Integration Tests (4.0)
+    needs: build
+    uses: ./.github/workflows/core-integration-tests.yml
+    with:
+      kafka_connect_version: '4.0'
+
+  cloud-integration:
+    name: Cloud Integration Tests
+    needs: build
+    uses: ./.github/workflows/cloud-integration-tests.yml
+    secrets: inherit
+
+
