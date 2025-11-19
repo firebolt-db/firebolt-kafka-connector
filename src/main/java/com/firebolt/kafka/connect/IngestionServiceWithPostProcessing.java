@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect;
 
 
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -11,23 +10,26 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.commons.text.StringSubstitutor;
+import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
- *  Will use batch inserts with prepared statements. It will also open a transaction and commit the transaction.
- *  It will include a batchId and will run the post-processing script
+ *  Use the decorator pattern to wrap the ingestion service with a post-processing script.
+ *  First the decorated service will run its logic, then we will run the post-processing script in the same transaction
  */
 @Slf4j
-public class InsertPreparedStatementWithPostProcessing extends InsertPreparedStatement {
+public class IngestionServiceWithPostProcessing implements IngestionService {
 
-    private static final String BATCH_ID_COLUMN_NAME = "batch_id";
+    static final String BATCH_ID_COLUMN_NAME = "batch_id";
     private static final String FIREBOLT_BATCH_ID_KEY = "firebolt_param.batch_id";
 
+    private IngestionService ingestionService;
+    private Connection connection;
     private String postProcessingScript;
 
-    public InsertPreparedStatementWithPostProcessing(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, String postProcessingScript) {
-        super(connection, tableSchema, errorReporter, errorToleranceAll);
+    public IngestionServiceWithPostProcessing(IngestionService ingestionService, Connection connection, String postProcessingScript) {
+        this.ingestionService = ingestionService;
+        this.connection = connection;
         this.postProcessingScript = postProcessingScript;
     }
 
@@ -43,7 +45,7 @@ public class InsertPreparedStatementWithPostProcessing extends InsertPreparedSta
         connection.setAutoCommit(false);
 
         try {
-            super.addRecords(batchIdFireboltRecords);
+            ingestionService.addRecords(batchIdFireboltRecords);
 
             try (Statement statement = connection.createStatement()) {
                 log.info("Executing the post processing script");
