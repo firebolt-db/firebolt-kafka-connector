@@ -34,7 +34,7 @@ public class TableWriter {
      */
     private Supplier<Connection> connectionSupplier;
 
-    private InsertPreparedStatementProvider insertPreparedStatementProvider;
+    private IngestionServiceProvider ingestionServiceProvider;
     private ErrorReporter errorReporter;
     private FireboltMetadataService fireboltMetadataService;
     private String topicName;
@@ -48,17 +48,17 @@ public class TableWriter {
     private Optional<String> postProcessingScript;
 
     public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-        this(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, new InsertPreparedStatementProvider(), errorReporter, errorToleranceAll, postProcessingScript);
+        this(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, new IngestionServiceProvider(), errorReporter, errorToleranceAll, postProcessingScript);
     }
 
     @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, InsertPreparedStatementProvider insertPreparedStatementProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, IngestionServiceProvider ingestionServiceProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
         this.tableSchema = tableSchema;
         this.connectionSupplier = connectionSupplier;
         this.fireboltMetadataService = fireboltMetadataService;
         this.topicName = topicName;
         this.processedPartitionOffsets = processedPartitionOffsets;
-        this.insertPreparedStatementProvider = insertPreparedStatementProvider;
+        this.ingestionServiceProvider = ingestionServiceProvider;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
         this.postProcessingScript = postProcessingScript;
@@ -71,7 +71,7 @@ public class TableWriter {
             return;
         }
 
-        IngestionService ingestionService = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
+        IngestionService ingestionService = ingestionServiceProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
         ingestionService.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
@@ -116,13 +116,4 @@ public class TableWriter {
         return connection;
     }
 
-    /**
-     * For easier testing
-     */
-    static class InsertPreparedStatementProvider {
-        public IngestionService get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-            return postProcessingScript == null || postProcessingScript.isEmpty() ? new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll)
-                    : new InsertPreparedStatementWithPostProcessing(connection, tableSchema, errorReporter, errorToleranceAll, postProcessingScript.get());
-        }
-    }
 }
