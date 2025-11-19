@@ -4,6 +4,7 @@ import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.IngestionService;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.ParquetDataGenerator;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.ParquetUploadHttpClient;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.OutputStream;
@@ -22,15 +23,17 @@ public class BinaryIngestionService implements IngestionService {
 
     private BinaryDataGenerator binaryDataGenerator;
     private TableSchema tableSchema;
+    private ParquetUploadHttpClient httpClient;
 
     public BinaryIngestionService(ErrorReporter errorReporter, boolean errorTolerance, TableSchema tableSchema) {
-        this(new ParquetDataGenerator(errorReporter, errorTolerance), tableSchema);
+        this(new ParquetDataGenerator(errorReporter, errorTolerance), tableSchema, new ParquetUploadHttpClient());
     }
 
     @VisibleForTesting
-    BinaryIngestionService(BinaryDataGenerator binaryDataGenerator, TableSchema tableSchema) {
+    BinaryIngestionService(BinaryDataGenerator binaryDataGenerator, TableSchema tableSchema, ParquetUploadHttpClient httpClient) {
         this.binaryDataGenerator = binaryDataGenerator;
         this.tableSchema = tableSchema;
+        this.httpClient = httpClient;
     }
 
     @Override
@@ -42,6 +45,7 @@ public class BinaryIngestionService implements IngestionService {
 
         // Generate Parquet content
         OutputStream out = binaryDataGenerator.generate(fireboltRecords, tableSchema);
+
         byte[] parquetBytes;
         if (out instanceof java.io.ByteArrayOutputStream) {
             parquetBytes = ((java.io.ByteArrayOutputStream) out).toByteArray();
@@ -52,6 +56,12 @@ public class BinaryIngestionService implements IngestionService {
         String sql = generateInsertSqlStatement();
         log.debug("Created the sql statement: {}. Parquet file has: {} bytes", sql, parquetBytes.length);
         // once the jdbc driver is ready call the driver to upload the parquet file
+
+        try {
+            httpClient.upload(sql, MULTIPART_BINARY_FILENAME, parquetBytes);
+        } catch (Exception e) {
+            throw new SQLException("Failed to upload parquet content", e);
+        }
     }
 
     private String generateInsertSqlStatement() {

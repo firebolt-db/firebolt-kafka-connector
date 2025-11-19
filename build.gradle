@@ -136,6 +136,30 @@ dependencies {
         exclude group: 'org.apache.logging.log4j'
     }
 
+    // HTTP client for binary upload
+    implementation("com.squareup.okhttp3:okhttp:${okhttpVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
+    // Parquet writer (Avro-based) for local parquet generation
+    implementation("org.apache.parquet:parquet-avro:${parquetVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
+    implementation("org.apache.parquet:parquet-hadoop-bundle:${parquetVersion}") {
+        exclude group: 'org.slf4j';
+        exclude group: 'org.apache.logging.log4j'
+    }
+
+    compileOnly("org.apache.hadoop:hadoop-client-api:${hadoopCommonVersion}")
+    implementation("org.apache.hadoop:hadoop-client-runtime:${hadoopCommonVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
     // Lombok
     compileOnly "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
@@ -403,7 +427,27 @@ dependencies {
 jar {
     archiveBaseName = project.property('archivesBaseName')
     archiveVersion = project.version
-    
+
+    // already excludes SLF4J, manifest…
+    exclude 'org/glassfish/**',
+            'org/glassfish/jersey/**',
+            'org/glassfish/hk2/**',
+            'org/eclipse/jetty/**',
+            'org/eclipse/jetty/websocket/**',
+            'org/eclipse/jetty/http2/**',
+            'javax/**',
+            'jakarta/**',
+            'org/ow2/asm/**',
+            'ch/qos/logback/**',
+            'commons-logging/**',
+            'org/apache/zookeeper/**',
+            'org/apache/curator/**',
+            'com/sun/jersey/**',
+            'com/sun/xml/bind/**',
+            'org/glassfish/jaxb/**',
+            'jersey/repackaged/**',
+            'org/slf4j/**'
+
     manifest {
         attributes(
             'Implementation-Title': project.property('description'),
@@ -566,6 +610,25 @@ tasks.withType(Jar) {
 
 // Create a fat JAR with all dependencies for Confluent Hub
 tasks.register('confluentJar', Jar) {
+    exclude 'org/glassfish/**',
+            'org/glassfish/jersey/**',
+            'org/glassfish/hk2/**',
+            'org/eclipse/jetty/**',
+            'org/eclipse/jetty/websocket/**',
+            'org/eclipse/jetty/http2/**',
+            'javax/**',
+            'jakarta/**',
+            'org/ow2/asm/**',
+            'ch/qos/logback/**',
+            'commons-logging/**',
+            'org/apache/zookeeper/**',
+            'org/apache/curator/**',
+            'com/sun/jersey/**',
+            'com/sun/xml/bind/**',
+            'org/glassfish/jaxb/**',
+            'jersey/repackaged/**',
+            'org/slf4j/**'
+
     archiveClassifier.set("confluent")
 
     from sourceSets.main.output

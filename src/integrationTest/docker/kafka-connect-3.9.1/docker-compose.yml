@@ -52,7 +52,8 @@ services:
 
   # Firebolt Core Database
   firebolt-core:
-    image: ghcr.io/firebolt-db/firebolt-core:preview-rc
+#    image: ghcr.io/firebolt-db/firebolt-core:preview-rc
+    image: 231290928314.dkr.ecr.us-east-1.amazonaws.com/firebolt-core:debug-4.30.0-pre.0.20251118085534.02b3c9795d0e
     hostname: firebolt-core
     container_name: firebolt-core-391
     command: --node 0
