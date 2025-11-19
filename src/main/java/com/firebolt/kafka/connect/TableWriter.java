@@ -71,8 +71,8 @@ public class TableWriter {
             return;
         }
 
-        InsertPreparedStatement insertPreparedStatement = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
-        insertPreparedStatement.addRecords(fireboltRecords);
+        IngestionService ingestionService = insertPreparedStatementProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
+        ingestionService.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
         updateProcessedOffsets(fireboltRecords);
@@ -120,7 +120,7 @@ public class TableWriter {
      * For easier testing
      */
     static class InsertPreparedStatementProvider {
-        public InsertPreparedStatement get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+        public IngestionService get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
             return postProcessingScript == null || postProcessingScript.isEmpty() ? new InsertPreparedStatement(connection, tableSchema, errorReporter, errorToleranceAll)
                     : new InsertPreparedStatementWithPostProcessing(connection, tableSchema, errorReporter, errorToleranceAll, postProcessingScript.get());
         }

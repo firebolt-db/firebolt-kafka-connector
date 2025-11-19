@@ -27,7 +27,7 @@ import org.apache.commons.collections.CollectionUtils;
  * Insert into a table using prepared statements
  */
 @Slf4j
-public class InsertPreparedStatement {
+public class InsertPreparedStatement implements IngestionService {
 
     protected Connection connection;
     private TableSchema tableSchema;
