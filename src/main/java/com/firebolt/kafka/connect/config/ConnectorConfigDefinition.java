@@ -47,6 +47,13 @@ public class ConnectorConfigDefinition {
     public static final Boolean OPTIMIZE_INSERTS_DEFAULT = Boolean.FALSE;
 
     // =========================
+    // INGESTION MODE
+    // =========================
+    public static final String INGESTION_TYPE_CONFIG = "ingestion.type";
+    public static final String INGESTION_TYPE_DOC = "Ingestion mode. Supported values: 'sql' (default) to insert via SQL, or 'binary' to upload Parquet and ingest via read_parquet().";
+    public static final String INGESTION_TYPE_DEFAULT = "sql";
+
+    // =========================
     // ERROR HANDLING CONFIGURATION (delegated from Kafka Connect worker)
     // =========================
     public static final String ERROR_TOLERANCE_CONFIG = "errors.tolerance";
@@ -93,6 +100,12 @@ public class ConnectorConfigDefinition {
                         OPTIMIZE_INSERTS_DEFAULT,
                         ConfigDef.Importance.MEDIUM,
                         OPTIMIZE_INSERTS_DOC)
+                .define(INGESTION_TYPE_CONFIG,
+                        ConfigDef.Type.STRING,
+                        INGESTION_TYPE_DEFAULT,
+                        ConfigDef.ValidString.in("sql", "binary"),
+                        ConfigDef.Importance.HIGH,
+                        INGESTION_TYPE_DOC)
 
                 // Table Configuration
                 .define(TOPIC_TO_TABLE_MAPPING_CONFIG,

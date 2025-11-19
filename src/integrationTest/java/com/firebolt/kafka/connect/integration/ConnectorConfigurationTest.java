@@ -228,9 +228,8 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         
         // Verify error message contains information about duplicate tables
         assertNotNull(errorMessage, "Error message should not be null");
-        assertTrue(errorMessage.toLowerCase().contains("duplicate") || 
-                   errorMessage.toLowerCase().contains("table") ||
-                   errorMessage.toLowerCase().contains("mapping"),
+        assertTrue(errorMessage.toLowerCase().contains("table") ||
+                   errorMessage.toLowerCase().contains("duplicate"),
                    "Error message should mention duplicate tables: " + errorMessage);
     }
     
@@ -310,7 +309,7 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         assertTrue(errorMessage.contains("Invalid value unknown for configuration exactlyOnce: Expected value to be either true or false"),
                    "Error message should indicate invalid boolean for exactlyOnce: " + errorMessage);
     }
-    
+
     @Test
     void testInvalidConnectorClass() throws IOException {
         Map<String, Object> connectorConfig = createBaseConnectorConfig();
@@ -354,7 +353,7 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         assertNotNull(errorMessage, "Error message should not be null");
         assertTrue(errorMessage.toLowerCase().contains("table") && 
                    (errorMessage.toLowerCase().contains("not exist") || 
-                    errorMessage.toLowerCase().contains("does not exist") ||
+                    errorMessage.toLowerCase().contains("does not exist") || 
                     errorMessage.toLowerCase().contains("do not exist")),
                    "Error message should mention non-existent tables: " + errorMessage);
     }
@@ -365,7 +364,7 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         // Reference a table that definitely doesn't exist (using a very specific name)
         connectorConfig.put("topic.to.table.mapping", "test-topic:definitely_does_not_exist_table_xyz123");
         
-        // Attempt to create connector and expect failure due to table validation
+        // Attempt to create connector expecting failure due to table validation
         String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
         
         // Verify error message specifically mentions the table existence issue
@@ -434,7 +433,18 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
         assertTrue(errorMessage.length() > 50, 
                    "Error message should be substantial for multiple errors: " + errorMessage);
     }
-    
+
+    @Test
+    void testInvalidIngestionType() throws IOException {
+        Map<String, Object> connectorConfig = createBaseConnectorConfig();
+        connectorConfig.put("ingestion.type", "invalid-type");
+
+        String errorMessage = createConnectorExpectingFailure(testConnectorName, connectorConfig);
+
+        assertNotNull(errorMessage, "Error message should not be null");
+        assertTrue(errorMessage.contains("Invalid value invalid-type for configuration ingestion.type: String must be one of: sql, binary"));
+    }
+
     private Map<String, Object> createBaseConnectorConfig() {
         Map<String, Object> config = new HashMap<>();
         
@@ -669,6 +679,26 @@ public class ConnectorConfigurationTest extends BaseIntegrationTest {
             boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, config);
 
             assertTrue(success, "Connector creation should succeed with valid post.processing.script JSON");
+        }
+
+        @Test
+        void testValidIngestionTypeSql() throws IOException {
+            Map<String, Object> connectorConfig = createBaseConnectorConfig();
+            connectorConfig.put("ingestion.type", "sql");
+
+            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, connectorConfig);
+
+            assertTrue(success, "Connector creation should succeed when ingestion.type is 'sql'");
+        }
+
+        @Test
+        void testValidIngestionTypeBinary() throws IOException {
+            Map<String, Object> connectorConfig = createBaseConnectorConfig();
+            connectorConfig.put("ingestion.type", "binary");
+
+            boolean success = createConnectorExpectingSuccessWithName(successfulConnectorName, connectorConfig);
+
+            assertTrue(success, "Connector creation should succeed when ingestion.type is 'binary'");
         }
     }
 
