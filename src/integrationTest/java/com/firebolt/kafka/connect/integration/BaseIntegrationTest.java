@@ -55,7 +55,7 @@ public abstract class BaseIntegrationTest {
     
     protected static final String KAFKA_CONNECT_HOST = System.getenv().getOrDefault("KAFKA_CONNECT_URL", "http://localhost:8083");
     protected static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
-    protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(60);
+    protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(40);
 
     protected static final String DEFAULT_DATABASE_NAME = "integration_test_db";
 

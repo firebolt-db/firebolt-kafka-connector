@@ -24,8 +24,7 @@ public class ParquetAvroSchemaProvider {
 
         for (TableSchema.Column column : tableSchema.getColumns()) {
             String name = column.getName();
-            boolean nullable = column.isNullable();
-            Schema fieldSchema = mapSqlTypeToAvro(column.getSqlType(), nullable);
+            Schema fieldSchema = mapSqlTypeToAvro(column);
             fields.name(name).type(fieldSchema).noDefault();
         }
         return fields.endRecord();
@@ -53,14 +52,13 @@ public class ParquetAvroSchemaProvider {
      * struct -> Types.VARCHAR
      *
      *
-     * @param sqlType
-     * @param nullable
      * @return
      */
 
-    private static Schema mapSqlTypeToAvro(int sqlType, boolean nullable) {
+    private Schema mapSqlTypeToAvro(TableSchema.Column tableColumn) {
+        boolean isNullable = tableColumn.isNullable();
         Schema base;
-        switch (sqlType) {
+        switch (tableColumn.getSqlType()) {
             case Types.INTEGER:
                 base = Schema.create(Schema.Type.INT);
                 break;
@@ -88,15 +86,37 @@ public class ParquetAvroSchemaProvider {
                 // timestamp and timestamp tz have a microseconds precision
                 base = LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG));
                 break;
+            case Types.ARRAY:
+                base = createArraySchema(tableColumn);
+                break;
             case Types.NUMERIC:
             case Types.VARCHAR:
             default:
                 base = Schema.create(Schema.Type.STRING);
                 break;
         }
-        if (nullable) {
+        if (isNullable) {
             return Schema.createUnion(Schema.create(Schema.Type.NULL), base);
         }
         return base;
+    }
+
+    /**
+     * Builds an Avro array schema. For now, supports arrays of integers.
+     * - Elements are nullable: union(null, int)
+     * - Field nullability (array itself nullable) is handled by the caller.
+     */
+    private Schema createArraySchema(TableSchema.Column tableColumn) {
+        String dataType = tableColumn.getDataType() == null ? "" : tableColumn.getDataType().toLowerCase();
+
+        boolean isIntArray = dataType.startsWith("array(int");
+
+        // NOTE will add more datatypes as we develop
+
+        Schema itemSchema = isIntArray
+                ? SchemaBuilder.unionOf().nullType().and().intType().endUnion()
+                : SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
+
+        return SchemaBuilder.array().items(itemSchema);
     }
 }
