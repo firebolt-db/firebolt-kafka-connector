@@ -27,6 +27,8 @@ ext {
     awaitilityVersion = '4.3.0'
     commonsLang3Version = '3.19.0'
     commonsTextVersion = '1.14.0'
+    parquetVersion = '1.16.0'
+    hadoopCommonVersion = '3.4.2'
 }
 
 java {
@@ -68,7 +70,7 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
-    compileOnly("org.apache.avro:avro:${avroVersion}") {
+    implementation("org.apache.avro:avro:${avroVersion}") {
         exclude group: 'org.apache.kafka'
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
@@ -102,7 +104,14 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-core:${log4jVersion}"
     compileOnly "org.apache.logging.log4j:log4j-api:${log4jVersion}"
     compileOnly "org.apache.logging.log4j:log4j-slf4j2-impl:${log4jVersion}"
-    
+
+    // Minimal Hadoop classes required by parquet-hadoop Path/Configuration
+    compileOnly("org.apache.hadoop:hadoop-common:${hadoopCommonVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
     // Utilities - bundle this, exclude any Kafka and logging dependencies
     implementation("com.google.guava:guava:${guavaVersion}") {
         exclude group: 'org.apache.kafka'
@@ -115,6 +124,13 @@ dependencies {
         exclude group: 'org.apache.logging.log4j'
     }
     implementation("org.apache.commons:commons-text:${commonsTextVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    
+    // Parquet writer (Avro-based) for local parquet generation
+    implementation("org.apache.parquet:parquet-avro:${parquetVersion}") {
         exclude group: 'org.apache.kafka'
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
@@ -166,7 +182,11 @@ dependencies {
     
     // Awaitility for async testing
     testImplementation "org.awaitility:awaitility:${awaitilityVersion}"
-}
+
+    // Minimal Hadoop classes required by parquet-hadoop Path/Configuration
+    testImplementation "org.apache.hadoop:hadoop-common:${hadoopCommonVersion}"
+
+    }
 
 
 
