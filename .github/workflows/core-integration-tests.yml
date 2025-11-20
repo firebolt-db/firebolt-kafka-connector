@@ -21,6 +21,7 @@ on:
      
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
+  FIREBOLT_CORE_IMAGE: ${{ vars.FIREBOLT_CORE_IMAGE }}
 
 jobs:
   integration-tests:
@@ -47,6 +48,16 @@ jobs:
       run: |
         echo "Testing with Kafka Connect version: ${{ inputs.kafka_connect_version }}"
         
+    - name: Login to Amazon ECR
+      id: ecr-login
+      uses: aws-actions/amazon-ecr-login@v2
+      if: ${{ !startsWith(env.FIREBOLT_CORE_IMAGE, 'ghcr.io/firebolt-db') }}
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        AWS_REGION: ${{ vars.AWS_REGION }}
+                
     - name: Build project
       run: ./gradlew build --no-daemon
       
@@ -68,7 +79,7 @@ jobs:
 
     - name: Setup firebolt core permissions
       run: |
-        WHO="$(docker run --rm --entrypoint whoami ghcr.io/firebolt-db/firebolt-core:preview-rc)"
+        WHO="$(docker run --rm --entrypoint whoami "$FIREBOLT_CORE_IMAGE")"
         # Ensure the host directory that is mounted to /firebolt-core/data exists
         if [ "$WHO" = "firebolt-core" ]; then
           mkdir -p "$COMPOSE_FILE_DIR/firebolt-core"
