@@ -122,87 +122,87 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         return Arrays.asList(
             // Complete record with typical values
             aValidTestRecord(1)
-                .build()
+                .build(),
 
-//            // Record with minimum value
-//            aValidTestRecord(2)
-//                .requiredInteger(Integer.MIN_VALUE)
-//                .build(),
-//
-//            // Record with maximum value
-//            aValidTestRecord(3)
-//                .requiredInteger(Integer.MAX_VALUE)
-//                .build(),
-//
-//            // Record with null integer
-//            aValidTestRecord(4)
-//                .optionalInteger(null)
-//                .build(),
-//
-//            // required list with nullable (empty list)
-//            aValidTestRecord(5)
-//                .requiredListWithNullableElements(new ArrayList<>())
-//                .build(),
-//
-//            // required list but with null values
-//            aValidTestRecord(6)
-//                .requiredListWithNullableElements(Arrays.asList(1, null, 2))
-//                .build(),
-//
-//            // required list with min and max values
-//            aValidTestRecord(7)
-//                .requiredListWithNullableElements(Arrays.asList(null, null, Integer.MAX_VALUE, Integer.MIN_VALUE))
-//                .build(),
-//
-//            // required list with non-null values, but empty list
-//            aValidTestRecord(8)
-//                .requiredListWithNonNullElements(new ArrayList<>())
-//                .build(),
-//
-//            // required list with non-null values and min and max values
-//            aValidTestRecord(9)
-//                .requiredListWithNonNullElements(Arrays.asList(Integer.MIN_VALUE, 123, -123, Integer.MAX_VALUE))
-//                .build(),
-//
-//            // Record with empty but valid optional list
-//            aValidTestRecord(10)
-//                .optionalList(new ArrayList<>())
-//                .build(),
-//
-//            // Record with null optional list
-//            aValidTestRecord(11)
-//                .optionalList(null)
-//                .build(),
-//
-//            // Record with valid optional list (includes nulls)
-//            aValidTestRecord(12)
-//                .optionalList(Arrays.asList(-100, 200, null))
-//                .build(),
-//
-//            // Record with valid optional list with null values, but empty array
-//            aValidTestRecord(13)
-//                .optionalListWithNonNullElements(new ArrayList<>())
-//                .build(),
-//
-//            // Record with valid optional list with null values, but null
-//            aValidTestRecord(14)
-//                .optionalListWithNonNullElements(null)
-//                .build(),
-//
-//            // Record with valid optional list without null values
-//            aValidTestRecord(15)
-//                .optionalListWithNonNullElements(Arrays.asList(-100, 0, 200))
-//                .build(),
-//
-//            // Record with large lists (5000 elements each)
-//            aValidTestRecord(16)
-//                .requiredInteger(999)
-//                .optionalInteger(-999)
-//                .requiredListWithNullableElements(createLargeListWithNulls(5000))
-//                .requiredListWithNonNullElements(createLargeListWithoutNulls(5000))
-//                .optionalList(createOptionalLargeList(5000))
-//                .optionalListWithNonNullElements(createOptionalLargeList(3000))  // Different size for variety
-//                .build()
+            // Record with minimum value
+            aValidTestRecord(2)
+                .requiredInteger(Integer.MIN_VALUE)
+                .build(),
+
+            // Record with maximum value
+            aValidTestRecord(3)
+                .requiredInteger(Integer.MAX_VALUE)
+                .build(),
+
+            // Record with null integer
+            aValidTestRecord(4)
+                .optionalInteger(null)
+                .build(),
+
+            // required list with nullable (empty list)
+            aValidTestRecord(5)
+                .requiredListWithNullableElements(new ArrayList<>())
+                .build(),
+
+            // required list but with null values
+            aValidTestRecord(6)
+                .requiredListWithNullableElements(Arrays.asList(1, null, 2))
+                .build(),
+
+            // required list with min and max values
+            aValidTestRecord(7)
+                .requiredListWithNullableElements(Arrays.asList(null, null, Integer.MAX_VALUE, Integer.MIN_VALUE))
+                .build(),
+
+            // required list with non-null values, but empty list
+            aValidTestRecord(8)
+                .requiredListWithNonNullElements(new ArrayList<>())
+                .build(),
+
+            // required list with non-null values and min and max values
+            aValidTestRecord(9)
+                .requiredListWithNonNullElements(Arrays.asList(Integer.MIN_VALUE, 123, -123, Integer.MAX_VALUE))
+                .build(),
+
+            // Record with empty but valid optional list
+            aValidTestRecord(10)
+                .optionalList(new ArrayList<>())
+                .build(),
+
+            // Record with null optional list
+            aValidTestRecord(11)
+                .optionalList(null)
+                .build(),
+
+            // Record with valid optional list (includes nulls)
+            aValidTestRecord(12)
+                .optionalList(Arrays.asList(-100, 200, null))
+                .build(),
+
+            // Record with valid optional list with null values, but empty array
+            aValidTestRecord(13)
+                .optionalListWithNonNullElements(new ArrayList<>())
+                .build(),
+
+            // Record with valid optional list with null values, but null
+            aValidTestRecord(14)
+                .optionalListWithNonNullElements(null)
+                .build(),
+
+            // Record with valid optional list without null values
+            aValidTestRecord(15)
+                .optionalListWithNonNullElements(Arrays.asList(-100, 0, 200))
+                .build(),
+
+            // Record with large lists (5000 elements each)
+            aValidTestRecord(16)
+                .requiredInteger(999)
+                .optionalInteger(-999)
+                .requiredListWithNullableElements(createLargeListWithNulls(5000))
+                .requiredListWithNonNullElements(createLargeListWithoutNulls(5000))
+                .optionalList(createOptionalLargeList(5000))
+                .optionalListWithNonNullElements(createOptionalLargeList(3000))  // Different size for variety
+                .build()
         );
     }
     
@@ -214,9 +214,9 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 "\"optionalShort\" INTEGER NULL, " +
                 "\"optionalByte\" INTEGER NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(INTEGER NULL) NOT NULL, " +
-//                "\"requiredListWithNonNullElements\" ARRAY(INTEGER NOT NULL) NOT NULL, " +
-//                "\"optionalList\" ARRAY(INTEGER NULL) NULL, " +
-//                "\"optionalListWithNonNullElements\" ARRAY(INTEGER NOT NULL) NULL, " +
+                "\"requiredListWithNonNullElements\" ARRAY(INTEGER NOT NULL) NOT NULL, " +
+                "\"optionalList\" ARRAY(INTEGER NULL) NULL, " +
+                "\"optionalListWithNonNullElements\" ARRAY(INTEGER NOT NULL) NULL, " +
                 "\"integerFromString\" INTEGER NOT NULL" +
                 ")";
     }
@@ -250,7 +250,9 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredInteger\", \"optionalInteger\", " +
             "\"optionalShort\", \"optionalByte\", " +
-            " \"integerFromString\", \"requiredListWithNullableElements\" " +
+            " \"integerFromString\", \"requiredListWithNullableElements\", " +
+            " \"requiredListWithNonNullElements\", \"optionalList\", " +
+            " \"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -272,9 +274,9 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
-//                Array actualRequiredListWithNonNullArray = rs.getArray("requiredListWithNonNullElements");
-//                Array actualOptionalListArray = rs.getArray("optionalList");
-//                Array actualOptionalListWithNonNullElementsArray = rs.getArray("optionalListWithNonNullElements");
+                Array actualRequiredListWithNonNullArray = rs.getArray("requiredListWithNonNullElements");
+                Array actualOptionalListArray = rs.getArray("optionalList");
+                Array actualOptionalListWithNonNullElementsArray = rs.getArray("optionalListWithNonNullElements");
                 
                 // Basic field verification
                 assertEquals(expected.getRecordId(), actualRecordId, 
@@ -308,17 +310,17 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 // Array verification using getArray()
                 verifyIntegerArray("requiredListWithNullableElements",
                     expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
-//
-//                verifyIntegerArray("requiredListWithNonNullElements",
-//                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
-//
-//                // Optional list verification
-//                verifyIntegerArray("optionalList",
-//                    expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
-//
-//                // Optional list with non-null elements verification
-//                verifyIntegerArray("optionalListWithNonNullElements",
-//                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
+
+                verifyIntegerArray("requiredListWithNonNullElements",
+                    expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
+
+                // Optional list verification
+                verifyIntegerArray("optionalList",
+                    expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
+
+                // Optional list with non-null elements verification
+                verifyIntegerArray("optionalListWithNonNullElements",
+                    expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
 
                 // Verify integerFromString column matches parsed value of string
                 int expectedIntegerFromString = Integer.parseInt(expected.getIntegerFromString());

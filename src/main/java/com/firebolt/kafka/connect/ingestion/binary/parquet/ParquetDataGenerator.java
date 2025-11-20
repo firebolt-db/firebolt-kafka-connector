@@ -9,17 +9,13 @@ import com.firebolt.kafka.connect.ingestion.binary.BinaryDataGenerator;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.io.OutputFile;
 import org.apache.parquet.io.PositionOutputStream;
@@ -121,6 +117,23 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
 
             try {
                 Object convertedValue = columnDataTypeConverterFactory.getConverter(column).toParquetValue(kafkaMessageColumnValue, column);
+
+                // Ensure arrays are represented as GenericData.Array with the correct schema,
+                // so nullable elements are handled properly by Avro/Parquet writers.
+                if (column.getSqlType() == Types.ARRAY && convertedValue instanceof List) {
+                    List<?> list = (List<?>) convertedValue;
+                    Schema fieldSchema = avroSchema.getField(columnName).schema();
+                    Schema arraySchema = fieldSchema.getType() == Schema.Type.UNION
+                            ? fieldSchema.getTypes().stream()
+                                    .filter(s -> s.getType() == Schema.Type.ARRAY)
+                                    .findFirst()
+                                    .orElseThrow(() -> new IllegalStateException("Union does not contain ARRAY schema for field: " + columnName))
+                            : fieldSchema;
+                    GenericData.Array<Object> avroArray = new GenericData.Array<>(list.size(), arraySchema);
+                    avroArray.addAll(list);
+                    convertedValue = avroArray;
+                }
+
                 avroRecord.put(columnName, convertedValue);
             } catch (ColumnConversionFailedException e) {
                 // as of now we are failing at the first column conversion failure. We could try to convert all the columns so we give all the data in one record convertion exception.
