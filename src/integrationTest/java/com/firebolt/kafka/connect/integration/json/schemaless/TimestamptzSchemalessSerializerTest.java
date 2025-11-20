@@ -22,7 +22,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -43,8 +43,7 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
         // Generate unique connector name for this test run
         generateUniqueConnectorName("timestamptz-serializer-test");
 
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, timestamptzTableSchema());
+        // moved setup to test methods
     }
 
     @AfterEach
@@ -61,11 +60,13 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testTimestamptzSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testTimestamptzSerialization(boolean includeNulls, java.util.Map<String,String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for timestamptz data type (schemaless)", testDescription);
+
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, timestamptzTableSchema(), connectorOverrides);
+
         producer = initializeSchemalessJsonProducer(includeNulls);
         
         List<TimestamptzTestRecord> testRecords = createTestRecords();
@@ -81,11 +82,12 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "false, 'invalid records should not block valid records'"
-    })
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(boolean includeNulls, String testDescription) throws Exception {
-        producer = initializeSchemalessJsonProducer(includeNulls);
+    @MethodSource("sqlIngestionOnly")
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(java.util.Map<String,String> connectorOverrides) throws Exception {
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, timestamptzTableSchema(), connectorOverrides);
+
+        producer = initializeSchemalessJsonProducer();
 
         List<TimestamptzTestRecord> mixedRecords = Arrays.asList(
             aValidTestRecord(101)

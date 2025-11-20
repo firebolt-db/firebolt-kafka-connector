@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
@@ -17,7 +18,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,10 +41,6 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
 
         // Generate unique connector name for this test run
         generateUniqueConnectorName("bytea-serializer-test");
-        
-        // Setup test resources using centralized method
-        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT, 
-                         byteaTableSchema(), jsonByteaSchema());
     }
     
     @AfterEach
@@ -59,12 +56,16 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
         super.tearDown();
     }
 
+
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testByteaSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testByteaSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for bytea data type", testDescription);
+
+        // Setup test resources using centralized method
+        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                byteaTableSchema(), jsonByteaSchema(), connectorOverrides);
+
         producer = initializeJsonProducer(includeNulls);
         
         List<ByteaTestRecord> testRecords = createTestRecords();

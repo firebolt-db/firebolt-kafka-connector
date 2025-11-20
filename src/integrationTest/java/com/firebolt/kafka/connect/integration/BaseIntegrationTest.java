@@ -22,6 +22,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -34,8 +35,6 @@ import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -43,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.provider.Arguments;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,8 +58,11 @@ public abstract class BaseIntegrationTest {
     protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(20);
 
     protected static final String DEFAULT_DATABASE_NAME = "integration_test_db";
+    protected static final Boolean INCLUDE_NULL_SERIALIZED_VALUES = true;
+    protected static final Boolean DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES = false;
 
     protected final ObjectMapper objectMapper = new ObjectMapper();
+
     protected final OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -535,4 +538,37 @@ public abstract class BaseIntegrationTest {
         }
     }
 
+    /**
+     * Most of the datatypes test would run the schema and schemaless integration with both sql and binary ingestion type
+     * This represents a provider for those tests
+     * @return
+     */
+    protected static Stream<Arguments> sqlAndBinaryTestSetupWithOrWithoutNulls() {
+        return Stream.of(
+                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
+                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values"),
+                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values"),
+                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values")
+        );
+    }
+
+    protected static Stream<Arguments> sqlIngestionTypeWithOrWithoutNulls() {
+        return Stream.of(
+                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
+                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values")
+        );
+    }
+
+    protected static Stream<Arguments> ingestionTypes() {
+        return Stream.of(
+                Arguments.of( Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
+                Arguments.of( Map.of("ingestion.type", "binary"), "sql ingestion without null values")
+        );
+    }
+
+    protected static Stream<Arguments> sqlIngestionOnly() {
+        return Stream.of(
+                Arguments.of( Map.of("ingestion.type", "sql"), "sql ingestion with null values")
+        );
+    }
 }
