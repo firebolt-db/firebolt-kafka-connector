@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -44,10 +45,6 @@ public class TimestamptzSchemaSerializerTest extends SchemaBaseIntegrationTest {
 
         // Generate unique connector name for this test run
         generateUniqueConnectorName("timestamptz-serializer-test");
-        
-        // Setup test resources using centralized method
-        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT, 
-                         timestamptzTableSchema(), jsonTimestamptzSchema());
     }
 
     @AfterEach
@@ -64,11 +61,14 @@ public class TimestamptzSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testTimestamptzSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testTimestamptzSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for timestamptz data type", testDescription);
+
+        // Setup test resources using centralized method
+        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                timestamptzTableSchema(), jsonTimestamptzSchema(), connectorOverrides);
+
         producer = initializeJsonProducer(includeNulls);
         
         List<TimestamptzTestRecord> testRecords = createTestRecords();
@@ -84,11 +84,13 @@ public class TimestamptzSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "false, 'invalid records should not block valid records'"
-    })
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(boolean includeNulls, String testDescription) throws Exception {
-        producer = initializeJsonProducer(includeNulls);
+    @MethodSource("sqlIngestionOnly")
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
+        // Setup test resources using centralized method
+        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                timestamptzTableSchema(), jsonTimestamptzSchema(), connectorOverrides);
+
+        producer = initializeJsonProducer();
 
         List<TimestamptzTestRecord> mixedRecords = Arrays.asList(
             aValidTestRecord(101)

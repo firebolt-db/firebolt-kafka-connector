@@ -14,18 +14,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import com.firebolt.kafka.connect.utils.TestTag;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,8 +45,6 @@ public class DateSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
         // Generate unique connector name for this test run
         generateUniqueConnectorName("date-serializer-test");
 
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, dateTableSchema());
     }
 
     @AfterEach
@@ -65,11 +61,13 @@ public class DateSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testDateSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testDateSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for date data type (schemaless)", testDescription);
+
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, dateTableSchema(), connectorOverrides);
+
         producer = initializeSchemalessJsonProducer(includeNulls);
         
         List<DateTestRecord> testRecords = createTestRecords();
@@ -81,8 +79,12 @@ public class DateSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
         verifyDateRecordsInFirebolt(testRecords);
     }
 
-    @Test
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+    @ParameterizedTest
+    @MethodSource("sqlIngestionOnly")
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, dateTableSchema(), connectorOverrides);
+
         producer = initializeSchemalessJsonProducer();
 
         DateTestRecord validRecord1 = aValidTestRecord(401)

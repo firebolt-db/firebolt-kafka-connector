@@ -8,6 +8,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
@@ -15,9 +16,8 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -39,10 +39,6 @@ public class DoubleSchemaSerializerTest extends SchemaBaseIntegrationTest {
 
         // Generate unique connector name for this test run
         generateUniqueConnectorName("double-serializer-test");
-        
-        // Setup test resources using centralized method
-        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT, 
-                         doubleTableSchema(), jsonDoubleSchema());
     }
     
     @AfterEach
@@ -59,11 +55,14 @@ public class DoubleSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testDoubleSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testDoubleSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for double precision data type", testDescription);
+
+        // Setup test resources using centralized method
+        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                doubleTableSchema(), jsonDoubleSchema(), connectorOverrides);
+
         producer = initializeJsonProducer(includeNulls);
 
         List<DoubleTestRecord> testRecords = createTestRecords();
@@ -667,8 +666,13 @@ public class DoubleSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalListWithNonNullElements(Arrays.asList(111.1, 222.2, 333.3));
     }
 
-    @Test
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+    @ParameterizedTest
+    @MethodSource("sqlIngestionOnly")
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
+        // Setup test resources using centralized method
+        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                doubleTableSchema(), jsonDoubleSchema(), connectorOverrides);
+
         producer = initializeJsonProducer();
 
         DoubleTestRecord validRecord1 = aValidTestRecord(301)

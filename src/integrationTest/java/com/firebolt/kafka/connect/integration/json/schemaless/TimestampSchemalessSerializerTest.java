@@ -26,7 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,8 +47,7 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
         // Generate unique connector name for this test run
         generateUniqueConnectorName("timestamp-serializer-test");
 
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, timestampTableSchema());
+        // moved setup to test methods
     }
 
     @AfterEach
@@ -65,11 +64,13 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testTimestampSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testTimestampSerialization(boolean includeNulls, java.util.Map<String,String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for timestamp data type (schemaless)", testDescription);
+
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, timestampTableSchema(), connectorOverrides);
+
         producer = initializeSchemalessJsonProducer(includeNulls);
         
         List<TimestampTestRecord> testRecords = createTestRecords();

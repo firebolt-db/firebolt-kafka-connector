@@ -10,15 +10,15 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.TestInfo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,10 +41,6 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
         
         // Generate unique connector name for this test run
         generateUniqueConnectorName("numeric-serializer-test");
-        
-        // Setup test resources using centralized method
-        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT, 
-                         numericTableSchema(), jsonNumericSchema());
     }
     
     @AfterEach
@@ -61,11 +57,14 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testNumericSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testNumericSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for numeric data type", testDescription);
+
+        // Setup test resources using centralized method
+        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                numericTableSchema(), jsonNumericSchema(), connectorOverrides);
+
         producer = initializeJsonProducer(includeNulls);
         
         List<NumericTestRecord> testRecords = createTestRecords();
@@ -77,8 +76,13 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
         verifyNumericRecordsInFirebolt(testRecords);
     }
 
-    @Test
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+    @ParameterizedTest
+    @MethodSource("sqlIngestionOnly")
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
+        // Setup test resources using centralized method
+        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                numericTableSchema(), jsonNumericSchema(), connectorOverrides);
+
         producer = initializeJsonProducer();
 
         NumericTestRecord validRecord1 = aValidTestRecord(301)
