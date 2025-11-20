@@ -29,39 +29,16 @@ public class TableWriter {
     // when this table writer is created we should fetch the offsets from the metadata table
     private Map<Integer, Long> processedPartitionOffsets;
 
-    /**
-     * A supplier that can give us a new connection, in case the current one is closed
-     */
-    private Supplier<Connection> connectionSupplier;
-
-    private IngestionServiceProvider ingestionServiceProvider;
-    private ErrorReporter errorReporter;
+    private IngestionService ingestionService;
     private FireboltMetadataService fireboltMetadataService;
     private String topicName;
-    private boolean errorToleranceAll;
 
-    /**
-     * A connection that will be used for pushing the records to firebolt table
-     */
-    private Connection connection;
-
-    private Optional<String> postProcessingScript;
-
-    public TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-        this(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, new IngestionServiceProvider(), errorReporter, errorToleranceAll, postProcessingScript);
-    }
-
-    @VisibleForTesting
-    TableWriter(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, IngestionServiceProvider ingestionServiceProvider, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
+    public TableWriter(TableSchema tableSchema, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, IngestionService ingestionService) {
         this.tableSchema = tableSchema;
-        this.connectionSupplier = connectionSupplier;
         this.fireboltMetadataService = fireboltMetadataService;
         this.topicName = topicName;
         this.processedPartitionOffsets = processedPartitionOffsets;
-        this.ingestionServiceProvider = ingestionServiceProvider;
-        this.errorReporter = errorReporter;
-        this.errorToleranceAll = errorToleranceAll;
-        this.postProcessingScript = postProcessingScript;
+        this.ingestionService = ingestionService;
     }
 
     public void insertRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
@@ -71,7 +48,6 @@ public class TableWriter {
             return;
         }
 
-        IngestionService ingestionService = ingestionServiceProvider.get(getConnection(), tableSchema, errorReporter, errorToleranceAll, postProcessingScript);
         ingestionService.addRecords(fireboltRecords);
 
         // update the processed offsets in Kafka node
@@ -83,11 +59,11 @@ public class TableWriter {
     }
 
     public void close() {
-        if (connection != null) {
+        if (ingestionService != null) {
             try {
-                connection.close();
+                ingestionService.close();
             } catch (Exception e) {
-                log.error("Failed to gracefully close connection");
+                log.error("Failed to gracefully close the ingestion service");
             }
         }
     }
@@ -101,19 +77,6 @@ public class TableWriter {
             }
         });
 
-    }
-
-    private Connection getConnection() throws SQLException {
-        if (connection == null) {
-            connection = connectionSupplier.get();
-        }
-
-        if (connection.isClosed()) {
-            log.warn("Connection is not open so create a new one");
-            connection = connectionSupplier.get();
-        }
-
-        return connection;
     }
 
 }

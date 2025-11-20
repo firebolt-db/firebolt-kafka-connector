@@ -62,6 +62,17 @@ public class InsertPreparedStatement implements IngestionService {
         addRecordsInternal(fireboltRecords, validColumnNames);
     }
 
+    @Override
+    public void close() {
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                log.error("Failed to close the connection");
+            }
+        }
+    }
+
 
     private Set<String> detectColumnsWithNullValuesAcrossAllRecords(List<AbstractFireboltRecord> fireboltRecords) {
         Set<String> intersection = new HashSet<>(fireboltRecords.get(0).getColumnNamesWithNullValues());

@@ -14,4 +14,8 @@ public interface IngestionService {
      */
     void addRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException;
 
+    /**
+     * Close all resources associated with the ingestion service
+     */
+    void close() throws Exception;
 }

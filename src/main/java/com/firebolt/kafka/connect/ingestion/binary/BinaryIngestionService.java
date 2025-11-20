@@ -54,6 +54,11 @@ public class BinaryIngestionService implements IngestionService {
         // once the jdbc driver is ready call the driver to upload the parquet file
     }
 
+    @Override
+    public void close() {
+        // to be implemented when we will add the jdbc connection
+    }
+
     private String generateInsertSqlStatement() {
         return String.format(INSERT_SQL_TEMPLATE, tableSchema.getTableName(), MULTIPART_BINARY_FILENAME);
     }

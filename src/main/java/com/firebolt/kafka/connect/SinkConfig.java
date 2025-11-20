@@ -142,4 +142,16 @@ public class SinkConfig {
         String value = config.get(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG);
         return value != null && Boolean.parseBoolean(value);
     }
+
+    public IngestionType getIngestionType() {
+        String value = config.get(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG);
+        if (StringUtils.isBlank(value)) {
+            // by default ingestion type should be sql if not passed in
+            return IngestionType.SQL;
+        } else {
+            return IngestionType.fromValue(value);
+        }
+
+
+    }
 }
