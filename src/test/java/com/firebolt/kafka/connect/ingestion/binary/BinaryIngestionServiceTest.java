@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary;
 
 import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.ParquetUploadHttpClient;
 import java.io.ByteArrayOutputStream;
 import java.util.Collections;
 import java.util.List;
@@ -23,10 +24,13 @@ class BinaryIngestionServiceTest {
     @Mock
     private BinaryDataGenerator mockDataGenerator;
 
+    @Mock
+    private ParquetUploadHttpClient mockParquetUploadHttpClient;
+
     @Test
     void addRecordsReturnsEarlyWhenNull() throws Exception {
         TableSchema tableSchema = new TableSchema("orders");
-        BinaryIngestionService service = new BinaryIngestionService(mockDataGenerator, tableSchema);
+        BinaryIngestionService service = new BinaryIngestionService(mockDataGenerator, tableSchema, mockParquetUploadHttpClient);
 
         service.addRecords(null);
 
@@ -36,7 +40,7 @@ class BinaryIngestionServiceTest {
     @Test
     void addRecordsReturnsEarlyWhenEmpty() throws Exception {
         TableSchema tableSchema = new TableSchema("orders");
-        BinaryIngestionService service = new BinaryIngestionService(mockDataGenerator, tableSchema);
+        BinaryIngestionService service = new BinaryIngestionService(mockDataGenerator, tableSchema, mockParquetUploadHttpClient);
 
         service.addRecords(Collections.emptyList());
 
@@ -46,7 +50,7 @@ class BinaryIngestionServiceTest {
     @Test
     void addRecordsUploadsParquetBytesWithCorrectSqlAndPart() throws Exception {
         TableSchema tableSchema = new TableSchema("orders");
-        BinaryIngestionService service = new BinaryIngestionService(mockDataGenerator, tableSchema);
+        BinaryIngestionService service = new BinaryIngestionService(mockDataGenerator, tableSchema, mockParquetUploadHttpClient);
 
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
         List<AbstractFireboltRecord> records = List.of(record);

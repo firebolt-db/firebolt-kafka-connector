@@ -136,6 +136,30 @@ dependencies {
         exclude group: 'org.apache.logging.log4j'
     }
 
+    // HTTP client for binary upload
+    implementation("com.squareup.okhttp3:okhttp:${okhttpVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
+    // Parquet writer (Avro-based) for local parquet generation
+    implementation("org.apache.parquet:parquet-avro:${parquetVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
+    implementation("org.apache.parquet:parquet-hadoop-bundle:${parquetVersion}") {
+        exclude group: 'org.slf4j';
+        exclude group: 'org.apache.logging.log4j'
+    }
+
+    compileOnly("org.apache.hadoop:hadoop-client-api:${hadoopCommonVersion}")
+    implementation("org.apache.hadoop:hadoop-client-runtime:${hadoopCommonVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
     // Lombok
     compileOnly "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
@@ -403,7 +427,7 @@ dependencies {
 jar {
     archiveBaseName = project.property('archivesBaseName')
     archiveVersion = project.version
-    
+
     manifest {
         attributes(
             'Implementation-Title': project.property('description'),
