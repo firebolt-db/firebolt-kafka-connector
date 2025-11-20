@@ -56,7 +56,7 @@ services:
 
   # Firebolt Core Database
   firebolt-core:
-    image: ghcr.io/firebolt-db/firebolt-core:preview-rc
+    image: ${FIREBOLT_CORE_IMAGE:-ghcr.io/firebolt-db/firebolt-core:preview-rc}
     hostname: firebolt-core
     container_name: firebolt-core-40
     command: --node 0
