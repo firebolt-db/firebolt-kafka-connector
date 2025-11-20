@@ -61,7 +61,7 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
 
     @ParameterizedTest
     @CsvSource({
-//        "true,  'WITH null fields included in JSON as field: null'",
+        "true,  'WITH null fields included in JSON as field: null'",
         "false, 'WITH null fields omitted from JSON entirely'"
     })
     void testIntegerSerialization(boolean includeNulls, String testDescription) throws Exception {
@@ -78,42 +78,42 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         verifyIntegerRecordsInFirebolt(testRecords);
     }
 
-//    @Test
-//    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
-//        producer = initializeSchemalessJsonProducer();
-//
-//        IntegerTestRecord validRecord1 = aValidTestRecord(201)
-//                .build();
-//        IntegerTestRecord validRecord2 = aValidTestRecord(202)
-//                .build();
-//        IntegerTestRecord validRecord3 = aValidTestRecord(203)
-//                .build();
-//        IntegerTestRecord invalidRecord1 = aValidTestRecord(204)
-//                .integerFromString("abc")
-//                .build();
-//        IntegerTestRecord invalidRecord2 = aValidTestRecord(205)
-//                .integerFromString("1.23")
-//                .build();
-//        IntegerTestRecord invalidRecord3 = aValidTestRecord(206)
-//                .integerFromString(Long.toString((long)Integer.MAX_VALUE + 100000))
-//                .build();
-//
-//        List<IntegerTestRecord> testRecords = List.of(
-//                validRecord1,
-//                invalidRecord1,
-//                validRecord2,
-//                invalidRecord2,
-//                invalidRecord3,
-//                validRecord3
-//        );
-//
-//        publishMessages(testRecords);
-//
-//        List<IntegerTestRecord> expectedRecords = List.of(validRecord1, validRecord2, validRecord3);
-//        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
-//
-//        verifyIntegerRecordsInFirebolt(expectedRecords);
-//    }
+    @Test
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+        producer = initializeSchemalessJsonProducer();
+
+        IntegerTestRecord validRecord1 = aValidTestRecord(201)
+                .build();
+        IntegerTestRecord validRecord2 = aValidTestRecord(202)
+                .build();
+        IntegerTestRecord validRecord3 = aValidTestRecord(203)
+                .build();
+        IntegerTestRecord invalidRecord1 = aValidTestRecord(204)
+                .integerFromString("abc")
+                .build();
+        IntegerTestRecord invalidRecord2 = aValidTestRecord(205)
+                .integerFromString("1.23")
+                .build();
+        IntegerTestRecord invalidRecord3 = aValidTestRecord(206)
+                .integerFromString(Long.toString((long)Integer.MAX_VALUE + 100000))
+                .build();
+
+        List<IntegerTestRecord> testRecords = List.of(
+                validRecord1,
+                invalidRecord1,
+                validRecord2,
+                invalidRecord2,
+                invalidRecord3,
+                validRecord3
+        );
+
+        publishMessages(testRecords);
+
+        List<IntegerTestRecord> expectedRecords = List.of(validRecord1, validRecord2, validRecord3);
+        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
+
+        verifyIntegerRecordsInFirebolt(expectedRecords);
+    }
 
     /**
      * Creates test records covering all scenarios.
