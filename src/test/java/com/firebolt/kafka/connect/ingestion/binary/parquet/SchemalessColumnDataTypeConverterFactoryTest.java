@@ -1,6 +1,8 @@
 package com.firebolt.kafka.connect.ingestion.binary.parquet;
 
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBigIntColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -24,6 +26,28 @@ class SchemalessColumnDataTypeConverterFactoryTest {
         TableSchema.Column col = new TableSchema.Column("count", dataType, java.sql.Types.INTEGER, false);
         ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
         assertInstanceOf(SchemalessIntegerColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "bigint",
+            "int8",
+            "long"
+    })
+    void returnsBigIntConverterForBigIntAliases(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("count64", dataType, java.sql.Types.BIGINT, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessBigIntColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "array(bigint)"
+    })
+    void returnsArrayConverterForArrayBigInt(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("counts", dataType, java.sql.Types.ARRAY, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
