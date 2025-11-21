@@ -22,11 +22,18 @@ on:
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
   FIREBOLT_CORE_IMAGE: ${{ vars.FIREBOLT_CORE_IMAGE }}
-
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: 231290928314 # publishing account
+  IAM_ROLE_DURATION_SECONDS: 14400
+  IAM_ROLE_NAME: github-actions-publishing
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
-    
+    permissions:
+      id-token: write
+      contents: read
+      # write permission needed for cancel-action to succeed.
+      actions: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -47,17 +54,19 @@ jobs:
     - name: Display Kafka Connect version
       run: |
         echo "Testing with Kafka Connect version: ${{ inputs.kafka_connect_version }}"
-        
+
+    - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-region: ${{ env.AWS_REGION }}
+        role-duration-seconds: ${{ env.IAM_ROLE_DURATION_SECONDS }}
+        role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.IAM_ROLE_NAME }}
+
     - name: Login to Amazon ECR
-      id: ecr-login
-      uses: aws-actions/amazon-ecr-login@v2
-      if: ${{ !startsWith(env.FIREBOLT_CORE_IMAGE, 'ghcr.io/firebolt-db') }}
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-        AWS_REGION: ${{ vars.AWS_REGION }}
-                
+      run: |
+        sudo usermod -a -G docker $(whoami)
+        aws ecr get-login-password --region ${{ inputs.aws_ecr_region }} | docker login --username AWS --password-stdin ${{ inputs.aws_ecr_account_url }}
+      shell: bash
+
     - name: Build project
       run: ./gradlew build --no-daemon
       
