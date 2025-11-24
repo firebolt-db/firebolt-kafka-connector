@@ -62,13 +62,15 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     // as this is should be the inner table column not the outer one
     private List<? extends Object> asIntArray(List<?> elements, TableSchema.Column tableColumn) {
         List<Integer> integers = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(Integer.class);
+
         for (Object element : elements) {
             if (element == null) {
                 integers.add(null);
             } else {
-                @SuppressWarnings("unchecked")
-                ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
-                        (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(Integer.class);
                 Integer convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
                 integers.add(convertedValue);
             }
@@ -78,13 +80,15 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
 
     private List<? extends Object> asLongArray(List<?> elements, TableSchema.Column tableColumn) {
         List<Long> longs = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(Long.class);
+
         for (Object element : elements) {
             if (element == null) {
                 longs.add(null);
             } else {
-                @SuppressWarnings("unchecked")
-                ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
-                        (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(Long.class);
                 Long convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
                 longs.add(convertedValue);
             }

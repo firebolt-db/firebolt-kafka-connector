@@ -18,17 +18,34 @@ class SchemalessIntegerColumnDataTypeConverterTest {
 
     @ParameterizedTest
     @CsvSource({
-            "BYTE, 42",
-            "SHORT, 42",
-            "INT, 42",
-            "LONG_IN_RANGE, 42",
-            "STRING_NUMERIC, 42",
-            "STRING_NUMERIC_WITH_SPACES, 42"
+            "  100 ",
+            "" + Integer.MAX_VALUE +"",
+            "" + Integer.MIN_VALUE +""
     })
-    void convertsSupportedNumericRepresentations(String kind, int expected) {
-        Object value = testValue(kind);
+    void convertsFromString(String value) {
         Integer result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), intColumn);
-        assertEquals(expected, result.intValue());
+        assertEquals(Integer.parseInt(value), result.intValue());
+    }
+
+    @Test
+    void canConvertByteValue() {
+        Object value = Byte.MAX_VALUE;
+        Integer result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), intColumn);
+        assertEquals(Byte.MAX_VALUE, result.intValue());
+    }
+
+    @Test
+    void canConvertShortValue() {
+        Object value = Short.MAX_VALUE;
+        Integer result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), intColumn);
+        assertEquals(Short.MAX_VALUE, result.intValue());
+    }
+
+    @Test
+    void canConvertIntValue() {
+        Object value = Integer.MAX_VALUE;
+        Integer result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), intColumn);
+        assertEquals(Integer.MAX_VALUE, result.intValue());
     }
 
     @Test
@@ -55,25 +72,6 @@ class SchemalessIntegerColumnDataTypeConverterTest {
                 () -> converter.toParquetValue(new SchemalessKafkaMessageColumnValue(1.23d), intColumn));
         assertEquals("count", ex.getColumnName());
         assertEquals("integer", ex.getColumnType());
-    }
-
-    private static Object testValue(String kind) {
-        switch (kind) {
-            case "BYTE":
-                return Byte.valueOf((byte) 42);
-            case "SHORT":
-                return Short.valueOf((short) 42);
-            case "INT":
-                return Integer.valueOf(42);
-            case "LONG_IN_RANGE":
-                return Long.valueOf(42L);
-            case "STRING_NUMERIC":
-                return "42";
-            case "STRING_NUMERIC_WITH_SPACES":
-                return "  42  ";
-            default:
-                throw new IllegalArgumentException(kind);
-        }
     }
 }
 

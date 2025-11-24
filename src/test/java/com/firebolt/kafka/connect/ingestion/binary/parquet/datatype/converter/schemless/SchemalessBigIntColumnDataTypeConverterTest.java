@@ -18,17 +18,41 @@ class SchemalessBigIntColumnDataTypeConverterTest {
 
     @ParameterizedTest
     @CsvSource({
-            "BYTE, 42",
-            "SHORT, 42",
-            "INT, 42",
-            "LONG, 42",
-            "STRING_NUMERIC, 42",
-            "STRING_NUMERIC_WITH_SPACES, 42"
+            "  200 ",
+            "" + Long.MAX_VALUE +"",
+            "" + Long.MIN_VALUE +""
     })
-    void convertsSupportedNumericRepresentations(String kind, long expected) {
-        Object value = testValue(kind);
+    void convertsFromString(String value) {
         Long result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), bigintColumn);
-        assertEquals(expected, result.longValue());
+        assertEquals(Long.parseLong(value), result.longValue());
+    }
+
+    @Test
+    void canConvertByteValue() {
+        Object value = Byte.MAX_VALUE;
+        Long result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), bigintColumn);
+        assertEquals(Byte.MAX_VALUE, result.longValue());
+    }
+
+    @Test
+    void canConvertShortValue() {
+        Object value = Short.MAX_VALUE;
+        Long result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), bigintColumn);
+        assertEquals(Short.MAX_VALUE, result.longValue());
+    }
+
+    @Test
+    void canConvertIntValue() {
+        Object value = Integer.MAX_VALUE;
+        Long result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), bigintColumn);
+        assertEquals(Integer.MAX_VALUE, result.longValue());
+    }
+
+    @Test
+    void canConvertLongValue() {
+        Object value = Long.MAX_VALUE;
+        Long result = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(value), bigintColumn);
+        assertEquals(Long.MAX_VALUE, result.longValue());
     }
 
     @Test
