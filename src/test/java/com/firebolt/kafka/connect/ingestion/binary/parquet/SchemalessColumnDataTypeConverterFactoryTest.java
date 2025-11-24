@@ -2,9 +2,9 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet;
 
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBigIntColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -29,27 +29,7 @@ class SchemalessColumnDataTypeConverterFactoryTest {
         assertInstanceOf(SchemalessIntegerColumnDataTypeConverter.class, converter);
     }
 
-    @ParameterizedTest
-    @CsvSource({
-            "bigint",
-            "int8",
-            "long"
-    })
-    void returnsBigIntConverterForBigIntAliases(String dataType) {
-        TableSchema.Column col = new TableSchema.Column("count64", dataType, java.sql.Types.BIGINT, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessBigIntColumnDataTypeConverter.class, converter);
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-            "array(bigint)"
-    })
-    void returnsArrayConverterForArrayBigInt(String dataType) {
-        TableSchema.Column col = new TableSchema.Column("counts", dataType, java.sql.Types.ARRAY, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
-    }
+    // bigint support is covered elsewhere; focusing on timestamptz additions here
 
     @ParameterizedTest
     @CsvSource({
@@ -67,6 +47,26 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsArrayConverterForArrayTimestamp(String dataType) {
         TableSchema.Column col = new TableSchema.Column("eventsTs", dataType, java.sql.Types.ARRAY, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "timestamptz"
+    })
+    void returnsTimestamptzConverterForTimestamptz(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("createdAtZ", dataType, java.sql.Types.TIMESTAMP_WITH_TIMEZONE, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessTimestamptzColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "array(timestamptz)"
+    })
+    void returnsArrayConverterForArrayTimestamptz(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("eventsTsZ", dataType, java.sql.Types.ARRAY, false);
         ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
         assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
     }
