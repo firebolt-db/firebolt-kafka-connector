@@ -63,7 +63,10 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
         super.tearDown();
     }
 
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
+    // until then we will run these tests locally against core
     @ParameterizedTest
+//    @MethodSource("sqlAndBinaryTestSetupWithOrWithoutNulls")
     @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
     void testTimestampSerialization(boolean includeNulls, java.util.Map<String,String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for timestamp data type (schemaless)", testDescription);

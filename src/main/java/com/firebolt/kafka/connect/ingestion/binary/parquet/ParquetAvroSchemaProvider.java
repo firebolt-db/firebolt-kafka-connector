@@ -110,12 +110,22 @@ public class ParquetAvroSchemaProvider {
         String dataType = tableColumn.getDataType() == null ? "" : tableColumn.getDataType().toLowerCase();
 
         boolean isIntArray = dataType.startsWith("array(int");
+        boolean isBigIntArray = dataType.startsWith("array(bigint");
+        boolean isTimestampArray = dataType.startsWith("array(timestamp");
 
         // NOTE will add more datatypes as we develop
 
-        Schema itemSchema = isIntArray
-                ? SchemaBuilder.unionOf().nullType().and().intType().endUnion()
-                : SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
+        Schema itemSchema;
+        if (isIntArray) {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().intType().endUnion();
+        } else if (isBigIntArray) {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().longType().endUnion();
+        } else if (isTimestampArray) {
+            Schema tsMicros = LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG));
+            itemSchema = SchemaBuilder.unionOf().nullType().and().type(tsMicros).endUnion();
+        } else {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
+        }
 
         return SchemaBuilder.array().items(itemSchema);
     }
