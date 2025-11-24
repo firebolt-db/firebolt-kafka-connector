@@ -27,8 +27,8 @@ public class TableWriterProvider {
         this.ingestionServiceProvider = ingestionServiceProvider;
     }
 
-    public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, SinkConfig sinkConfig) {
-        IngestionService ingestionService = ingestionServiceProvider.get(connectionSupplier.get(), tableSchema, errorReporter, errorToleranceAll, sinkConfig);
+    public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, SinkConfig sinkConfig) {
+        IngestionService ingestionService = ingestionServiceProvider.get(connectionSupplier.get(), tableSchema, errorReporter, sinkConfig);
         return new TableWriter(tableSchema, fireboltMetadataService, topicName, processedPartitionOffsets, ingestionService);
     }
 }

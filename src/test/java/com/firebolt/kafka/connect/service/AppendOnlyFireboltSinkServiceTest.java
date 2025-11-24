@@ -213,7 +213,6 @@ public class AppendOnlyFireboltSinkServiceTest {
                 eq(TOPIC_A),
                 eq(Map.of(0, -1L)),
                 eq(mockErrorReporter),
-                eq(false),
                 any()
         )).thenReturn(writer);
 
@@ -251,7 +250,6 @@ public class AppendOnlyFireboltSinkServiceTest {
                 eq(TOPIC_A),
                 eq(Map.of(0, 10L)),
                 eq(mockErrorReporter),
-                eq(false),
                 any()
         )).thenReturn(writer);
 

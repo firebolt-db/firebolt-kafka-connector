@@ -116,7 +116,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
         Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
-        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, config);
+        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, config);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition
