@@ -2,7 +2,7 @@ package com.firebolt.kafka.connect.integration.json.schemaless;
 
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.BooleanTestRecord;
-import com.firebolt.kafka.connect.utils.TestTag;
+ 
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -10,17 +10,16 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -42,8 +41,6 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         // Generate unique connector name for this test run
         generateUniqueConnectorName("boolean-serializer-test");
         
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, booleanTableSchema());
     }
     
     @AfterEach
@@ -60,11 +57,13 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testBooleanSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testBooleanSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for boolean data type (schemaless)", testDescription);
+
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, booleanTableSchema(), connectorOverrides);
+
         producer = initializeSchemalessJsonProducer(includeNulls);
         
         List<BooleanTestRecord> testRecords = createTestRecords();
@@ -76,8 +75,12 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         verifyBooleanRecordsInFirebolt(testRecords);
     }
 
-    @Test
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues() throws Exception {
+    @ParameterizedTest
+    @MethodSource("sqlIngestionOnly")
+    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, booleanTableSchema(), connectorOverrides);
+
         producer = initializeSchemalessJsonProducer();
 
         BooleanTestRecord validRecord1 = aValidTestRecord(101)

@@ -15,6 +15,7 @@ import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,8 +51,6 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
 
         generateUniqueConnectorName("all-data-types-test-connector");
 
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(ALL_DATA_TYPES_TOPIC_NAME, ALL_DATA_TYPES_TABLE_NAME, allDataTypesTableSchema());
     }
     
     @AfterEach
@@ -68,12 +67,14 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
     }
 
     @ParameterizedTest
-    @CsvSource({
-            "true, 'WITH null fields included in JSON as field: null'",
-            "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testAllDataTypesJsonSchemaSerializationAndKafkaConnectProcessing(boolean includeNulls, String testDescription) throws Exception {
-        producer =  initializeSchemalessJsonProducer(includeNulls);
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testAllDataTypesJsonSchemaSerializationAndKafkaConnectProcessing(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for all data types (schemaless)", testDescription);
+
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(ALL_DATA_TYPES_TOPIC_NAME, ALL_DATA_TYPES_TABLE_NAME, allDataTypesTableSchema(), connectorOverrides);
+
+        producer = initializeSchemalessJsonProducer(includeNulls);
         
         // Generate 5 test messages with different data patterns
         List<AllDataTypesTestRecord> testRecords = generateAllDataTypesTestRecords();

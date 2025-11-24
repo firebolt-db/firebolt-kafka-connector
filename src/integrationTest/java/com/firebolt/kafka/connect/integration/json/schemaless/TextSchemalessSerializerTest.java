@@ -1,8 +1,7 @@
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
-import com.firebolt.kafka.connect.utils.TestTag;
-import org.junit.jupiter.api.Tag;
+ 
 import com.firebolt.kafka.connect.integration.json.datatype.TextTestRecord;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -11,6 +10,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
@@ -19,7 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -41,8 +41,7 @@ public class TextSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
         // Generate unique connector name for this test run
         generateUniqueConnectorName("text-serializer-test");
 
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, textTableSchema());
+        // moved setup to test methods
     }
     
     @AfterEach
@@ -59,11 +58,13 @@ public class TextSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "true,  'WITH null fields included in JSON as field: null'",
-        "false, 'WITH null fields omitted from JSON entirely'"
-    })
-    void testTextSerialization(boolean includeNulls, String testDescription) throws Exception {
+    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    void testTextSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
+        log.info("Running {} for text data type (schemaless)", testDescription);
+
+        // Setup test resources using centralized method
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, textTableSchema(), connectorOverrides);
+
         producer = initializeSchemalessJsonProducer(includeNulls);
         
         List<TextTestRecord> testRecords = createTestRecords();
