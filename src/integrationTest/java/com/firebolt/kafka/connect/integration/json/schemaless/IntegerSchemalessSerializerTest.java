@@ -55,7 +55,10 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         super.tearDown();
     }
 
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
+    // until then we will run these tests locally against core
     @ParameterizedTest
+//    @MethodSource("sqlAndBinaryTestSetupWithOrWithoutNulls")
     @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
     void testIntegerSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for integer data type (schemaless)", testDescription);
@@ -76,7 +79,10 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         verifyIntegerRecordsInFirebolt(testRecords);
     }
 
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryIngestionTypes
+    // until then we will run these tests locally against core
     @ParameterizedTest
+//    @MethodSource("sqlAndBinaryIngestionTypes")
     @MethodSource("sqlIngestionOnly")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
@@ -252,6 +258,7 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredInteger\", \"optionalInteger\", " +
             "\"optionalShort\", \"optionalByte\", " +
+            " \"integerFromString\", \"requiredListWithNullableElements\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\", \"integerFromString\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -309,18 +316,18 @@ public class IntegerSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 }
                 
                 // Array verification using getArray()
-                verifyIntegerArray("requiredListWithNullableElements", 
+                verifyIntegerArray("requiredListWithNullableElements",
                     expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex, true);
-                    
-                verifyIntegerArray("requiredListWithNonNullElements", 
+
+                verifyIntegerArray("requiredListWithNonNullElements",
                     expected.getRequiredListWithNonNullElements(), actualRequiredListWithNonNullArray, recordIndex, false);
-                
+
                 // Optional list verification
-                verifyIntegerArray("optionalList", 
+                verifyIntegerArray("optionalList",
                     expected.getOptionalList(), actualOptionalListArray, recordIndex, true);
-                
+
                 // Optional list with non-null elements verification
-                verifyIntegerArray("optionalListWithNonNullElements", 
+                verifyIntegerArray("optionalListWithNonNullElements",
                     expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex, false);
 
                 // Verify integerFromString column matches parsed value of string

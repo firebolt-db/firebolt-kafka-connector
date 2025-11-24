@@ -41,4 +41,9 @@ public class SchemalessIntegerColumnDataTypeConverter extends AbstractColumnType
         throw aColumnConversionFailedException(fireboltColumn, value);
     }
 
+    @Override
+    public Class<Integer> getConvertedType() {
+        return Integer.class;
+    }
+
 }

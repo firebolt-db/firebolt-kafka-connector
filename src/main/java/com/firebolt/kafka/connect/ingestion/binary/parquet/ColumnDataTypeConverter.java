@@ -9,4 +9,9 @@ public interface ColumnDataTypeConverter<T extends KafkaMessageColumnValue, R> {
 
     R toParquetValue(T value, TableSchema.Column tableColumn) throws ColumnConversionFailedException;
 
+    /**
+     * Retuns the class of the converted value. E.g if we convert to an integer this would be then Integer.class
+     * @return
+     */
+    Class<R> getConvertedType();
 }

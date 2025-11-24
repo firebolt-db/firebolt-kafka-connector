@@ -559,7 +559,7 @@ public abstract class BaseIntegrationTest {
         );
     }
 
-    protected static Stream<Arguments> ingestionTypes() {
+    protected static Stream<Arguments> sqlAndBinaryIngestionTypes() {
         return Stream.of(
                 Arguments.of( Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
                 Arguments.of( Map.of("ingestion.type", "binary"), "sql ingestion without null values")
