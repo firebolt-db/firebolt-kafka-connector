@@ -6,8 +6,7 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.TableWriter;
 import com.firebolt.kafka.connect.convert.RecordConverterFactory;
 import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
-
-import java.lang.reflect.Field;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -18,9 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
-import com.firebolt.kafka.connect.service.AppendOnlyFireboltSinkService.TableWriterProvider;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -39,9 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -219,7 +213,6 @@ public class AppendOnlyFireboltSinkServiceTest {
                 eq(TOPIC_A),
                 eq(Map.of(0, -1L)),
                 eq(mockErrorReporter),
-                eq(false),
                 any()
         )).thenReturn(writer);
 
@@ -257,7 +250,6 @@ public class AppendOnlyFireboltSinkServiceTest {
                 eq(TOPIC_A),
                 eq(Map.of(0, 10L)),
                 eq(mockErrorReporter),
-                eq(false),
                 any()
         )).thenReturn(writer);
 

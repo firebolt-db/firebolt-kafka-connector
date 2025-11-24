@@ -2,6 +2,8 @@ package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.FireboltRecord;
+import com.firebolt.kafka.connect.IngestionService;
+import com.firebolt.kafka.connect.IngestionServiceProvider;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.TableWriter;
@@ -114,7 +116,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
         Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
-        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
+        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, config);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition
@@ -193,14 +195,5 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
                 .filter(Optional::isPresent)  // when the sink record cannot be processed it will be retuned as empty, so only keep the ones that were successfully processed
                 .map(Optional::get)
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * For easier testing
-     */
-    static class TableWriterProvider {
-        public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, boolean errorToleranceAll, Optional<String> postProcessingScript) {
-            return new TableWriter(tableSchema, connectionSupplier, fireboltMetadataService, topicName, processedPartitionOffsets, errorReporter, errorToleranceAll, postProcessingScript);
-        }
     }
 }

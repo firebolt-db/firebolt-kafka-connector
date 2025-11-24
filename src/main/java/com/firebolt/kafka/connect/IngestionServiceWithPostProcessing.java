@@ -24,7 +24,10 @@ public class IngestionServiceWithPostProcessing implements IngestionService {
     private static final String FIREBOLT_BATCH_ID_KEY = "firebolt_param.batch_id";
 
     private IngestionService ingestionService;
+
+    // This is the same connection that is used in the IngestionService
     private Connection connection;
+
     private String postProcessingScript;
 
     public IngestionServiceWithPostProcessing(IngestionService ingestionService, Connection connection, String postProcessingScript) {
@@ -69,6 +72,25 @@ public class IngestionServiceWithPostProcessing implements IngestionService {
             }
         }
 
+    }
+
+    @Override
+    public void close() {
+        if (ingestionService!= null) {
+            try {
+                ingestionService.close();
+            } catch (Exception e) {
+                log.error("Failed to close the ingestion service");
+            }
+        }
+
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                log.error("Failed to close connection");
+            }
+        }
     }
 
     /**
