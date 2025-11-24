@@ -5,18 +5,21 @@ import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBigIntColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 
 public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeConverterFactory {
 
     private SchemalessIntegerColumnDataTypeConverter integerDataTypeConverter;
     private SchemalessBigIntColumnDataTypeConverter bigIntDataTypeConverter;
+    private SchemalessTimestampColumnDataTypeConverter timestampDataTypeConverter;
     private SchemalessArrayColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemalessColumnDataTypeConverterFactory() {
         this(
                 new SchemalessIntegerColumnDataTypeConverter(),
                 new SchemalessBigIntColumnDataTypeConverter(),
+                new SchemalessTimestampColumnDataTypeConverter(),
                 new SchemalessArrayColumnDataTypeConverter()
         );
     }
@@ -24,14 +27,17 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
     @VisibleForTesting
     SchemalessColumnDataTypeConverterFactory(SchemalessIntegerColumnDataTypeConverter integerDataTypeConverter,
                                              SchemalessBigIntColumnDataTypeConverter bigIntDataTypeConverter,
+                                             SchemalessTimestampColumnDataTypeConverter timestampDataTypeConverter,
                                              SchemalessArrayColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
+        this.timestampDataTypeConverter = timestampDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         // need to populate the array column data type with the values that it can convert
         arrayColumnDataTypeConverter.addConverter(Integer.class, integerDataTypeConverter);
         arrayColumnDataTypeConverter.addConverter(Long.class, bigIntDataTypeConverter);
+        arrayColumnDataTypeConverter.setTimestampConverter(timestampDataTypeConverter);
     }
 
     @Override
@@ -43,6 +49,8 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
                 return integerDataTypeConverter;
             case BIGINT:
                 return bigIntDataTypeConverter;
+            case TIMESTAMP:
+                return timestampDataTypeConverter;
             case ARRAY:
                 return arrayColumnDataTypeConverter;
         }

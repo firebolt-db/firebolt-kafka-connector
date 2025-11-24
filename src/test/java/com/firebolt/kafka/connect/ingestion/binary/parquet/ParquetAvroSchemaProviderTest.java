@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ParquetAvroSchemaProviderTest {
 
@@ -152,6 +153,45 @@ class ParquetAvroSchemaProviderTest {
         assertEquals(expectedBase, colSchemna.getType());
         assertNotNull(colSchemna.getLogicalType());
         assertEquals(expectedLogicalTypeName, colSchemna.getLogicalType().getName());
+    }
+
+    @Test
+    void nonNullableArrayBigintHasItemUnionNullLong() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("arr", "array(bigint)", Types.ARRAY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("arr");
+        assertNotNull(field);
+
+        assertEquals(Schema.Type.ARRAY, field.schema().getType());
+        Schema element = field.schema().getElementType();
+        assertEquals(Schema.Type.UNION, element.getType());
+        List<Schema> itemTypes = element.getTypes();
+        assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+        assertEquals(Schema.Type.LONG, itemTypes.get(1).getType());
+        assertNull(itemTypes.get(1).getLogicalType());
+    }
+
+    @Test
+    void nonNullableArrayTimestampHasItemUnionNullTimestampMicrosLong() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("arr_ts", "array(timestamp)", Types.ARRAY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("arr_ts");
+        assertNotNull(field);
+
+        assertEquals(Schema.Type.ARRAY, field.schema().getType());
+        Schema element = field.schema().getElementType();
+        assertEquals(Schema.Type.UNION, element.getType());
+        List<Schema> itemTypes = element.getTypes();
+        assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+        assertEquals(Schema.Type.LONG, itemTypes.get(1).getType());
+        assertNotNull(itemTypes.get(1).getLogicalType());
+        assertEquals("timestamp-micros", itemTypes.get(1).getLogicalType().getName());
     }
 }
 
