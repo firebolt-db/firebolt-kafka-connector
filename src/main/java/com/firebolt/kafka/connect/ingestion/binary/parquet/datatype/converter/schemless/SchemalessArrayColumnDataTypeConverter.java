@@ -19,9 +19,11 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private static final String INTEGER_TYPE_NAME = "integer";
     private static final String BIGINT_TYPE_NAME = "bigint";
     private static final String TIMESTAMP_TYPE_NAME = "timestamp";
+    private static final String TIMESTAMPTZ_TYPE_NAME = "timestamptz";
 
     private Map<Class<?>, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
     private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> timestampConverter;
+    private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> timestamptzConverter;
 
     @Override
     public List<? extends Object> toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column tableColumn) throws ColumnConversionFailedException {
@@ -41,6 +43,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (typeName.equals(TIMESTAMP_TYPE_NAME)) {
             return asTimestampArray(elements, tableColumn);
+        }
+        if (typeName.equals(TIMESTAMPTZ_TYPE_NAME)) {
+            return asTimestamptzArray(elements, tableColumn);
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -68,6 +73,13 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
             throw new IllegalArgumentException("Timestamp converter must convert to Long (micros)");
         }
         this.timestampConverter = converter;
+    }
+
+    public void setTimestamptzConverter(ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter) {
+        if (converter.getConvertedType() != Long.class) {
+            throw new IllegalArgumentException("Timestamptz converter must convert to Long (micros)");
+        }
+        this.timestamptzConverter = converter;
     }
 
     // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
@@ -117,6 +129,19 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return timestamps;
     }
 
+    private List<? extends Object> asTimestamptzArray(List<?> elements, TableSchema.Column tableColumn) {
+        List<Long> timestamps = new ArrayList<>();
+        for (Object element : elements) {
+            if (element == null) {
+                timestamps.add(null);
+            } else {
+                Long convertedValue = timestamptzConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                timestamps.add(convertedValue);
+            }
+        }
+        return timestamps;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
@@ -127,6 +152,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (fireboltColumn.getDataType().equals("array(timestamp)")) {
             return TIMESTAMP_TYPE_NAME;
+        }
+        if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
+            return TIMESTAMPTZ_TYPE_NAME;
         }
 
         // add more data types

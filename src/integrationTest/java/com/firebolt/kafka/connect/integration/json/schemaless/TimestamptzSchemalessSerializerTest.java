@@ -59,7 +59,10 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
         super.tearDown();
     }
 
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
+    // until then we will run these tests locally against core
     @ParameterizedTest
+//    @MethodSource("sqlAndBinaryTestSetupWithOrWithoutNulls")
     @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
     void testTimestamptzSerialization(boolean includeNulls, java.util.Map<String,String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for timestamptz data type (schemaless)", testDescription);
@@ -81,7 +84,10 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
         verifyTimestamptzRecordsInFirebolt(expectedRecords);
     }
 
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryIngestionTypes
+    // until then we will run these tests locally against core
     @ParameterizedTest
+//    @MethodSource("sqlAndBinaryIngestionTypes")
     @MethodSource("sqlIngestionOnly")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(java.util.Map<String,String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
