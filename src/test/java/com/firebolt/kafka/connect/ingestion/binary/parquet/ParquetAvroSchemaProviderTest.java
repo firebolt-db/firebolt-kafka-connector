@@ -211,6 +211,26 @@ class ParquetAvroSchemaProviderTest {
         assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
         assertEquals(Schema.Type.DOUBLE, itemTypes.get(1).getType());
     }
+
+    @Test
+    void nonNullableArrayDateHasItemUnionNullDateInt() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("arr_date", "array(date)", Types.ARRAY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("arr_date");
+        assertNotNull(field);
+
+        assertEquals(Schema.Type.ARRAY, field.schema().getType());
+        Schema element = field.schema().getElementType();
+        assertEquals(Schema.Type.UNION, element.getType());
+        List<Schema> itemTypes = element.getTypes();
+        assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+        assertEquals(Schema.Type.INT, itemTypes.get(1).getType());
+        assertNotNull(itemTypes.get(1).getLogicalType());
+        assertEquals("date", itemTypes.get(1).getLogicalType().getName());
+    }
     @Test
     void nonNullableArrayDecimalHasItemUnionNullString() {
         TableSchema schema = new TableSchema("t");
