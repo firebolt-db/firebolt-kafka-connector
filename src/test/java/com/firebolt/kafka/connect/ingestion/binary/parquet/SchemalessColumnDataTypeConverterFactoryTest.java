@@ -4,6 +4,7 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBigIntColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -52,8 +53,27 @@ class SchemalessColumnDataTypeConverterFactoryTest {
 
     @ParameterizedTest
     @CsvSource({
+            "timestamp"
+    })
+    void returnsTimestampConverterForTimestamp(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("createdAt", dataType, java.sql.Types.TIMESTAMP, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessTimestampColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "array(timestamp)"
+    })
+    void returnsArrayConverterForArrayTimestamp(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("eventsTs", dataType, java.sql.Types.ARRAY, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "text",
-            "timestamp",
             "numeric",
             "bytea",
             "real"
