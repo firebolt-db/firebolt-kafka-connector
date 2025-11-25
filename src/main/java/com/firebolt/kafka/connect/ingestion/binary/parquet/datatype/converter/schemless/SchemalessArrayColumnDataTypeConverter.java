@@ -1,30 +1,15 @@
 package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless;
 
-import com.firebolt.kafka.connect.KafkaMessageColumnValue;
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.datatype.converter.CompositeDataTypeConverter;
-import com.firebolt.kafka.connect.datatype.converter.FireboltByteaConverter;
-import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
-import com.firebolt.kafka.connect.datatype.converter.TimestampUtil;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractColumnTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.ColumnDataTypeConverter;
-import java.nio.ByteBuffer;
-import java.sql.Array;
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 
@@ -32,12 +17,13 @@ import org.apache.commons.collections.CollectionUtils;
 public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeConverter<SchemalessKafkaMessageColumnValue, List<? extends Object>> {
 
     private static final String INTEGER_TYPE_NAME = "integer";
+    private static final String BIGINT_TYPE_NAME = "bigint";
 
-    private Map<Class, ColumnDataTypeConverter> converters = new HashMap<>();
+    private Map<Class<?>, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
 
     @Override
     public List<? extends Object> toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column tableColumn) throws ColumnConversionFailedException {
-        List<Object> elements = (List) schemalessKafkaMessageColumnValue.getValue();
+        List<?> elements = (List<?>) schemalessKafkaMessageColumnValue.getValue();
 
         String typeName = detectTypeName(tableColumn);
         if (CollectionUtils.isEmpty(elements)) {
@@ -47,6 +33,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
         if (typeName.equals(INTEGER_TYPE_NAME)) {
             return asIntArray(elements, tableColumn);
+        }
+        if (typeName.equals(BIGINT_TYPE_NAME)) {
+            return asLongArray(elements, tableColumn);
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -60,7 +49,7 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return clazz;
     }
 
-    public void addConverter(Class type, ColumnDataTypeConverter converter) {
+    public <R> void addConverter(Class<R> type, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, R> converter) {
         //make sure the converters match the same type
         if (converter.getConvertedType() != type) {
             throw new IllegalArgumentException("Cannot convert to " + type + "using " + converter.getClass());
@@ -71,24 +60,49 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
 
     // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
     // as this is should be the inner table column not the outer one
-    private List<? extends Object> asIntArray(List<Object> elements, TableSchema.Column tableColumn) {
+    private List<? extends Object> asIntArray(List<?> elements, TableSchema.Column tableColumn) {
         List<Integer> integers = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(Integer.class);
+
         for (Object element : elements) {
             if (element == null) {
                 integers.add(null);
             } else {
-                ColumnDataTypeConverter converter = converters.get(Integer.class);
-                Integer convertedValue = (Integer) converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                Integer convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
                 integers.add(convertedValue);
             }
         }
         return integers;
     }
 
+    private List<? extends Object> asLongArray(List<?> elements, TableSchema.Column tableColumn) {
+        List<Long> longs = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(Long.class);
+
+        for (Object element : elements) {
+            if (element == null) {
+                longs.add(null);
+            } else {
+                Long convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                longs.add(convertedValue);
+            }
+        }
+        return longs;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
             return INTEGER_TYPE_NAME;
+        }
+        if (fireboltColumn.getDataType().equals("array(bigint)")) {
+            return BIGINT_TYPE_NAME;
         }
 
         // add more data types
