@@ -113,6 +113,7 @@ public class ParquetAvroSchemaProvider {
         boolean isBigIntArray = dataType.startsWith("array(bigint");
         boolean isTimestampArray = dataType.startsWith("array(timestamp");
         boolean isTimestamptzArray = dataType.startsWith("array(timestamptz");
+        boolean isRealArray = dataType.startsWith("array(real");
 
         // NOTE will add more datatypes as we develop
 
@@ -124,6 +125,8 @@ public class ParquetAvroSchemaProvider {
         } else if (isTimestampArray || isTimestamptzArray) {
             Schema tsMicros = LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG));
             itemSchema = SchemaBuilder.unionOf().nullType().and().type(tsMicros).endUnion();
+        } else if (isRealArray) {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().floatType().endUnion();
         } else {
             itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
         }
