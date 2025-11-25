@@ -71,7 +71,7 @@ class ParquetAvroSchemaProviderTest {
             "DATE,INT",
             "TIMESTAMP,LONG",
             "TIMESTAMP_WITH_TIMEZONE,LONG",
-            "NUMERIC,STRING",
+            "NUMERIC,BYTES",
             "VARCHAR,STRING"
     })
     void mapsNonNullableSqlTypesToExpectedAvroTypes(String sqlTypeName, String expectedAvroTypeName) throws Exception {
@@ -100,7 +100,7 @@ class ParquetAvroSchemaProviderTest {
             "DATE,INT",
             "TIMESTAMP,LONG",
             "TIMESTAMP_WITH_TIMEZONE,LONG",
-            "NUMERIC,STRING",
+            "NUMERIC,BYTES",
             "VARCHAR,STRING"
     })
     void mapsNullableSqlTypesToUnionWithNull(String sqlTypeName, String expectedAvroTypeName) throws Exception {
@@ -192,6 +192,24 @@ class ParquetAvroSchemaProviderTest {
         assertEquals(Schema.Type.LONG, itemTypes.get(1).getType());
         assertNotNull(itemTypes.get(1).getLogicalType());
         assertEquals("timestamp-micros", itemTypes.get(1).getLogicalType().getName());
+    }
+
+    @Test
+    void nonNullableArrayDecimalHasItemUnionNullString() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("arr_dec", "array(numeric)", Types.ARRAY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("arr_dec");
+        assertNotNull(field);
+
+        assertEquals(Schema.Type.ARRAY, field.schema().getType());
+        Schema element = field.schema().getElementType();
+        assertEquals(Schema.Type.UNION, element.getType());
+        List<Schema> itemTypes = element.getTypes();
+        assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+        assertEquals(Schema.Type.BYTES, itemTypes.get(1).getType());
     }
 
     @Test
