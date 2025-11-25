@@ -118,7 +118,8 @@ public class ParquetAvroSchemaProvider {
         boolean isTimestampArray = dataType.startsWith("array(timestamp");
         boolean isTimestamptzArray = dataType.startsWith("array(timestamptz");
         boolean isRealArray = dataType.startsWith("array(real");
-        boolean isDecimalArray = dataType.startsWith("array(numeric");
+        boolean isDoubleArray = dataType.startsWith("array(double");
+        boolean isDecimalArray = dataType.startsWith("array(numeric") || dataType.startsWith("array(decimal");
 
         // NOTE will add more datatypes as we develop
 
@@ -132,6 +133,8 @@ public class ParquetAvroSchemaProvider {
             itemSchema = SchemaBuilder.unionOf().nullType().and().type(tsMicros).endUnion();
         } else if (isRealArray) {
             itemSchema = SchemaBuilder.unionOf().nullType().and().floatType().endUnion();
+        } else if (isDoubleArray) {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().doubleType().endUnion();
         } else if (isDecimalArray) {
             // TODO read the precision and scale from the column
             Schema decimal = LogicalTypes.decimal(38, 9)

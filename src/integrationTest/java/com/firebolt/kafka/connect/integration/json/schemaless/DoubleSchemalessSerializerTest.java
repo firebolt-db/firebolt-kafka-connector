@@ -56,7 +56,10 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
         super.tearDown();
     }
 
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
+    // until then we will run these tests locally against core
     @ParameterizedTest
+//    @MethodSource("sqlAndBinaryTestSetupWithOrWithoutNulls")
     @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
     void testDoubleSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for double precision data type (schemaless)", testDescription);
@@ -556,7 +559,10 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
                 .optionalListWithNonNullElements(Arrays.asList(111.1, 222.2, 333.3));
     }
 
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryIngestionTypes
+    // until then we will run these tests locally against core
     @ParameterizedTest
+//    @MethodSource("sqlAndBinaryIngestionTypes")
     @MethodSource("sqlIngestionOnly")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
