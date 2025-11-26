@@ -121,6 +121,7 @@ public class ParquetAvroSchemaProvider {
         boolean isDoubleArray = dataType.startsWith("array(double");
         boolean isDecimalArray = dataType.startsWith("array(numeric") || dataType.startsWith("array(decimal");
         boolean isDateArray = dataType.startsWith("array(date");
+        boolean isTextArray = dataType.startsWith("array(text");
 
         // NOTE will add more datatypes as we develop
 
@@ -144,6 +145,8 @@ public class ParquetAvroSchemaProvider {
         } else if (isDateArray) {
             Schema date = LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT));
             itemSchema = SchemaBuilder.unionOf().nullType().and().type(date).endUnion();
+        } else if (isTextArray) {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
         } else {
             itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
         }
