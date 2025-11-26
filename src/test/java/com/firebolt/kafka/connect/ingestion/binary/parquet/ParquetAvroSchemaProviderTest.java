@@ -251,6 +251,24 @@ class ParquetAvroSchemaProviderTest {
     }
 
     @Test
+    void nonNullableArrayBooleanHasItemUnionNullBoolean() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("arr_bool", "array(boolean)", Types.ARRAY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("arr_bool");
+        assertNotNull(field);
+
+        assertEquals(Schema.Type.ARRAY, field.schema().getType());
+        Schema element = field.schema().getElementType();
+        assertEquals(Schema.Type.UNION, element.getType());
+        List<Schema> itemTypes = element.getTypes();
+        assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+        assertEquals(Schema.Type.BOOLEAN, itemTypes.get(1).getType());
+    }
+
+    @Test
     void nonNullableArrayDecimalHasItemUnionNullString() {
         TableSchema schema = new TableSchema("t");
         schema.addColumn("arr_dec", "array(numeric)", Types.ARRAY, false);
