@@ -24,6 +24,7 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private static final String REAL_TYPE_NAME = "real";
     private static final String DOUBLE_TYPE_NAME = "double";
     private static final String DECIMAL_TYPE_NAME = "numeric";
+    private static final String DATE_TYPE_NAME = "date";
 
     private Map<Class<?>, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
     private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> timestampConverter;
@@ -59,6 +60,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (typeName.equals(DECIMAL_TYPE_NAME)) {
             return asDecimalArray(elements, tableColumn);
+        }
+        if (typeName.equals(DATE_TYPE_NAME)) {
+            return asDateArray(elements, tableColumn);
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -213,6 +217,24 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return doubles;
     }
 
+    private List<? extends Object> asDateArray(List<?> elements, TableSchema.Column tableColumn) {
+        List<Integer> days = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(Integer.class);
+
+        for (Object element : elements) {
+            if (element == null) {
+                days.add(null);
+            } else {
+                Integer convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                days.add(convertedValue);
+            }
+        }
+        return days;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
@@ -235,6 +257,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (fireboltColumn.getDataType().equals("array(numeric)") || fireboltColumn.getDataType().equals("array(decimal)")) {
             return DECIMAL_TYPE_NAME;
+        }
+        if (fireboltColumn.getDataType().equals("array(date)")) {
+            return DATE_TYPE_NAME;
         }
 
         // add more data types
