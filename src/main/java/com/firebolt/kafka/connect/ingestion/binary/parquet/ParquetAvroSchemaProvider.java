@@ -122,6 +122,7 @@ public class ParquetAvroSchemaProvider {
         boolean isDecimalArray = dataType.startsWith("array(numeric") || dataType.startsWith("array(decimal");
         boolean isDateArray = dataType.startsWith("array(date");
         boolean isTextArray = dataType.startsWith("array(text");
+        boolean isBooleanArray = dataType.startsWith("array(boolean");
 
         // NOTE will add more datatypes as we develop
 
@@ -147,6 +148,8 @@ public class ParquetAvroSchemaProvider {
             itemSchema = SchemaBuilder.unionOf().nullType().and().type(date).endUnion();
         } else if (isTextArray) {
             itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
+        } else if (isBooleanArray) {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().booleanType().endUnion();
         } else {
             itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
         }
