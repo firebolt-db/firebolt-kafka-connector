@@ -13,6 +13,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDateColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTextColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBooleanColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessByteaColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 
@@ -28,6 +29,7 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
     private SchemalessDateColumnDataTypeConverter dateDataTypeConverter;
     private SchemalessTextColumnDataTypeConverter textDataTypeConverter;
     private SchemalessBooleanColumnDataTypeConverter booleanDataTypeConverter;
+    private SchemalessByteaColumnDataTypeConverter byteaDataTypeConverter;
     private SchemalessArrayColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemalessColumnDataTypeConverterFactory() {
@@ -42,6 +44,7 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
                 new SchemalessDateColumnDataTypeConverter(),
                 new SchemalessTextColumnDataTypeConverter(),
                 new SchemalessBooleanColumnDataTypeConverter(),
+                new SchemalessByteaColumnDataTypeConverter(),
                 new SchemalessArrayColumnDataTypeConverter()
         );
     }
@@ -57,6 +60,7 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
                                              SchemalessDateColumnDataTypeConverter dateDataTypeConverter,
                                              SchemalessTextColumnDataTypeConverter textDataTypeConverter,
                                              SchemalessBooleanColumnDataTypeConverter booleanDataTypeConverter,
+                                             SchemalessByteaColumnDataTypeConverter byteaDataTypeConverter,
                                              SchemalessArrayColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
@@ -68,6 +72,7 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
         this.dateDataTypeConverter = dateDataTypeConverter;
         this.textDataTypeConverter = textDataTypeConverter;
         this.booleanDataTypeConverter = booleanDataTypeConverter;
+        this.byteaDataTypeConverter = byteaDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         // need to populate the array column data type with the values that it can convert
@@ -81,6 +86,7 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
         arrayColumnDataTypeConverter.addConverter(Boolean.class, booleanDataTypeConverter);
         arrayColumnDataTypeConverter.setTimestampConverter(timestampDataTypeConverter);
         arrayColumnDataTypeConverter.setTimestamptzConverter(timestamptzDataTypeConverter);
+        arrayColumnDataTypeConverter.setByteaConverter(byteaDataTypeConverter);
     }
 
     @Override
@@ -108,6 +114,8 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
                 return textDataTypeConverter;
             case BOOLEAN:
                 return booleanDataTypeConverter;
+            case BYTEA:
+                return byteaDataTypeConverter;
             case ARRAY:
                 return arrayColumnDataTypeConverter;
         }

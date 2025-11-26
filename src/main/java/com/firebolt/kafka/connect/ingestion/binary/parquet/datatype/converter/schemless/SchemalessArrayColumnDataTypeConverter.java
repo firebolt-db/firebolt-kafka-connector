@@ -26,11 +26,13 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private static final String DECIMAL_TYPE_NAME = "numeric";
     private static final String DATE_TYPE_NAME = "date";
     private static final String TEXT_TYPE_NAME = "text";
+    private static final String BYTEA_TYPE_NAME = "bytea";
     private static final String BOOLEAN_TYPE_NAME = "boolean";
 
     private Map<Class<?>, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
     private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> timestampConverter;
     private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> timestamptzConverter;
+    private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer> byteaConverter;
 
     @Override
     public List<? extends Object> toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column tableColumn) throws ColumnConversionFailedException {
@@ -68,6 +70,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (typeName.equals(TEXT_TYPE_NAME)) {
             return asTextArray(elements, tableColumn);
+        }
+        if (typeName.equals(BYTEA_TYPE_NAME)) {
+            return asByteaArray(elements, tableColumn);
         }
         if (typeName.equals(BOOLEAN_TYPE_NAME)) {
             return asBooleanArray(elements, tableColumn);
@@ -107,6 +112,12 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         this.timestamptzConverter = converter;
     }
 
+    public void setByteaConverter(ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer> converter) {
+        if (converter.getConvertedType() != ByteBuffer.class) {
+            throw new IllegalArgumentException("Bytea converter must convert to ByteBuffer");
+        }
+        this.byteaConverter = converter;
+    }
     // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
     // as this is should be the inner table column not the outer one
     private List<? extends Object> asIntArray(List<?> elements, TableSchema.Column tableColumn) {
@@ -261,6 +272,18 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return strings;
     }
 
+    private List<? extends Object> asByteaArray(List<?> elements, TableSchema.Column tableColumn) {
+        List<ByteBuffer> bufs = new ArrayList<>();
+        for (Object element : elements) {
+            if (element == null) {
+                bufs.add(null);
+            } else {
+                ByteBuffer convertedValue = byteaConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                bufs.add(convertedValue);
+            }
+        }
+        return bufs;
+    }
     private List<? extends Object> asBooleanArray(List<?> elements, TableSchema.Column tableColumn) {
         List<Boolean> values = new ArrayList<>();
         @SuppressWarnings("unchecked")
@@ -305,6 +328,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (fireboltColumn.getDataType().equals("array(text)")) {
             return TEXT_TYPE_NAME;
+        }
+        if (fireboltColumn.getDataType().equals("array(bytea)")) {
+            return BYTEA_TYPE_NAME;
         }
         if (fireboltColumn.getDataType().equals("array(boolean)")) {
             return BOOLEAN_TYPE_NAME;

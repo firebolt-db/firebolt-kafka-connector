@@ -136,7 +136,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
 
     @ParameterizedTest
     @CsvSource({
-            "bytea"
+            "struct",
+            "geography"
     })
     void throwsForUnsupportedTypes(String dataType) {
         TableSchema.Column col = new TableSchema.Column("c", dataType, java.sql.Types.OTHER, true);

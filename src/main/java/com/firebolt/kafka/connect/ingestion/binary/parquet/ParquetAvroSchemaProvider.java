@@ -123,6 +123,7 @@ public class ParquetAvroSchemaProvider {
         boolean isDateArray = dataType.startsWith("array(date");
         boolean isTextArray = dataType.startsWith("array(text");
         boolean isBooleanArray = dataType.startsWith("array(boolean");
+        boolean isByteaArray = dataType.startsWith("array(bytea");
 
         // NOTE will add more datatypes as we develop
 
@@ -150,6 +151,8 @@ public class ParquetAvroSchemaProvider {
             itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
         } else if (isBooleanArray) {
             itemSchema = SchemaBuilder.unionOf().nullType().and().booleanType().endUnion();
+        } else if (isByteaArray) {
+            itemSchema = SchemaBuilder.unionOf().nullType().and().bytesType().endUnion();
         } else {
             itemSchema = SchemaBuilder.unionOf().nullType().and().stringType().endUnion();
         }

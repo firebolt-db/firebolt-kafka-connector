@@ -254,7 +254,7 @@ public class FireboltColumnDataTypeTest {
     void testEnumValues() {
         FireboltColumnDataType[] values = FireboltColumnDataType.values();
         
-        assertEquals(12, values.length);
+        assertEquals(14, values.length);
         assertEquals(FireboltColumnDataType.INTEGER, values[0]);
         assertEquals(FireboltColumnDataType.ARRAY, values[1]);
         assertEquals(FireboltColumnDataType.TIMESTAMP, values[2]);
@@ -267,6 +267,8 @@ public class FireboltColumnDataTypeTest {
         assertEquals(FireboltColumnDataType.TEXT, values[9]);
         assertEquals(FireboltColumnDataType.BYTEA, values[10]);
         assertEquals(FireboltColumnDataType.BOOLEAN, values[11]);
+        assertEquals(FireboltColumnDataType.STRUCT, values[12]);
+        assertEquals(FireboltColumnDataType.GEOGRAPHY, values[13]);
     }
 
     @Test
