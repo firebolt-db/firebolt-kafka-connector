@@ -22,6 +22,7 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private static final String TIMESTAMP_TYPE_NAME = "timestamp";
     private static final String TIMESTAMPTZ_TYPE_NAME = "timestamptz";
     private static final String REAL_TYPE_NAME = "real";
+    private static final String DOUBLE_TYPE_NAME = "double";
     private static final String DECIMAL_TYPE_NAME = "numeric";
 
     private Map<Class<?>, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
@@ -52,6 +53,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (typeName.equals(REAL_TYPE_NAME)) {
             return asFloatArray(elements, tableColumn);
+        }
+        if (typeName.equals(DOUBLE_TYPE_NAME)) {
+            return asDoubleArray(elements, tableColumn);
         }
         if (typeName.equals(DECIMAL_TYPE_NAME)) {
             return asDecimalArray(elements, tableColumn);
@@ -191,6 +195,24 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return decimals;
     }
 
+    private List<? extends Object> asDoubleArray(List<?> elements, TableSchema.Column tableColumn) {
+        List<Double> doubles = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Double> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Double>) converters.get(Double.class);
+
+        for (Object element : elements) {
+            if (element == null) {
+                doubles.add(null);
+            } else {
+                Double convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                doubles.add(convertedValue);
+            }
+        }
+        return doubles;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
@@ -208,7 +230,10 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         if (fireboltColumn.getDataType().equals("array(real)")) {
             return REAL_TYPE_NAME;
         }
-        if (fireboltColumn.getDataType().equals("array(numeric)")) {
+        if (fireboltColumn.getDataType().equals("array(double precision)")) {
+            return DOUBLE_TYPE_NAME;
+        }
+        if (fireboltColumn.getDataType().equals("array(numeric)") || fireboltColumn.getDataType().equals("array(decimal)")) {
             return DECIMAL_TYPE_NAME;
         }
 
