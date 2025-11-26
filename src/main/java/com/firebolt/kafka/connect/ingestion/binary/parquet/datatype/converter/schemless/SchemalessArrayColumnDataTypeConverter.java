@@ -5,6 +5,7 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractColumnTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.ColumnDataTypeConverter;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private static final String TIMESTAMP_TYPE_NAME = "timestamp";
     private static final String TIMESTAMPTZ_TYPE_NAME = "timestamptz";
     private static final String REAL_TYPE_NAME = "real";
+    private static final String DECIMAL_TYPE_NAME = "numeric";
 
     private Map<Class<?>, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
     private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> timestampConverter;
@@ -50,6 +52,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (typeName.equals(REAL_TYPE_NAME)) {
             return asFloatArray(elements, tableColumn);
+        }
+        if (typeName.equals(DECIMAL_TYPE_NAME)) {
+            return asDecimalArray(elements, tableColumn);
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -168,6 +173,24 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return floats;
     }
 
+    private List<? extends Object> asDecimalArray(List<?> elements, TableSchema.Column tableColumn) {
+        List<ByteBuffer> decimals = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer>) converters.get(ByteBuffer.class);
+
+        for (Object element : elements) {
+            if (element == null) {
+                decimals.add(null);
+            } else {
+                ByteBuffer convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                decimals.add(convertedValue);
+            }
+        }
+        return decimals;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
@@ -184,6 +207,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (fireboltColumn.getDataType().equals("array(real)")) {
             return REAL_TYPE_NAME;
+        }
+        if (fireboltColumn.getDataType().equals("array(numeric)")) {
+            return DECIMAL_TYPE_NAME;
         }
 
         // add more data types

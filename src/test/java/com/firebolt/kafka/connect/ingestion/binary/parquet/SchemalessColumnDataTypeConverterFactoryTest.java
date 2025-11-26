@@ -4,6 +4,7 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDecimalColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -94,8 +95,27 @@ class SchemalessColumnDataTypeConverterFactoryTest {
 
     @ParameterizedTest
     @CsvSource({
+            "decimal", "numeric"
+    })
+    void returnsDecimalConverterForDecimal(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("amount", dataType, java.sql.Types.NUMERIC, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessDecimalColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "array(decimal)"
+    })
+    void returnsArrayConverterForArrayDecimal(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("amounts", dataType, java.sql.Types.ARRAY, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "text",
-            "numeric",
             "bytea"
     })
     void throwsForUnsupportedTypes(String dataType) {
