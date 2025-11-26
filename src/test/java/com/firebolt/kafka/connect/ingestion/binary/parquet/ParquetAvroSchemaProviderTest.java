@@ -209,9 +209,28 @@ class ParquetAvroSchemaProviderTest {
         assertEquals(Schema.Type.UNION, element.getType());
         List<Schema> itemTypes = element.getTypes();
         assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+
         assertEquals(Schema.Type.LONG, itemTypes.get(1).getType());
         assertNotNull(itemTypes.get(1).getLogicalType());
         assertEquals("timestamp-micros", itemTypes.get(1).getLogicalType().getName());
+    }
+
+    @Test
+    void nonNullableArrayRealHasItemUnionNullFloat() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("arr_real", "array(real)", Types.ARRAY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("arr_real");
+        assertNotNull(field);
+
+        assertEquals(Schema.Type.ARRAY, field.schema().getType());
+        Schema element = field.schema().getElementType();
+        assertEquals(Schema.Type.UNION, element.getType());
+        List<Schema> itemTypes = element.getTypes();
+        assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+        assertEquals(Schema.Type.FLOAT, itemTypes.get(1).getType());
     }
 }
 

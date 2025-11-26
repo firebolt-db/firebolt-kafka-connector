@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -63,6 +64,16 @@ class SchemalessColumnDataTypeConverterFactoryTest {
 
     @ParameterizedTest
     @CsvSource({
+            "real"
+    })
+    void returnsRealConverterForReal(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("price", dataType, java.sql.Types.REAL, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessRealColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "array(timestamptz)"
     })
     void returnsArrayConverterForArrayTimestamptz(String dataType) {
@@ -73,10 +84,19 @@ class SchemalessColumnDataTypeConverterFactoryTest {
 
     @ParameterizedTest
     @CsvSource({
+            "array(real)"
+    })
+    void returnsArrayConverterForArrayReal(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("prices", dataType, java.sql.Types.ARRAY, false);
+        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "text",
             "numeric",
-            "bytea",
-            "real"
+            "bytea"
     })
     void throwsForUnsupportedTypes(String dataType) {
         TableSchema.Column col = new TableSchema.Column("c", dataType, java.sql.Types.OTHER, true);

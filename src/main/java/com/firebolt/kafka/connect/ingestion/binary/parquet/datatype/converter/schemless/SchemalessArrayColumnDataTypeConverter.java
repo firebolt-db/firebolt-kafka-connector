@@ -20,6 +20,7 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private static final String BIGINT_TYPE_NAME = "bigint";
     private static final String TIMESTAMP_TYPE_NAME = "timestamp";
     private static final String TIMESTAMPTZ_TYPE_NAME = "timestamptz";
+    private static final String REAL_TYPE_NAME = "real";
 
     private Map<Class<?>, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
     private ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> timestampConverter;
@@ -46,6 +47,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (typeName.equals(TIMESTAMPTZ_TYPE_NAME)) {
             return asTimestamptzArray(elements, tableColumn);
+        }
+        if (typeName.equals(REAL_TYPE_NAME)) {
+            return asFloatArray(elements, tableColumn);
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -133,17 +137,35 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return timestamps;
     }
 
-    private List<? extends Object> asTimestamptzArray(List<?> elements, TableSchema.Column tableColumn) {
-        List<Long> timestamps = new ArrayList<>();
+    private List<? extends Object> asTimestamptzArray(List<?> elements, TableSchema.Column tableColumn){
+            List<Long> timestamps = new ArrayList<>();
+            for (Object element : elements) {
+                if (element == null) {
+                    timestamps.add(null);
+                } else {
+                    Long convertedValue = timestamptzConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                    timestamps.add(convertedValue);
+                }
+            }
+            return timestamps;
+    }
+
+    private List<? extends Object> asFloatArray(List<?> elements, TableSchema.Column tableColumn) {
+        List<Float> floats = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Float> converter =
+                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Float>) converters.get(Float.class);
+
         for (Object element : elements) {
             if (element == null) {
-                timestamps.add(null);
+                floats.add(null);
             } else {
-                Long convertedValue = timestamptzConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
-                timestamps.add(convertedValue);
+                Float convertedValue = converter.toParquetValue(new SchemalessKafkaMessageColumnValue(element), tableColumn);
+                floats.add(convertedValue);
             }
         }
-        return timestamps;
+        return floats;
     }
 
     private String detectTypeName(TableSchema.Column fireboltColumn) {
@@ -159,6 +181,9 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         }
         if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
             return TIMESTAMPTZ_TYPE_NAME;
+        }
+        if (fireboltColumn.getDataType().equals("array(real)")) {
+            return REAL_TYPE_NAME;
         }
 
         // add more data types
