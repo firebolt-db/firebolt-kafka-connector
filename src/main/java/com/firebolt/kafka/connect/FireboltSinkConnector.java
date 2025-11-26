@@ -41,7 +41,7 @@ public class FireboltSinkConnector extends SinkConnector {
     private FireboltDbService fireboltDbService;
 
     public FireboltSinkConnector() {
-        this(null);
+        this(new FireboltDbService());
     }
 
     @VisibleForTesting
@@ -142,9 +142,8 @@ public class FireboltSinkConnector extends SinkConnector {
     private void validateConnectionConfig(Map<String, String> connectorConfigs, 
                                         List<ConfigValue> configValues) {
         try {
-            FireboltDbService dbService = getOrCreateDbService(connectorConfigs);
             JdbcConfig jdbcConfig = getJdbcConfig(connectorConfigs);
-            dbService.testConnection(jdbcConfig);
+            fireboltDbService.testConnection(jdbcConfig);
             log.info("Connection validation successful for JDBC URL");
         } catch (ConnectionFailedException e) {
             log.warn("Connection validation failed: {}", e.getMessage());
@@ -191,8 +190,7 @@ public class FireboltSinkConnector extends SinkConnector {
             Set<String> tableNames = getTableNames(connectorConfigs);
             
             if (!tableNames.isEmpty()) {
-                FireboltDbService dbService = getOrCreateDbService(connectorConfigs);
-                Set<String> nonExistentTables = dbService.validateTablesExist(getJdbcConfig(connectorConfigs), tableNames);
+                Set<String> nonExistentTables = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tableNames);
                 
                 if (!nonExistentTables.isEmpty()) {
                     String errorMessage = String.format("The following tables do not exist in the database: %s. " +
@@ -262,8 +260,7 @@ public class FireboltSinkConnector extends SinkConnector {
                 return; // nothing to validate
             }
 
-            FireboltDbService dbService = getOrCreateDbService(connectorConfigs);
-            Set<String> missing = dbService.validateTablesExist(getJdbcConfig(connectorConfigs), tables);
+            Set<String> missing = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tables);
             if (!missing.isEmpty()) {
                 addErrorToConfig(configValues,
                         ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
@@ -351,18 +348,6 @@ public class FireboltSinkConnector extends SinkConnector {
                 .filter(cv -> cv.name().equals(name))
                 .findFirst()
                 .orElse(null);
-    }
-
-    /**
-     * Gets or creates a FireboltDbService instance. If one was injected for testing, use it.
-     * Otherwise, create a new one with a SinkConfig from the connector configs.
-     */
-    private FireboltDbService getOrCreateDbService(Map<String, String> connectorConfigs) {
-        if (fireboltDbService != null) {
-            return fireboltDbService;
-        }
-        SinkConfig sinkConfig = new SinkConfig(connectorConfigs);
-        return new FireboltDbService(sinkConfig);
     }
 
 }

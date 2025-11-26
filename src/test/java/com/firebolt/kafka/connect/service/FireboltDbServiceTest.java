@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.JdbcConfig;
-import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -16,8 +15,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,12 +33,10 @@ class FireboltDbServiceTest {
 
     private FireboltDbService fireboltDbService;
     private JdbcConfig jdbcConfig;
-    private SinkConfig sinkConfig;
 
     @BeforeEach
     void setUp() {
-        sinkConfig = new SinkConfig(new HashMap<>());
-        fireboltDbService = new FireboltDbService(sinkConfig);
+        fireboltDbService = new FireboltDbService();
         jdbcConfig = JdbcConfig.builder()
                 .jdbcConnectionUrl("jdbc:firebolt:test_database?engine=test_engine&account=test_account")
                 .clientId(Optional.of("test_client_id"))
