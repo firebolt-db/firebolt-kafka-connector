@@ -354,40 +354,6 @@ public class SinkConfigTest {
         assertFalse(result);
     }
 
-    @ParameterizedTest
-    @CsvSource({
-        "true, true",
-        "false, false"
-    })
-    void testIsOptimizeInsertsWithBooleanValues(String value, boolean expected) {
-        configMap.put(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG, value);
-        SinkConfig testConfig = new SinkConfig(configMap);
-
-        boolean result = testConfig.isOptimizeInserts();
-
-        assertEquals(expected, result);
-    }
-
-    @Test
-    void testIsOptimizeInsertsWhenOmittedDefaultsToFalse() {
-        configMap.remove(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG);
-        SinkConfig testConfig = new SinkConfig(configMap);
-
-        boolean result = testConfig.isOptimizeInserts();
-
-        assertFalse(result);
-    }
-
-    @Test
-    void testIsOptimizeInsertsWhenNullDefaultsToFalse() {
-        configMap.put(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG, null);
-        SinkConfig testConfig = new SinkConfig(configMap);
-
-        boolean result = testConfig.isOptimizeInserts();
-
-        assertFalse(result);
-    }
-
     // =========================
     // POST-PROCESSING SCRIPT TESTS
     // =========================

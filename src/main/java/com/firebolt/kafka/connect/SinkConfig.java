@@ -83,7 +83,7 @@ public class SinkConfig {
 
     /**
      * Gets the script content from either the inline script or script file.
-     * 
+     *
      * @param mapping the mapping containing either script or scriptFile
      * @return the script content
      */
@@ -92,7 +92,7 @@ public class SinkConfig {
             log.debug("Using inline script for table: {}", mapping.getTable());
             return mapping.getScript();
         }
-        
+
         if (StringUtils.isNotBlank(mapping.getScriptFile())) {
             try {
                 Path scriptPath = Paths.get(mapping.getScriptFile());
@@ -109,7 +109,7 @@ public class SinkConfig {
                 throw new RuntimeException("Failed to read script file: " + mapping.getScriptFile(), e);
             }
         }
-        
+
         throw new IllegalStateException("Neither script nor scriptFile is specified for table: " + mapping.getTable());
     }
 
@@ -133,14 +133,6 @@ public class SinkConfig {
      */
     public boolean isExactlyOnce() {
         return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
-    }
-
-    /**
-     * Returns true if insert operations should be optimized for better performance.
-     */
-    public boolean isOptimizeInserts() {
-        String value = config.get(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG);
-        return value != null && Boolean.parseBoolean(value);
     }
 
     public IngestionType getIngestionType() {

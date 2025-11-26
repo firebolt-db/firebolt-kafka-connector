@@ -82,7 +82,7 @@ public class FireboltSinkTask extends SinkTask {
             createAndSetErrorReporter();
 
             // Initialize services
-            this.fireboltDbService = new FireboltDbService(this.sinkConfig);
+            this.fireboltDbService = new FireboltDbService();
 
             log.info("Firebolt Sink Task started successfully");
 

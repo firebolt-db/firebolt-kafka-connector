@@ -69,7 +69,6 @@ class ConnectorConfigDefinitionTest {
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.FIREBOLT_CLIENT_ID_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
-            assertTrue(configDef.names().contains(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG));
             assertTrue(configDef.names().contains(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG));
@@ -79,7 +78,7 @@ class ConnectorConfigDefinitionTest {
         @Test
         void shouldHaveCorrectNumberOfConfigProperties() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
-            assertEquals(9, configDef.names().size());
+            assertEquals(8, configDef.names().size());
         }
 
         @Test
@@ -94,8 +93,6 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG).type);
             assertEquals(ConfigDef.Type.BOOLEAN,
                 configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).type);
-            assertEquals(ConfigDef.Type.BOOLEAN,
-                configDef.configKeys().get(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG).type);
             assertEquals(ConfigDef.Type.STRING,
                 configDef.configKeys().get(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG).type);
             assertEquals(ConfigDef.Type.STRING, 
@@ -118,8 +115,6 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH,
                 configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).importance);
-            assertEquals(ConfigDef.Importance.MEDIUM,
-                configDef.configKeys().get(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH,
                 configDef.configKeys().get(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH, 
@@ -233,47 +228,19 @@ class ConnectorConfigDefinitionTest {
         }
 
         @Test
-        void shouldAcceptOptimizeInsertsTrue() {
-            Map<String, String> config = new HashMap<>(createValidConfig());
-            config.put(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG, "true");
-
-            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
-        }
-
-        @Test
-        void shouldAcceptOptimizeInsertsFalse() {
-            Map<String, String> config = new HashMap<>(createValidConfig());
-            config.put(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG, "false");
-
-            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
-        }
-
-        @Test
-        void shouldRejectUnknownOptimizeInsertsValue() {
-            Map<String, String> config = new HashMap<>(createValidConfig());
-            config.put(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG, "unknown");
-
-            var result = ConnectorConfigDefinition.CONFIG_DEF.validate(config);
-            boolean hasOptimizeInsertsErrors = result.stream()
-                .filter(v -> ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG.equals(v.name()))
-                .anyMatch(v -> !v.errorMessages().isEmpty());
-            assertTrue(hasOptimizeInsertsErrors, "Expected validation errors for invalid optimize.inserts value");
-        }
-
-        @Test
         void shouldAcceptValidIngestionTypeValues() {
-            Map<String, String> configSql = new HashMap<>(createValidConfig());
+            Map<String, String> configSql = createValidConfig();
             configSql.put(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG, "sql");
             assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(configSql));
 
-            Map<String, String> configBinary = new HashMap<>(createValidConfig());
+            Map<String, String> configBinary = createValidConfig();
             configBinary.put(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG, "binary");
             assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(configBinary));
         }
 
         @Test
         void shouldRejectInvalidIngestionType() {
-            Map<String, String> config = new HashMap<>(createValidConfig());
+            Map<String, String> config = createValidConfig();
             config.put(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG, "invalid");
             var result = ConnectorConfigDefinition.CONFIG_DEF.validate(config);
             boolean hasErrors = result.stream()
@@ -299,13 +266,6 @@ class ConnectorConfigDefinitionTest {
         void shouldDefaultExactlyOnceToFalseWhenNotProvided() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
             Object defaultValue = configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).defaultValue;
-            assertEquals(Boolean.FALSE, defaultValue);
-        }
-
-        @Test
-        void shouldDefaultOptimizeInsertsToFalseWhenNotProvided() {
-            ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
-            Object defaultValue = configDef.configKeys().get(ConnectorConfigDefinition.OPTIMIZE_INSERTS_CONFIG).defaultValue;
             assertEquals(Boolean.FALSE, defaultValue);
         }
 
@@ -338,7 +298,6 @@ class ConnectorConfigDefinitionTest {
             assertTrue(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_DOC.contains("client secret"));
             assertTrue(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_DOC.contains("Comma-separated"));
             assertTrue(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_DOC.toLowerCase().contains("exactly-once"));
-            assertTrue(ConnectorConfigDefinition.OPTIMIZE_INSERTS_DOC.toLowerCase().contains("optimize"));
             assertTrue(ConnectorConfigDefinition.ERROR_TOLERANCE_DOC.contains("Error tolerance policy"));
             assertTrue(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_DOC.toLowerCase().contains("post-processing"));
         }
