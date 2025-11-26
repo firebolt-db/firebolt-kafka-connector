@@ -14,7 +14,7 @@ public class IngestionServiceProvider {
     public IngestionService get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, SinkConfig sinkConfig) {
         boolean tolerateAllErrors = sinkConfig.isErrorToleranceAll();
         IngestionService ingestionService = sinkConfig.getIngestionType() == IngestionType.SQL ?
-                new InsertPreparedStatement(connection, tableSchema, errorReporter, tolerateAllErrors) : new BinaryIngestionService(errorReporter, tolerateAllErrors, tableSchema);
+                new InsertPreparedStatement(connection, tableSchema, errorReporter, tolerateAllErrors) : new BinaryIngestionService(connection, errorReporter, tolerateAllErrors, tableSchema);
 
         Optional<String> postProcessingScript = sinkConfig.getPostProcessingScript(tableSchema.getTableName());
         return postProcessingScript == null || postProcessingScript.isEmpty() ? ingestionService
