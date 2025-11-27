@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect.load;
 
 import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
+import com.firebolt.kafka.connect.load.verifier.FireboltTableRecordVerifier;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +65,11 @@ public class TestScenario {
      * The publisher that will be used to push messages to kafka
      */
     private JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> loadTestKafkaMessagePublisher;
+
+    /**
+     * The verifier to check that the records were ingested correctly into firebolt
+     */
+    private FireboltTableRecordVerifier fireboltTableRecordVerifier;
 
     @Override
     public String toString() {

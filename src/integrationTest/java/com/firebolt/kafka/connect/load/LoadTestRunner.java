@@ -22,12 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assert.assertEquals;
 
 /**
  * Runs one load test:
@@ -51,7 +49,6 @@ public class LoadTestRunner {
         long runStartTime = Instant.now().toEpochMilli();
 
         log.info("Using the message size of roughly {} bytes", testScenario.getAverageMessageSizeInBytes());
-        TestRecordFactory testRecordFactory = new TestRecordFactory(testScenario.getAverageMessageSizeInBytes());
 
         String cloudResourcesApiKey = testScenario.getConfluentCloudSettings().getCloudResourceApiKey();
         String cloudResourcesApiSecret = testScenario.getConfluentCloudSettings().getCloudResourceApiSecret();
@@ -78,7 +75,6 @@ public class LoadTestRunner {
         try (ConfluentResourceClient confluentResourceClient = new ConfluentResourceClient(cloudResourcesApiKey, cloudResourcesApiSecret)) {
             String schemaRegistryUrl = confluentResourceClient.getSchemaRegistryUrl(environmentId);
             String clusterEndpointUrl = confluentResourceClient.getClusterEndpointUrl(clusterId, environmentId);
-            String bootstrapServers = confluentResourceClient.getBootstrapServerUrl(clusterId, environmentId);
 
             try (ConfluentConnectorClient confluentConnectorClient = new ConfluentConnectorClient(environmentId, clusterId, cloudResourcesApiKey, cloudResourcesApiSecret);
                  ConfluentKafkaClient confluentKafkaClient = new ConfluentKafkaClient(clusterEndpointUrl, clusterId, kafkaApiKey, kafkaApiSecret);
@@ -300,76 +296,7 @@ public class LoadTestRunner {
     }
 
     private void verifyFireboltRecords(FireboltClient client, String tableName) throws SQLException {
-        int messageCount = testScenario.getNrOfKafkaMessageToProduce();
-
-        // verify that the first record and last record is present
-        List<Integer> recordIds = new ArrayList<>();
-        recordIds.add(1);
-        recordIds.add(messageCount);
-
-        if (messageCount > 1000) {
-            // if we have 50k messages produces, verify 50 records randomly
-            int rowIdsToVerify = messageCount / 1000;
-
-            // add another random 1000 record ids
-            java.util.Set<Integer> added = new java.util.HashSet<>();
-            java.util.Random rnd = new java.util.Random();
-
-            while (added.size() < rowIdsToVerify) {
-                // 1 and message count were already added by default.
-                int val = 2 + rnd.nextInt(messageCount-1);
-                if (!recordIds.contains(val)) {
-                    added.add(val);
-                }
-            }
-
-            recordIds.addAll(added);
-        }
-
-        log.info("Verifying {} record ids", recordIds.size());
-
-        // verify rows in batches of 500
-        int batchSize = 500;
-        List<Integer> nextIds = new ArrayList<>();
-        for (int i = 0;i<recordIds.size();i++) {
-            nextIds.add(recordIds.get(i));
-
-            if (nextIds.size() == batchSize) {
-                log.info("Verifying a batch of ids");
-                verifyIds(client, tableName, nextIds);
-
-                nextIds = new ArrayList<>();
-            }
-        }
-
-        if (!nextIds.isEmpty()) {
-            log.info("Verifying the last batch");
-            verifyIds(client, tableName, nextIds);
-        }
-    }
-
-    private static void verifyIds(FireboltClient client, String tableName, List<Integer> ids) throws SQLException {
-        ids = ids.stream().sorted().collect(Collectors.toList()); // natural sorting order is ascending
-        StringBuilder sqlStatement = new StringBuilder("select \"colInteger\"")
-                .append(" from \"").append(tableName).append("\" ")
-                .append(" where \"colInteger\" in (");
-        for (int i = 0; i<ids.size() -1; i++) {
-            sqlStatement.append(ids.get(i)).append(",");
-        }
-
-        // append the last one
-        sqlStatement.append(ids.get(ids.size()-1))
-                .append(") order by \"colInteger\" asc;");  // order by ids ascending
-
-        ResultSet resultSet = client.executeQuery(sqlStatement.toString());
-        List<Integer> actualIds = new ArrayList<>();
-        while (resultSet.next()) {
-            actualIds.add(resultSet.getInt(1));
-        }
-
-        String idsVerified = String.join(",", ids.stream().map(String::valueOf).collect(Collectors.toList()));
-        assertEquals("Mismatch in ids " + idsVerified, ids.size(), actualIds.size());
-        assertEquals("Mismatch in ids " + idsVerified, ids, actualIds);
+        testScenario.getFireboltTableRecordVerifier().verifyRecords(client, tableName);
     }
 
     private void waitForDataInFirebolt(FireboltClient fireboltClient, String tableName) {

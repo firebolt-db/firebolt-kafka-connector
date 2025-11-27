@@ -3,8 +3,10 @@ package com.firebolt.kafka.connect.load;
 import com.firebolt.kafka.connect.clients.ConfluentResourceClient;
 import com.firebolt.kafka.connect.load.messagegenerator.LoadTestRecordMessageGenerator;
 import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
+import com.firebolt.kafka.connect.load.verifier.LoadTestRecordFireboltTableVerifier;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -60,7 +62,16 @@ public class LoadTest {
         // Run test scenarios for each message size
         for (String messageSizeStr : messageSizes) {
             int messageSize = Integer.parseInt(messageSizeStr.trim());
-            JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> messagePublisher = createMessagePublisher(messageSize, confluentCloudSettings);
+
+            LoadTestRecordFireboltTableVerifier loadTestRecordFireboltTableVerifier = new LoadTestRecordFireboltTableVerifier();
+            JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> messagePublisher = createMessagePublisher(messageSize, loadTestRecordFireboltTableVerifier, messageCount, confluentCloudSettings);
+
+            Map<String,String> connectorPropertiesOverride = new HashMap<>();
+
+            // Add special configuration for larger message sizes
+            if (messageSize >= 10000) {
+                connectorPropertiesOverride.put("consumer.override.max.poll.records", "3000");
+            }
 
             TestScenario testScenario = TestScenario.builder()
                     .averageMessageSizeInBytes(messageSize)
@@ -73,30 +84,12 @@ public class LoadTest {
                     .staticOutboundHostnames(STAGING_APIS)
                     .confluentCloudSettings(confluentCloudSettings)
                     .fireboltSettings(fireboltSettings)
+                    .connectorConfiguration(Map.of("consumer.override.max.poll.records", "3000"))
                     .deleteConnector(true)
                     .deleteTable(true)
                     .loadTestKafkaMessagePublisher(messagePublisher)
+                    .fireboltTableRecordVerifier(loadTestRecordFireboltTableVerifier)
                     .build();
-
-            // Add special configuration for larger message sizes
-            if (messageSize >= 10000) {
-                testScenario = TestScenario.builder()
-                        .averageMessageSizeInBytes(messageSize)
-                        .nrOfKafkaMessageToProduce(messageCount)
-                        .connectorName("load-test-connector-" + messageSize)
-                        .topicName("load-test-connector-" + messageSize)
-                        .fireboltIngestionWaitDuration(Duration.ofMinutes(60))
-                        .tableSchemaDefinitionFilePath(tableDefinitionFilePath)
-                        .jsonSchemaRegistryDefinitionFilePath(jsonSchemaDefinitionFilePathPath)
-                        .staticOutboundHostnames(STAGING_APIS)
-                        .confluentCloudSettings(confluentCloudSettings)
-                        .fireboltSettings(fireboltSettings)
-                        .connectorConfiguration(Map.of("consumer.override.max.poll.records", "3000"))
-                        .deleteConnector(true)
-                        .deleteTable(true)
-                        .loadTestKafkaMessagePublisher(messagePublisher)
-                        .build();
-            }
 
             log.info("Running test scenario for message size: {} bytes", messageSize);
             LoadTestRunner loadTestRunner = new LoadTestRunner(testScenario);
@@ -107,7 +100,7 @@ public class LoadTest {
         printActiveThreads();
     }
 
-    private static JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> createMessagePublisher(int messageSize, ConfluentCloudSettings confluentCloudSettings) throws IOException {
+    private static JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> createMessagePublisher(int messageSize, LoadTestRecordFireboltTableVerifier loadTestRecordFireboltTableVerifier, int messageCount, ConfluentCloudSettings confluentCloudSettings) throws IOException {
         TestRecordFactory testRecordFactory = new TestRecordFactory(messageSize);
 
         try (ConfluentResourceClient confluentResourceClient = new ConfluentResourceClient(confluentCloudSettings.getCloudResourceApiKey(), confluentCloudSettings.getCloudResourceApiSecret())) {
@@ -117,7 +110,7 @@ public class LoadTest {
             JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> messagePublisher = new JsonSchemaRegistryKafkaMessagePublisher<>(
                     bootstrapServers, confluentCloudSettings().getKafkaApiKey(), confluentCloudSettings().getKafkaApiSecret(),
                     schemaRegistryUrl, confluentCloudSettings().getSchemaRegistryApiKey(), confluentCloudSettings().getSchemaRegistryApiSecret(),
-                    new LoadTestRecordMessageGenerator(testRecordFactory));
+                    new LoadTestRecordMessageGenerator(testRecordFactory, loadTestRecordFireboltTableVerifier, messageCount));
 
             return messagePublisher;
         }
