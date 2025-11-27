@@ -5,6 +5,7 @@ import com.firebolt.kafka.connect.clients.ConfluentKafkaClient;
 import com.firebolt.kafka.connect.clients.ConfluentResourceClient;
 import com.firebolt.kafka.connect.clients.ConfluentSchemaRegistryClient;
 import com.firebolt.kafka.connect.clients.FireboltClient;
+import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import org.apache.commons.lang3.tuple.Pair;
 import java.io.IOException;
@@ -140,7 +141,7 @@ public class LoadTestRunner {
                 registerJsonSchema(schemaRegistryClient, subjectName, testScenario.getJsonSchemaRegistryDefinitionFilePath());
 
                 // start publishing messages
-                publishMessages(testScenario.getNrOfKafkaMessageToProduce(), testRecordFactory, topicName, schemaRegistryUrl, schemaApiKey, schemaApiSecret, bootstrapServers, kafkaApiKey, kafkaApiSecret);
+                publishMessages(testScenario.getNrOfKafkaMessageToProduce(), topicName, testScenario.getLoadTestKafkaMessagePublisher());
 
                 // once all messages have been published start the connector
                 startConnector(confluentConnectorClient, connectorName);
@@ -400,42 +401,9 @@ public class LoadTestRunner {
         log.info("Found expected data in Firebolt table '{}'", tableName);
     }
 
-    private static void publishMessages(int messageCount, TestRecordFactory testRecordFactory, String topicName,
-                                        String schemaEndpointUrl, String schemaApiKey, String schemaApiSecret,
-                                        String bootstrapServers, String kafkaApiKey, String kafkaApiSecret) {
-        // Publish a sample message that conforms to the all-data-types schema using JSON Schema producer
-        try (Producer<String, LoadTestRecord> producer = initializeJsonProducer(
-                true,
-                bootstrapServers,
-                schemaEndpointUrl,
-                kafkaApiKey,
-                kafkaApiSecret,
-                schemaApiKey,
-                schemaApiSecret)) {
-            // Throughput improvements: async sends with batching & compression
-            CountDownLatch latch = new CountDownLatch(messageCount);
-            long start = System.currentTimeMillis();
-            for (int i = 1; i <= messageCount; i++) {
-                LoadTestRecord record = testRecordFactory.aValidRecord();
-                ProducerRecord<String, LoadTestRecord> pr = new ProducerRecord<>(topicName, record.getColInteger().toString(), record);
-                producer.send(pr, new Callback() {
-                    @Override
-                    public void onCompletion(RecordMetadata metadata, Exception exception) {
-                        if (exception != null) {
-                            log.error("Produce failed: {}", exception.getMessage());
-                        }
-                        latch.countDown();
-                    }
-                });
-            }
-            // Flush and wait bounded
-            producer.flush();
-            boolean completed = latch.await(Math.max(30L, messageCount / 100), TimeUnit.SECONDS);
-            long tookMs = System.currentTimeMillis() - start;
-            log.info("Published {} messages. Completed: {}. Elapsed: {} ms", messageCount, completed, tookMs);
-        } catch (Exception e) {
-            log.error("Failed to produce sample message", e);
-        }
+    private static void publishMessages(int messageCount, String topicName,
+                                        JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> kafkaMessagePublisher) {
+        kafkaMessagePublisher.publish(topicName, messageCount);
     }
 
     private static void registerJsonSchema(ConfluentSchemaRegistryClient schemaRegistryClient, String subject, String schemaPathName) throws IOException {

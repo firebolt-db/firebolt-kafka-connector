@@ -1,5 +1,6 @@
 package com.firebolt.kafka.connect.load;
 
+import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
@@ -58,6 +59,11 @@ public class TestScenario {
      */
     @Builder.Default
     private boolean deleteTable = false;
+
+    /**
+     * The publisher that will be used to push messages to kafka
+     */
+    private JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> loadTestKafkaMessagePublisher;
 
     @Override
     public String toString() {
