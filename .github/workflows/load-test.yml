@@ -34,6 +34,26 @@ on:
           - '8-column-with-default-timestamp'
           - '80-column'
           - '400-column'
+      ingestion_type:
+        description: 'Ingestion type to use (sql or binary)'
+        required: false
+        default: 'sql'
+        type: choice
+        options:
+          - 'sql'
+          - 'binary'
+      min_fetch_megabytes:
+        description: 'Minimum fetch size in MB (maps to consumer.override.fetch.min.bytes)'
+        required: false
+        default: '20'
+      max_wait_time_ms:
+        description: 'Max wait time in ms (maps to consumer.override.fetch.max.wait.ms)'
+        required: false
+        default: '2000'
+      max_records_poll:
+        description: 'Max records per poll (maps to consumer.override.max.poll.records)'
+        required: false
+        default: '10000'
 
 
 jobs:
@@ -73,7 +93,11 @@ jobs:
             -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
             -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '100,500' }}" \
             -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
-            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}"
+            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}" \
+            -Dloadtest.ingestion.type="${{ github.event.inputs.ingestion_type || 'sql' }}" \
+            -Dloadtest.fetch.min.megabytes="${{ github.event.inputs.min_fetch_megabytes || '20' }}" \
+            -Dloadtest.fetch.max.wait.ms="${{ github.event.inputs.max_wait_time_ms || '2000' }}" \
+            -Dloadtest.max.poll.records="${{ github.event.inputs.max_records_poll || '10000' }}"
         env:
           # Additional environment variables if needed
           GRADLE_OPTS: "-Xmx2g"

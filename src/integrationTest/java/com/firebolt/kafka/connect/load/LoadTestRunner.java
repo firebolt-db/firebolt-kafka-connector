@@ -195,17 +195,10 @@ public class LoadTestRunner {
         connectorConfig.put("jdbc.connection.url", jdbcUrl);
         connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
         connectorConfig.put("value.converter.schema.registry.url", schemaRegistryUrl);
-        connectorConfig.put("poll.interval.ms", "1000");
-        connectorConfig.put("consumer.override.max.poll.records", "6000");
         connectorConfig.put("value.converter.basic.auth.credentials.source", "USER_INFO");
         connectorConfig.put("value.converter.schema.registry.basic.auth.user.info", schemaApiKey+":"+schemaApiSecret);
-        connectorConfig.put("fetch.max.bytes", "15000000");
         connectorConfig.put("key.converter", "org.apache.kafka.connect.storage.StringConverter");
         connectorConfig.put("value.converter", "io.confluent.connect.json.JsonSchemaConverter");
-        connectorConfig.put("max.partition.fetch.bytes", "10000000");
-        connectorConfig.put("producer.override.max.request.size", "10485760");
-        connectorConfig.put("consumer.override.max.partition.fetch.bytes", "10485760");
-        connectorConfig.put("consumer.override.fetch.max.bytes", "20971520");
         connectorConfig.put("connector.class", "com.firebolt.kafka.connect.FireboltSinkConnector");
         connectorConfig.put("tasks.max", "1");
         connectorConfig.put("kafka.api.key", kafkaApiKey);
@@ -216,6 +209,12 @@ public class LoadTestRunner {
         connectorConfig.put("errors.deadletterqueue.topic.name", "dlq-topic-firebolt");
         connectorConfig.put("errors.deadletterqueue.context.headers.enable", "true");
 
+        // consumer overrides (this in turn can be overridden by the inputs from the load test)
+        connectorConfig.put("consumer.override.max.poll.records", "6000");
+        connectorConfig.put("consumer.override.fetch.max.bytes", "20971520");
+
+        // producer overrides (this in turn can be overridden by the inputs from the load test)
+        connectorConfig.put("producer.override.max.request.size", "10485760");
         return connectorConfig;
     }
 
