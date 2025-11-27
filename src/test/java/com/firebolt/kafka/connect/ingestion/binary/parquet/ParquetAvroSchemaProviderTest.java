@@ -269,6 +269,36 @@ class ParquetAvroSchemaProviderTest {
     }
 
     @Test
+    void nonNullableArrayByteaHasItemUnionNullBytes() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("arr_bytea", "array(bytea)", Types.ARRAY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("arr_bytea");
+        assertNotNull(field);
+
+        assertEquals(Schema.Type.ARRAY, field.schema().getType());
+        Schema element = field.schema().getElementType();
+        assertEquals(Schema.Type.UNION, element.getType());
+        List<Schema> itemTypes = element.getTypes();
+        assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
+        assertEquals(Schema.Type.BYTES, itemTypes.get(1).getType());
+    }
+
+    @Test
+    void nonNullableByteaHasBytes() {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn("b", "bytea", Types.BINARY, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+        Schema.Field field = avro.getField("b");
+        assertNotNull(field);
+        assertEquals(Schema.Type.BYTES, field.schema().getType());
+    }
+
+    @Test
     void nonNullableArrayDecimalHasItemUnionNullString() {
         TableSchema schema = new TableSchema("t");
         schema.addColumn("arr_dec", "array(numeric)", Types.ARRAY, false);
