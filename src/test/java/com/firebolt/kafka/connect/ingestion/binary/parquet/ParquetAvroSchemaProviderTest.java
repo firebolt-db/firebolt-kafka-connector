@@ -15,6 +15,39 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ParquetAvroSchemaProviderTest {
 
+    @ParameterizedTest
+    @CsvSource({
+            "boolean-test-table_schemaless,boolean_test_table_schemaless",
+            "123-invalid-start,_123_invalid_start",
+            "----,record",
+            "__,record",
+            "my$table$name,my_table_name"
+    })
+    void recordName_isSanitizedToValidAvroName(String tableName, String expectedRecordName) {
+        TableSchema tableSchema = new TableSchema(tableName);
+        tableSchema.addColumn("id", "int", java.sql.Types.INTEGER, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema schema = provider.get(tableSchema);
+
+        assertNotNull(schema);
+        assertEquals(expectedRecordName, schema.getName());
+        assertEquals("com.firebolt.kafka.connect." + expectedRecordName, schema.getFullName());
+    }
+
+    @Test
+    void emptyTableName_defaultsToRecord() {
+        TableSchema tableSchema = new TableSchema("");
+        tableSchema.addColumn("id", "int", java.sql.Types.INTEGER, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema schema = provider.get(tableSchema);
+
+        assertNotNull(schema);
+        assertEquals("record", schema.getName());
+        assertEquals("com.firebolt.kafka.connect.record", schema.getFullName());
+    }
+
     @Test
     void buildsRecordWithTableNameAndNamespace() {
         TableSchema schema = new TableSchema("orders");
