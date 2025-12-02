@@ -3,6 +3,8 @@ package com.firebolt.kafka.connect.integration;
 import com.firebolt.kafka.connect.integration.json.datatype.SimpleRecord;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -10,15 +12,17 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class TableNameTest extends SchemaBaseIntegrationTest {
+public class TableNameTest extends SchemalessBaseIntegrationTest {
 
-    private Producer<String, SimpleRecord> producer;
+    private Producer<String, String> producer;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -36,21 +40,18 @@ public class TableNameTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-            "table-name-with-dashes,name-with-dashes-table,topic1",
-            "table-name-with-upperchars,UPPER_CHARS_TABLE_NAME,topic2"
-    })
-    void testTableNameWithDashes(String connectorName, String tableName, String topicName) throws Exception {
-        String schemaSubject = topicName + "-value";
+    @MethodSource("tableNames")
+    void testTableNameWithDashes(String connectorName, String tableName, String topicName, Map<String, String> connectorOverride, String description) throws Exception {
+        log.info("Running test {}", description);
+
         try {
            // Generate unique connector name for this test run
-           generateUniqueConnectorName(connectorName);
+           generateUniqueConnectorName(connectorName + "-" +connectorOverride.get("ingestion.type"));
 
            // Setup test resources using centralized method
-           setupTestResources(topicName, tableName, schemaSubject,
-                   simpleRecordTableSchema(), jsonSimpleRecordSchema());
+           setupSchemalessTestResources(topicName, tableName, simpleRecordTableSchema(), connectorOverride);
 
-           producer = initializeJsonProducer();
+           producer = initializeSchemalessJsonProducer();
 
            List<SimpleRecord> testRecords = createTestRecords();
 
@@ -63,7 +64,7 @@ public class TableNameTest extends SchemaBaseIntegrationTest {
            verifyRecords(tableName, testRecords);
        } finally {
            // Clean up test resources
-           cleanupTestResources(tableName, topicName, schemaSubject);
+           cleanupSchemalessTestResources(tableName, topicName);
        }
     }
 
@@ -81,8 +82,8 @@ public class TableNameTest extends SchemaBaseIntegrationTest {
     private void publishMessages(String topicName, List<SimpleRecord> records) throws Exception {
         for (SimpleRecord record : records) {
             String key = "column-name-casing-test-key-" + record.getId();
-            ProducerRecord<String, SimpleRecord> producerRecord =
-                    new ProducerRecord<>(topicName, key, record);
+            ProducerRecord<String, String> producerRecord =
+                    new ProducerRecord<>(topicName, key, objectMapper.writeValueAsString(record));
 
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
@@ -105,5 +106,16 @@ public class TableNameTest extends SchemaBaseIntegrationTest {
                 .value("record : " + recordId)
                 .build();
 
+    }
+
+    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
+    // until then we will run these tests locally against core
+    protected static Stream<Arguments> tableNames() {
+        return Stream.of(
+                Arguments.of("connector-table-name-with-dashes", "name-with-dashes-table", "topic1", Map.of("ingestion.type", "sql"), "sql ingestion with for table name with dashes in name"),
+//                Arguments.of("connector-table-name-with-dashes", "name-with-dashes-table", "topic1", Map.of("ingestion.type", "binary"), "binary ingestion with for table name with dashes in name"),
+                Arguments.of("connector-table-name-with-uppercase", "UPPER_CHARS_TABLE_NAME", "topic2", Map.of("ingestion.type", "sql"), "sql ingestion with for table name with upper case in name")
+//                Arguments.of("connector-table-name-with-uppercase", "UPPER_CHARS_TABLE_NAME", "topic2", Map.of("ingestion.type", "binary"), "binary ingestion with for table name upper case in name")
+        );
     }
 }
