@@ -6,7 +6,7 @@
     "topics": "california-students, games",
 
     "topic.to.table.mapping": "california-students:students,games:champions_league_games_staging",
-    "jdbc.connection.url": "jdbc:firebolt:<your_database>>?account=<your_account>&engine=<your_engine>",
+    "jdbc.connection.url": "jdbc:firebolt:<your_database>?account=<your_account>&engine=<your_engine>",
     "firebolt.clientId": "<your_client_id",
     "firebolt.clientSecret": "your_client_secret>",
 

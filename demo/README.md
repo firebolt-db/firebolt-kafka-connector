@@ -6,8 +6,7 @@ This folder contains helper scripts to spin up a local Kafka Connect environment
 - Docker and Docker Compose installed and running
 - Java/Gradle if you plan to build and deploy the connector locally
 
-The stack uses the compose file at, and it will connect to the Firebolt Cloud so you need an account and clientId/clientSecret:
-`src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml`
+The stack uses the compose file at `src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml`, and it will connect to the Firebolt Cloud so you need an account and clientId/clientSecret:
 
 ### Quick start
 1. Build and deploy the connector jar (you need to do this once or when you rebase your code so you can deploy the latest code to the Kafka Connect):
@@ -26,6 +25,7 @@ The script above compiles the current code, creates a Kafka Sink Connector for f
 # or
 ./start_local_kafka_connect.sh --deploy_latest
 ```
+NOTE: make sure you run at least once with --deploy_latest. This would create the connector jar and deploy it to the Kafka Connect. You need to run this step every time you fetch/rebase the git repo as to have the most up to date connector code deployed to Kafka Connect
 
 3. Create a topic:
    As a pre-requisite, the kafka topics and the Firebolt tables have to be created before the connector definition is uploaded to create a connector.
@@ -50,7 +50,9 @@ NOTE: you also need to have the table names created in Firebolt as the connector
 ./create_connector_definition.sh -f sample_connector_definition.json
 ```
 
-6. Generate messages to a topic:
+6. The Firebolt tables have to be created ahead of time. You can find the schema and sql to create the students and champions_load_games tables under /demo/tableschemas
+
+7. Generate messages to a topic:
 
 ```bash
 # CSV samples are provided
@@ -59,11 +61,11 @@ NOTE: you also need to have the table names created in Firebolt as the connector
 
 Check the messages should be processed and appear in the table corresponding to the topic.
 
-7. If you want to perform any sort of deduplication or post-processing script you need to setup this attribute in the connector definition:
+8. If you want to perform any sort of deduplication or post-processing script you need to setup this attribute in the connector definition:
 
 - post.processing.script: " { "mappings" : [ "table":"table1", "script" : "<your script .... '${firebolt_params.batch_id}' "] }"
 
-8. Stop the environment:
+9. Stop the environment:
 
 ```bash
 ./stop_local_kafka_connect.sh
@@ -77,7 +79,7 @@ Check the messages should be processed and appear in the table corresponding to 
     - After start, view logs:
 
 ```bash
-docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml logs -f
+docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml
 ```
 
 - `stop_local_kafka_connect.sh`
@@ -85,10 +87,10 @@ docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.
 
 - `kafka/create_topic.sh`
     - Creates a topic in the broker container.
-    - Run without arguments to see available flags and defaults. Example:
+    - Run without arguments to see available flags and defaults. Example (with arguments):
 
 ```bash
-./kafka/create_topic.sh --topic demo-topic --partitions 1 --replication-factor 1
+./kafka/create_topic.sh --topic california-students
 ```
 
 - `kafka/list_topics.sh`
@@ -100,10 +102,10 @@ docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.
 
 - `kafka/generate_messages.sh`
     - Produces messages to a topic (CSV examples provided in `kafka/samples/`).
-    - Run without arguments to see usage. Example:
+    - Run without arguments to see usage. Example (with arguments):
 
 ```bash
-./kafka/generate_messages.sh --topic demo-topic --file ./kafka/samples/games_sample.csv
+./kafka/generate_messages.sh --topic california-students --file ./kafka/samples/students_sample.csv
 ```
 
 - `kafka/cleanup_all_topics.sh`

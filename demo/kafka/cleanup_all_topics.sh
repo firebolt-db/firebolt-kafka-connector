@@ -29,6 +29,7 @@ Examples:
   $(basename "$0") --include-internal
   $(basename "$0") --container kafka-cloud
   $(basename "$0") --wait-seconds 60
+  $(basename "$0") --include-internal --container kafka-cloud --wait-seconds 60
 EOF
 }
 
