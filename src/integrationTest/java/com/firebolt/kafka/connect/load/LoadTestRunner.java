@@ -7,7 +7,6 @@ import com.firebolt.kafka.connect.clients.ConfluentSchemaRegistryClient;
 import com.firebolt.kafka.connect.clients.FireboltClient;
 import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
-import org.apache.commons.lang3.tuple.Pair;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -21,19 +20,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.commons.lang3.tuple.Pair;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
@@ -510,52 +501,6 @@ public class LoadTestRunner {
 
     private static void waitForState(ConfluentConnectorClient client, String connectorName, String expectedState) {
         waitForState(client, connectorName, expectedState, Duration.ofMinutes(1));
-    }
-
-    // Local copy adapted from BaseIntegrationTest
-    private static <T> Producer<String, T> initializeJsonProducer(
-            boolean includeNulls,
-            String bootstrapServers,
-            String schemaRegistryUrl,
-            String kafkaApiKey,
-            String kafkaApiSecret,
-            String srApiKey,
-            String srApiSecret) {
-        Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer");
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.RETRIES_CONFIG, 5);
-        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 120000);
-        // batching & compression for higher throughput
-        props.put(ProducerConfig.LINGER_MS_CONFIG, 10);            // small delay to batch
-        props.put(ProducerConfig.BATCH_SIZE_CONFIG, 64_000);       // ~64KB per batch
-        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4"); // or "snappy"/"zstd"
-        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-
-        // Confluent Cloud Kafka auth (SASL_SSL)
-        props.put("security.protocol", "SASL_SSL");
-        props.put("sasl.mechanism", "PLAIN");
-        props.put("sasl.jaas.config",
-                "org.apache.kafka.common.security.plain.PlainLoginModule required username='" + kafkaApiKey + "' password='" + kafkaApiSecret + "';");
-        props.put("ssl.endpoint.identification.algorithm", "https");
-        props.put("client.dns.lookup", "use_all_dns_ips");
-        props.put("session.timeout.ms", 45000);
-
-        props.put("schema.registry.url", schemaRegistryUrl);
-        props.put("basic.auth.credentials.source", "USER_INFO");
-        props.put("basic.auth.user.info", srApiKey + ":" + srApiSecret);
-        props.put("auto.register.schemas", "false");
-        props.put("use.latest.version", "true");
-        props.put("latest.compatibility.strict", "false");
-
-        props.put("json.oneof.for.nullables", includeNulls);
-        props.put("json.default.property.inclusion", includeNulls ? "ALWAYS" : "NON_NULL");
-        props.put("json.write.dates.iso8601", true);
-        props.put("json.indent.output", false);
-
-        return new KafkaProducer<>(props);
     }
 
     private static List<String> createConnectorNetworkEndpoints(Set<String> endpoints) {
