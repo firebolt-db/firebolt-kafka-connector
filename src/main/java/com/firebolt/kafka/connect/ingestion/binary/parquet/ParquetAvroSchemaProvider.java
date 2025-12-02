@@ -18,8 +18,8 @@ public class ParquetAvroSchemaProvider {
      */
     public Schema get(TableSchema tableSchema) {
         // Use a sanitized Avro record name; field names come from table columns.
-        String avroRecordName = toValidAvroName(tableSchema.getTableName());
-        SchemaBuilder.FieldAssembler<Schema> fields = SchemaBuilder.record(avroRecordName)
+        String avroRecordTableName = toValidAvroName(tableSchema.getTableName());
+        SchemaBuilder.FieldAssembler<Schema> fields = SchemaBuilder.record(avroRecordTableName)
                 .namespace(SCHEMA_NAMESPACE)
                 .fields();
 
