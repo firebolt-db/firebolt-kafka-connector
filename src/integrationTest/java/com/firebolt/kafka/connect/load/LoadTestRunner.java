@@ -212,8 +212,9 @@ public class LoadTestRunner {
         // consumer overrides (this in turn can be overridden by the inputs from the load test)
         connectorConfig.put("consumer.override.max.poll.records", "6000");
         connectorConfig.put("consumer.override.fetch.max.bytes", "20971520");
+        connectorConfig.put("consumer.override.fetch.max.wait.ms", "1000");
 
-        // producer overrides (this in turn can be overridden by the inputs from the load test)
+        // producer overrides
         connectorConfig.put("producer.override.max.request.size", "10485760");
         return connectorConfig;
     }
