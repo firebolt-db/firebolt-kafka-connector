@@ -9,8 +9,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
-import static org.junit.Assert.assertEquals;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * A verifier checks that the expected records made it to the table.
  */
@@ -66,7 +65,8 @@ public class LoadTestRecordFireboltTableVerifier implements FireboltTableRecordV
         }
 
         String idsVerified = String.join(",", ids.stream().map(String::valueOf).collect(Collectors.toList()));
-        assertEquals("Mismatch in ids " + idsVerified, ids.size(), actualIds.size());
-        assertEquals("Mismatch in ids " + idsVerified, ids, actualIds);
+        String actualIdsAsString = String.join(",", actualIds.stream().map(String::valueOf).collect(Collectors.toList()));
+        assertEquals(ids.size(), actualIds.size(), "Mismatch in ids size. Expected: " + ids.size() + " but was: " + actualIds.size());
+        assertEquals(ids, actualIds, "Mismatch in ids. Expected ids: " + idsVerified + ", but was: " + actualIdsAsString);
     }
 }

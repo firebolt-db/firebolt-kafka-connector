@@ -84,7 +84,7 @@ public class LoadTest {
                     .staticOutboundHostnames(STAGING_APIS)
                     .confluentCloudSettings(confluentCloudSettings)
                     .fireboltSettings(fireboltSettings)
-                    .connectorConfiguration(Map.of("consumer.override.max.poll.records", "3000"))
+                    .connectorConfiguration(connectorPropertiesOverride)
                     .deleteConnector(true)
                     .deleteTable(true)
                     .loadTestKafkaMessagePublisher(messagePublisher)
