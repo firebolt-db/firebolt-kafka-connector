@@ -1,0 +1,204 @@
+name: Publish Custom Connector Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      connector_name:
+        description: 'Display name for the custom connector plugin'
+        required: true
+        type: string
+      environment_id:
+        description: 'Confluent Cloud environment ID (optional, falls back to repo var)'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Build Confluent archive (ZIP)
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon clean createConfluentArchive
+          ZIP_PATH=$(ls build/confluent/*.zip | head -n 1)
+          if [ -z "${ZIP_PATH}" ]; then
+            echo "No Confluent archive ZIP found in build/confluent" >&2
+            exit 1
+          fi
+          echo "ZIP_PATH=${ZIP_PATH}" >> "$GITHUB_ENV"
+          echo "Built archive: ${ZIP_PATH}"
+
+      - name: Upload archive as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-connector-archive
+          path: ${{ env.ZIP_PATH }}
+          retention-days: 14
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Upload archive to Confluent Cloud and create custom plugin
+        env:
+          CONFLUENT_API_KEY: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}
+          CONFLUENT_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}
+          ENV_ID_INPUT: ${{ inputs.environment_id }}
+          ENV_ID_VAR: ${{ vars.CONFLUENT_ENVIRONMENT_ID }}
+          CONNECTOR_NAME: ${{ inputs.connector_name }}
+          ZIP_PATH: ${{ env.ZIP_PATH }}
+        run: |
+          set -euo pipefail
+
+          # Resolve top commit SHA of the checked out branch
+          GIT_SHA="$(git rev-parse HEAD)"
+          echo "Top commit SHA: ${GIT_SHA}"
+
+          if [ -z "${CONFLUENT_API_KEY:-}" ] || [ -z "${CONFLUENT_API_SECRET:-}" ]; then
+            echo "Missing Confluent Cloud API credentials. Please set secrets CONFLUENT_CLOUD_RESOURCE_API_KEY and CONFLUENT_CLOUD_RESOURCE_API_SECRET." >&2
+            exit 1
+          fi
+          if [ ! -f "${ZIP_PATH}" ]; then
+            echo "Archive not found at ${ZIP_PATH}" >&2
+            exit 1
+          fi
+
+          ENV_ID="${ENV_ID_INPUT:-${ENV_ID_VAR:-}}"
+          if [ -z "$ENV_ID" ]; then
+            echo "Environment ID is required. Provide it via workflow input or repository variable CONFLUENT_ENVIRONMENT_ID." >&2
+            exit 1
+          fi
+
+          AUTH=$(printf "%s:%s" "$CONFLUENT_API_KEY" "$CONFLUENT_API_SECRET" | base64 | tr -d '\r\n')
+          # 1) Request a presigned upload URL (ZIP is large) via ccpm API
+          CCPM_URL="https://api.confluent.cloud/ccpm/v1/presigned-upload-url"
+          PRESIGNED_REQ=$(jq -n --arg env "$ENV_ID" '{content_format:"ZIP", cloud:"AWS", environment:{id:$env}}')
+
+          echo "Requesting presigned upload URL for environment ${ENV_ID}..."
+          PRESIGNED_RESP=$(curl --http1.1 --silent --show-error \
+            --request POST "$CCPM_URL" \
+            --header "Authorization: Basic $AUTH" \
+            --header "Accept: application/json" \
+            --header "content-type: application/json" \
+            --data "$PRESIGNED_REQ")
+
+          if ! echo "$PRESIGNED_RESP" | jq -e . >/dev/null 2>&1; then
+            echo "Non-JSON response from CCPM presigned URL API:" >&2
+            echo "$PRESIGNED_RESP" >&2
+            exit 1
+          fi
+          if echo "$PRESIGNED_RESP" | jq -e '.error_code // .code // .errors // empty' >/dev/null; then
+            echo "API error during presigned URL request: $(echo "$PRESIGNED_RESP" | jq -r '.message // .error // .detail // .title // (.errors[0].detail // .errors[0].title)')" >&2
+            echo "Full response:" >&2
+            echo "$PRESIGNED_RESP" | jq .
+            exit 1
+          fi
+
+          UPLOAD_URL=$(echo "$PRESIGNED_RESP" | jq -r '.upload_url // .data.upload_url // .url // empty')
+          # S3-style presigned POST form fields
+          FIELDS_TSV=$(echo "$PRESIGNED_RESP" | jq -r '
+            .upload_form_data // {} 
+            | to_entries[]? 
+            | select(.key != "bucket") 
+            | [.key, (.value|tostring)] 
+            | @tsv
+          ')
+          # Extract identifier for create step
+          UPLOAD_ID=$(echo "$PRESIGNED_RESP" | jq -r '.upload_id // .data.upload_id // empty')
+          if [ -z "${UPLOAD_URL}" ]; then
+            echo "Did not receive an upload_url from presigned URL response:" >&2
+            echo "$PRESIGNED_RESP" | jq .
+            exit 1
+          fi
+
+          echo "Uploading archive to presigned URL..."
+          # Use multipart POST when S3 form fields are present (expected path)
+          if [ -n "${FIELDS_TSV}" ]; then
+            echo "Detected POST presigned upload with form fields."
+            # Build -F args from fields
+            declare -a FORM_ARGS
+            while IFS=$'\t' read -r K V; do
+              [ -z "$K" ] && continue
+              FORM_ARGS+=(-F "$K=$V")
+            done <<< "${FIELDS_TSV}"
+            # Append file field (commonly 'file' for S3 POST)
+            FORM_ARGS+=(-F "file=@${ZIP_PATH}")
+            curl --http1.1 --silent --show-error --fail \
+              --request POST "$UPLOAD_URL" \
+              "${FORM_ARGS[@]}"
+          else
+            # Minimal PUT fallback (rare)
+            curl --http1.1 --silent --show-error --fail --location \
+              --request PUT "$UPLOAD_URL" \
+              -H "Content-Type: application/zip" \
+              --data-binary @"${ZIP_PATH}"
+          fi
+
+          # 2) Create the custom plugin by referencing the uploaded artifact via connect/v1 API
+          API_CREATE_URL="https://api.confluent.cloud/connect/v1/custom-connector-plugins?environment=${ENV_ID}"
+          echo "Creating custom connector plugin in environment ${ENV_ID} with display name '${CONNECTOR_NAME}'..."
+          # Fixed connector type and class for this plugin
+          CONNECTOR_TYPE_UPPER="SINK"
+          CONNECTOR_CLASS="com.firebolt.kafka.connect.FireboltSinkConnector"
+          # Always use ccpm upload_id for create
+          if [ -z "${UPLOAD_ID}" ]; then
+            echo "Missing upload_id in presigned response; cannot create custom plugin." >&2
+            echo "$PRESIGNED_RESP" | jq .
+            exit 1
+          fi
+          echo "Using ccpm upload_id from presign response."
+          CREATE_REQ=$(jq -n \
+            --arg display "${CONNECTOR_NAME}" \
+            --arg desc "${GIT_SHA}" \
+            --arg uid "${UPLOAD_ID}" \
+            --arg ctype "${CONNECTOR_TYPE_UPPER}" \
+            --arg cclass "${CONNECTOR_CLASS}" \
+            --argjson sens '["firebolt.clientId","firebolt.clientSecret"]' \
+            '{display_name:$display, description:$desc, connector_type:$ctype, connector_class:$cclass, sensitive_config_properties:$sens, upload_source:{location:"PRESIGNED_URL_LOCATION", upload_id:$uid}}')
+          echo "Create request payload:"
+          echo "$CREATE_REQ" | jq .
+          CREATE_RESP=$(curl --http1.1 --silent --show-error \
+            --request POST "$API_CREATE_URL" \
+            --header "Authorization: Basic $AUTH" \
+            --header "Accept: application/json" \
+            --header "Content-Type: application/json" \
+            --data "$CREATE_REQ")
+
+          if ! echo "$CREATE_RESP" | jq -e . >/dev/null 2>&1; then
+            echo "Non-JSON response from Confluent Cloud API (create plugin):" >&2
+            echo "$CREATE_RESP" >&2
+            exit 1
+          fi
+          if echo "$CREATE_RESP" | jq -e '.error_code // .code // empty' >/dev/null; then
+            echo "API error during create: $(echo "$CREATE_RESP" | jq -r '.message // .error // .detail // .title // .errors[0].detail // .errors[0].title')" >&2
+            echo "Full create response:" >&2
+            echo "$CREATE_RESP" | jq .
+            exit 1
+          fi
+
+          PLUGIN_ID=$(echo "$CREATE_RESP" | jq -r '.id // .data.id // .plugin.id // empty')
+          if [ -z "${PLUGIN_ID}" ]; then
+            echo "Could not extract plugin id from create response:" >&2
+            echo "$CREATE_RESP" | jq .
+            exit 1
+          fi
+          echo "Custom plugin created successfully."
+          echo "  name: ${CONNECTOR_NAME}"
+          echo "  id:   ${PLUGIN_ID}"
+          echo "PLUGIN_ID=${PLUGIN_ID}" >> "$GITHUB_ENV"
+
+
