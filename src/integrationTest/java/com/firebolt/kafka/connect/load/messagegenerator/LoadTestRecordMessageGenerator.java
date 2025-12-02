@@ -23,7 +23,7 @@ public class LoadTestRecordMessageGenerator implements MessageGenerator<LoadTest
 
     @Override
     public LoadTestRecord nextMessage(int messageSequenceId) {
-        LoadTestRecord loadTestRecord = recordFactory.aValidRecord();
+        LoadTestRecord loadTestRecord = recordFactory.aValidRecord(messageSequenceId);
 
         // by default add the first and last message to the verification
         if (messageSequenceId == 1 || messageSequenceId == messageCount) {
