@@ -15,17 +15,7 @@ public class TestRecordFactory {
      */
     private int recordSizeInBytes;
 
-    /**
-     * Each record will have an id that will be monotonically increasing
-     */
-    private AtomicInteger recordId;
-
     public TestRecordFactory(int recordSizeInBytes) {
-        this(1, recordSizeInBytes);
-    }
-
-    TestRecordFactory(int startRecordId, int recordSizeInBytes) {
-        this.recordId = new AtomicInteger(startRecordId);
         this.recordSizeInBytes = recordSizeInBytes;
     }
 
@@ -33,9 +23,9 @@ public class TestRecordFactory {
     /**
      * Will create a record of approximate size in bytes
      */
-    public LoadTestRecord aValidRecord() {
+    public LoadTestRecord aValidRecord(int recordId) {
         return LoadTestRecord.builder()
-                    .colInteger(recordId.getAndIncrement())
+                    .colInteger(recordId)
                     .colBigint(1000L)
                     .colNumeric(new BigDecimal("12345678901234567890123456789.123456789")) // Full NUMERIC(38,9) precision
                     .colReal(1.5f)
