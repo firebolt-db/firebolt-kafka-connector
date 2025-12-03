@@ -9,7 +9,7 @@ This folder contains helper scripts to spin up a local Kafka Connect environment
 The stack uses the compose file at `src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml`, and it will connect to the Firebolt Cloud so you need an account and clientId/clientSecret:
 
 ### Quick start
-1. Build and deploy the connector jar (you need to do this once or when you rebase your code so you can deploy the latest code to the Kafka Connect):
+1. Build and deploy the connector jar:
 
 ```bash
 ./gradlew deployToKafkaConnect
@@ -25,7 +25,7 @@ The script above compiles the current code, creates a Kafka Sink Connector for f
 # or
 ./start_local_kafka_connect.sh --deploy_latest
 ```
-NOTE: make sure you run at least once with --deploy_latest. This would create the connector jar and deploy it to the Kafka Connect. You need to run this step every time you fetch/rebase the git repo as to have the most up to date connector code deployed to Kafka Connect
+NOTE: You can either do ./gradlew deployToKafkaConnect (which builds and deploys the connector) + ./start_local_kafka_connect.sh (which starts the local container) or just do it in one command: ./start_local_kafka_connect.sh --deploy_latest (which builds and deploys the code and then starts the local container)  
 
 3. Create a topic:
    As a pre-requisite, the kafka topics and the Firebolt tables have to be created before the connector definition is uploaded to create a connector.
@@ -79,7 +79,7 @@ Check the messages should be processed and appear in the table corresponding to 
     - After start, view logs:
 
 ```bash
-docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml
+docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml logs -f
 ```
 
 - `stop_local_kafka_connect.sh`
@@ -117,12 +117,6 @@ docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.
         - `--container NAME` (default: `kafka-cloud`)
         - `--include-internal` (still skips the Kafka Connect internal topics)
         - `--wait-seconds N`
-
-- View container logs:
-
-```bash
-docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.yml logs -f
-```
 
 ### Notes
 - Run any script without arguments to see available flags and defaults.

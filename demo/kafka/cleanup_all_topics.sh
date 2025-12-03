@@ -85,11 +85,6 @@ echo "If you want a clean slate, consider stopping the environment first: bash d
 
 printf '%s\n' "${TOPICS}" | while IFS= read -r TOPIC; do
   [[ -z "${TOPIC}" ]] && continue
-  # Safety: never delete Kafka Connect internal Docker topics
-  if [[ "${TOPIC}" =~ ^docker-connect-(configs|offsets|status)(-.+)?$ ]]; then
-    echo "Skipping internal Kafka Connect topic '${TOPIC}'."
-    continue
-  fi
   echo "Deleting topic '${TOPIC}' ..."
   docker exec "${KAFKA_CONTAINER}" bash -lc "kafka-topics --bootstrap-server ${BOOTSTRAP} --delete --topic '${TOPIC}'" || true
 
