@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if ! docker ps --format '{{.Names}}' | grep -qx "${KAFKA_CONNECT_CONTAINER}"; then
-  echo "Kafka Connect container '${KAFKA_CONNECT_CONTAINER}' not running. Start it with demo/start.sh." >&2
+  echo "Kafka Connect container '${KAFKA_CONNECT_CONTAINER}' not running. Start it with demo/start_local_kafka_connect.sh." >&2
   exit 1
 fi
 

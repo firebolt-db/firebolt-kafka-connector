@@ -85,6 +85,9 @@ docker compose -f src/integrationTest/docker/kafka-connect-cloud/docker-compose.
 - `stop_local_kafka_connect.sh`
     - Stops and removes the compose stack started by the script above.
 
+- `cleanup_connectors.sh`
+    - Removes any connector definitions that was previously uploaded to this local Kafka Connect cluster
+  
 - `kafka/create_topic.sh`
     - Creates a topic in the broker container.
     - Run without arguments to see available flags and defaults. Example (with arguments):
