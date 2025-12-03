@@ -86,88 +86,90 @@ public class LoadTestRunner {
                     throw new RuntimeException("Did not find the custom plugin " + fireboltPluginId);
                 }
 
-                // topic and table has to exist before the connector is created
-                setupKafkaTopic(confluentKafkaClient, topicName);
-
-                // TODO make sure the engine is running
-                createFireboltTable(fireboltClient, tableName);
-
-                // create a new connector from the plugin
-                Map<String, String> connectorConfig = createDefaultConnectorConfiguration(schemaRegistryUrl);
-
-                // override any specific attributes of the connector definition
-                if (testScenario.getConnectorConfiguration() != null && !testScenario.getConnectorConfiguration().isEmpty()) {
-                    connectorConfig.putAll(testScenario.getConnectorConfiguration());
-                }
-
-                // add the dynamic APIs as the schema registry and the firebolt account engine url
-                Set<String> hostnames = new HashSet<>(testScenario.getStaticOutboundHostnames());
-                hostnames.add(schemaRegistryUrl);
-                hostnames.add(fireboltClient.getEngineUrl());
-                List<String> networkEndpoints = createConnectorNetworkEndpoints(hostnames);
-                log.info("Found : {} network endpoints", networkEndpoints);
-                connectorConfig.put("confluent.custom.connection.endpoints", String.join(";", networkEndpoints));
-
-                // create the connector
-                Map<String, Object> createdConnectorConfig = confluentConnectorClient.createConnector(environmentId, clusterId, connectorName, fireboltPluginId, connectorConfig);
-                createdConnectorConfig.entrySet().stream().forEach(entry -> log.info("Key: {}, [value] class: {},value  {} ", entry.getKey(), entry.getValue().getClass(), entry.getValue()));
-
-                // wait for connector to be started successfully (It takes some time until the connector is provisioned)
-                log.info("Waiting for connector to start");
-                waitForConnectorToStart(confluentConnectorClient, connectorName);
-                log.info("Connector {} is successfully running.", connectorName);
-
-                // keep the connector id
-                String connectorId = confluentConnectorClient.getConnectorId(connectorName);
-                log.info("Connector id : {}", connectorId);
-
-                // pause the connector (we will generate the messages first, and then we start the connector)
-                pauseConnector(confluentConnectorClient, connectorName);
-
                 String subjectName = topicName + "-value";
-                registerJsonSchema(schemaRegistryClient, subjectName, testScenario.getJsonSchemaRegistryDefinitionFilePath());
+                String connectorId = null;
+                try {
+                    // topic and table has to exist before the connector is created
+                    setupKafkaTopic(confluentKafkaClient, topicName);
 
-                // start publishing messages
-                publishMessages(testScenario.getNrOfKafkaMessageToProduce(), topicName, testScenario.getLoadTestKafkaMessagePublisher());
+                    // TODO make sure the engine is running
+                    createFireboltTable(fireboltClient, tableName);
 
-                // once all messages have been published start the connector
-                startConnector(confluentConnectorClient, connectorName);
+                    // create a new connector from the plugin
+                    Map<String, String> connectorConfig = createDefaultConnectorConfiguration(schemaRegistryUrl);
 
-                // wait until all messages are ingested into firebolt
-                waitForDataInFirebolt(fireboltClient, tableName);
+                    // override any specific attributes of the connector definition
+                    if (testScenario.getConnectorConfiguration() != null && !testScenario.getConnectorConfiguration().isEmpty()) {
+                        connectorConfig.putAll(testScenario.getConnectorConfiguration());
+                    }
 
-                // verify and compute the ingestion details
-                verifyFireboltRecords(fireboltClient, tableName);
+                    // add the dynamic APIs as the schema registry and the firebolt account engine url
+                    Set<String> hostnames = new HashSet<>(testScenario.getStaticOutboundHostnames());
+                    hostnames.add(schemaRegistryUrl);
+                    hostnames.add(fireboltClient.getEngineUrl());
+                    List<String> networkEndpoints = createConnectorNetworkEndpoints(hostnames);
+                    log.info("Found : {} network endpoints", networkEndpoints);
+                    connectorConfig.put("confluent.custom.connection.endpoints", String.join(";", networkEndpoints));
 
-                // collect some statistics from the run (how many messages per seconds were being inserted into firebolt, how many rows were inserted into each second, etc)
-                LoadTestRunResult loadTestRunResult = collectAndPrintRunStats(fireboltClient, tableName, runStartTime);
+                    // create the connector
+                    Map<String, Object> createdConnectorConfig = confluentConnectorClient.createConnector(environmentId, clusterId, connectorName, fireboltPluginId, connectorConfig);
+                    createdConnectorConfig.entrySet().stream().forEach(entry -> log.info("Key: {}, [value] class: {},value  {} ", entry.getKey(), entry.getValue().getClass(), entry.getValue()));
 
-                // stop connector
-                pauseConnector(confluentConnectorClient, connectorName);
+                    // wait for connector to be started successfully (It takes some time until the connector is provisioned)
+                    log.info("Waiting for connector to start");
+                    waitForConnectorToStart(confluentConnectorClient, connectorName);
+                    log.info("Connector {} is successfully running.", connectorName);
 
-                // delete kafka topic
-                confluentKafkaClient.deleteTopic(topicName);
+                    // keep the connector id
+                    connectorId = confluentConnectorClient.getConnectorId(connectorName);
+                    log.info("Connector id : {}", connectorId);
 
-                // delete schema
-                schemaRegistryClient.deleteSubject(subjectName);
+                    // pause the connector (we will generate the messages first, and then we start the connector)
+                    pauseConnector(confluentConnectorClient, connectorName);
 
-                if (testScenario.isDeleteConnector()) {
-                    log.info("Deleting the connector {}", connectorName);
-                    confluentConnectorClient.deleteConnector(testScenario.getConnectorName());
-                    log.info("Successfully deleted connector {}", testScenario.getConnectorName());
+                    registerJsonSchema(schemaRegistryClient, subjectName, testScenario.getJsonSchemaRegistryDefinitionFilePath());
 
-                    // the connector creates a topic in the format: <connectorName>-app-logs so delete the topic as well
-                    String connectorLogsTopicName = connectorId + "-app-logs";
-                    log.info("Delete {} connector log topic", connectorLogsTopicName);
-                    confluentKafkaClient.deleteTopic(connectorLogsTopicName);
+                    // start publishing messages
+                    publishMessages(testScenario.getNrOfKafkaMessageToProduce(), topicName, testScenario.getLoadTestKafkaMessagePublisher());
+
+                    // once all messages have been published start the connector
+                    startConnector(confluentConnectorClient, connectorName);
+
+                    // wait until all messages are ingested into firebolt
+                    waitForDataInFirebolt(fireboltClient, tableName);
+
+                    // verify and compute the ingestion details
+                    verifyFireboltRecords(fireboltClient, tableName);
+
+                    // collect some statistics from the run (how many messages per seconds were being inserted into firebolt, how many rows were inserted into each second, etc)
+                    return collectAndPrintRunStats(fireboltClient, tableName, runStartTime);
+
+                } finally {
+                    // stop connector
+                    pauseConnector(confluentConnectorClient, connectorName);
+
+                    // delete kafka topic
+                    confluentKafkaClient.deleteTopic(topicName);
+
+                    // delete schema
+                    schemaRegistryClient.deleteSubject(subjectName);
+
+                    if (testScenario.isDeleteConnector() && connectorId != null) {
+                        log.info("Deleting the connector {}", connectorName);
+                        confluentConnectorClient.deleteConnector(testScenario.getConnectorName());
+                        log.info("Successfully deleted connector {}", testScenario.getConnectorName());
+
+                        // the connector creates a topic in the format: <connectorName>-app-logs so delete the topic as well
+                        String connectorLogsTopicName = connectorId + "-app-logs";
+                        log.info("Delete {} connector log topic", connectorLogsTopicName);
+                        confluentKafkaClient.deleteTopic(connectorLogsTopicName);
+                    }
+
+                    if (testScenario.isDeleteTable()) {
+                        log.info("Dropping the table {}", tableName);
+                        fireboltClient.dropTable(tableName);
+                    }
                 }
-
-                if (testScenario.isDeleteTable()) {
-                    log.info("Dropping the table {}", tableName);
-                    fireboltClient.dropTable(tableName);
-                }
-
-                return loadTestRunResult;
             }
         }
     }
