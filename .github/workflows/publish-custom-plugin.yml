@@ -109,6 +109,12 @@ jobs:
           fi
 
           UPLOAD_URL=$(echo "$PRESIGNED_RESP" | jq -r '.upload_url // .data.upload_url // .url // empty')
+          if [ -z "${UPLOAD_URL}" ]; then
+            echo "Did not receive an upload_url from presigned URL response:" >&2
+            echo "$PRESIGNED_RESP" | jq .
+            exit 1
+          fi
+          
           # S3-style presigned POST form fields
           FIELDS_TSV=$(echo "$PRESIGNED_RESP" | jq -r '
             .upload_form_data // {} 
@@ -119,8 +125,8 @@ jobs:
           ')
           # Extract identifier for create step
           UPLOAD_ID=$(echo "$PRESIGNED_RESP" | jq -r '.upload_id // .data.upload_id // empty')
-          if [ -z "${UPLOAD_URL}" ]; then
-            echo "Did not receive an upload_url from presigned URL response:" >&2
+          if [ -z "${UPLOAD_ID}" ]; then
+            echo "Missing upload_id in presigned response; cannot create custom plugin." >&2
             echo "$PRESIGNED_RESP" | jq .
             exit 1
           fi
@@ -154,13 +160,10 @@ jobs:
           # Fixed connector type and class for this plugin
           CONNECTOR_TYPE_UPPER="SINK"
           CONNECTOR_CLASS="com.firebolt.kafka.connect.FireboltSinkConnector"
+          
           # Always use ccpm upload_id for create
-          if [ -z "${UPLOAD_ID}" ]; then
-            echo "Missing upload_id in presigned response; cannot create custom plugin." >&2
-            echo "$PRESIGNED_RESP" | jq .
-            exit 1
-          fi
           echo "Using ccpm upload_id from presign response."
+          
           CREATE_REQ=$(jq -n \
             --arg display "${CONNECTOR_NAME}" \
             --arg desc "${GIT_SHA}" \
