@@ -1,0 +1,29 @@
+{
+  "name": "firebolt-sink-connector",
+  "config": {
+    "connector.class": "com.firebolt.kafka.connect.FireboltSinkConnector",
+    "tasks.max": "1",
+    "topics": "california-students, games",
+
+    "topic.to.table.mapping": "california-students:students,games:champions_league_games_staging",
+    "jdbc.connection.url": "jdbc:firebolt:<your_database>?account=<your_account>&engine=<your_engine>",
+    "firebolt.clientId": "<your_client_id",
+    "firebolt.clientSecret": "your_client_secret>",
+
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+
+    "consumer.override.max.poll.records": "6000",
+    "consumer.max.partition.fetch.bytes": "10000000",
+    "consumer.override.max.partition.fetch.bytes": "10485760",
+    "consumer.override.fetch.max.bytes": "20971520",
+
+    "value.converter.basic.auth.credentials.source": "USER_INFO",
+    "value.converter.schema.registry.basic.auth.user.info": "schemaApiKey:schemaApiSecret",
+
+    "producer.override.max.request.size": "10485760",
+    "post.processing.script" : "{ \"mappings\": [ { \"table\": \"champions_league_games_staging\", \"script\": \"MERGE INTO \\\"champions_league_games\\\" AS tgt USING (SELECT * FROM ( SELECT t.*, ROW_NUMBER() OVER ( PARTITION BY t.game_id ORDER BY t.last_updated_at DESC ) AS rn FROM champions_league_games_staging AS t where t.batch_id='${firebolt_param.batch_id}' ) x WHERE x.rn = 1 ) as src ON tgt.game_id = src.game_id WHEN MATCHED THEN UPDATE SET score = src.score, last_updated_at = src.last_updated_at WHEN NOT MATCHED THEN INSERT (\\\"game_id\\\",\\\"host_team\\\",\\\"away_team\\\",\\\"game_start_time\\\",\\\"location\\\",\\\"score\\\",\\\"last_updated_at\\\") VALUES (src.game_id, src.host_team, src.away_team, src.game_start_time, src.location, src.score, src.last_updated_at);\" } ] }"
+
+  }
+}
