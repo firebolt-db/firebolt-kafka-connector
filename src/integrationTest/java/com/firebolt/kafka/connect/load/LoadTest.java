@@ -31,6 +31,13 @@ public class LoadTest {
 
         // Get table schema from system property or use default
         String tableSchema = System.getProperty("loadtest.table.schema", "8-column");
+        // Get ingestion type from system property or use default
+        String ingestionType = System.getProperty("loadtest.ingestion.type", "sql");
+
+        // Tunables for consumer fetch and poll behavior
+        int minFetchMegabytes = Integer.parseInt(System.getProperty("loadtest.fetch.min.megabytes", "20"));
+        int maxWaitTimeMs = Integer.parseInt(System.getProperty("loadtest.fetch.max.wait.ms", "2000"));
+        int maxPollRecords = Integer.parseInt(System.getProperty("loadtest.max.poll.records", "10000"));
         
         // Select schema files based on table schema
         String tableDefinitionFilePath;
@@ -68,9 +75,14 @@ public class LoadTest {
 
             Map<String,String> connectorPropertiesOverride = new HashMap<>();
 
-            // Add special configuration for larger message sizes
-            if (messageSize >= 10000) {
-                connectorPropertiesOverride.put("consumer.override.max.poll.records", "3000");
+            // Apply explicit overrides from inputs
+            long minFetchBytes = (long) minFetchMegabytes * 1024 * 1024; // convert MB to bytes
+            connectorPropertiesOverride.put("consumer.override.fetch.min.bytes", String.valueOf(minFetchBytes));
+            connectorPropertiesOverride.put("consumer.override.fetch.max.wait.ms", String.valueOf(maxWaitTimeMs));
+            connectorPropertiesOverride.put("consumer.override.max.poll.records", String.valueOf(maxPollRecords));
+            // If binary ingestion is selected, override connector ingestion.type
+            if ("binary".equalsIgnoreCase(ingestionType)) {
+                connectorPropertiesOverride.put("ingestion.type", "binary");
             }
 
             TestScenario testScenario = TestScenario.builder()

@@ -20,13 +20,13 @@ public class LoadTestRecordFireboltTableVerifier implements FireboltTableRecordV
 
     @Override
     public boolean verifyRecords(FireboltClient fireboltClient, String tableName) throws SQLException {
-        int batchSize = 500;
+        int batchSize = 100;
         List<Integer> nextIds = new ArrayList<>();
         for (int i = 0; i<recordsToVerify.size(); i++) {
             nextIds.add(recordsToVerify.get(i).getColInteger());
 
             if (nextIds.size() == batchSize) {
-                log.info("Verifying a batch of ids: {}", nextIds);
+                log.debug("Verifying a batch of ids: {}", nextIds);
                 verifyIds(fireboltClient, tableName, nextIds);
 
                 nextIds = new ArrayList<>();
@@ -34,7 +34,7 @@ public class LoadTestRecordFireboltTableVerifier implements FireboltTableRecordV
         }
 
         if (!nextIds.isEmpty()) {
-            log.info("Verifying the last batch");
+            log.debug("Verifying the last batch: {}", nextIds);
             verifyIds(fireboltClient, tableName, nextIds);
         }
 
@@ -50,7 +50,7 @@ public class LoadTestRecordFireboltTableVerifier implements FireboltTableRecordV
         StringBuilder sqlStatement = new StringBuilder("select \"colInteger\"")
                 .append(" from \"").append(tableName).append("\" ")
                 .append(" where \"colInteger\" in (");
-        for (int i = 0; i<ids.size() -1; i++) {
+        for (int i = 0; i< ids.size() -1; i++) {
             sqlStatement.append(ids.get(i)).append(",");
         }
 
