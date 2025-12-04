@@ -94,6 +94,58 @@ class ParquetDataGeneratorTest {
 
     @ParameterizedTest
     @CsvSource({
+            // tableColumnName, recordAttributeName, avroFieldName
+            "TEXT,Text,TEXT",
+            "localDate,localdate,localDate",
+            "BigInt,BIGINT,BigInt"
+    })
+    void matchesRecordAttributesCaseInsensitively(String tableColumnName, String recordAttributeName, String avroFieldName) throws Exception {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn(tableColumnName, "text", Types.VARCHAR, true);
+
+        Schema avro = SchemaBuilder.record("t")
+                .namespace("com.firebolt.kafka.connect")
+                .fields()
+                .name(avroFieldName).type(Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.STRING))).noDefault()
+                .endRecord();
+
+        when(mockSchemaProvider.get(schema)).thenReturn(avro);
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
+                (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(stringConverter);
+        when(stringConverter.toParquetValue(any(KafkaMessageColumnValue.class), eq(schema.getColumns().get(0))))
+                .thenAnswer(inv -> ((KafkaMessageColumnValue) inv.getArgument(0)).getValue());
+
+        KafkaMessageColumnValue value = mock(KafkaMessageColumnValue.class);
+        when(value.getValue()).thenReturn("v");
+        AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
+        when(record.getColumnNames()).thenReturn(java.util.Set.of(recordAttributeName));
+        when(record.getColumnValue(recordAttributeName)).thenReturn(value);
+
+        doNothing().when(mockWriter).close();
+
+        ParquetDataGenerator generator = new ParquetDataGenerator(
+                mockSchemaProvider,
+                mockConverterFactory,
+                new TestWriterProvider(mockWriter),
+                mockAvroNameSanitizer,
+                new ParquetDataGenerator.InMemoryFileProvider(),
+                mockErrorReporter,
+                true
+        );
+
+        OutputStream out = generator.generate(List.of(record), schema);
+        assertNotNull(out);
+
+        ArgumentCaptor<GenericData.Record> captor = ArgumentCaptor.forClass(GenericData.Record.class);
+        verify(mockWriter).write(captor.capture());
+        GenericData.Record written = captor.getValue();
+        assertEquals("v", written.get(avroFieldName));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "bad-name,bad_name",
             "my$table,my_table",
             "1abc,_1abc",
@@ -120,6 +172,7 @@ class ParquetDataGeneratorTest {
         KafkaMessageColumnValue nameValue = mock(KafkaMessageColumnValue.class);
         when(nameValue.getValue()).thenReturn("value");
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
+        when(record.getColumnNames()).thenReturn(java.util.Set.of(columnName));
         when(record.getColumnValue(columnName)).thenReturn(nameValue);
 
         when(mockAvroNameSanitizer.toValidAvroName(columnName)).thenReturn(avroFieldName);
@@ -167,6 +220,7 @@ class ParquetDataGeneratorTest {
         KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
         when(idValue.getValue()).thenReturn(123);
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
+        when(record.getColumnNames()).thenReturn(java.util.Set.of("id", "name"));
         when(record.getColumnValue("id")).thenReturn(idValue);
         when(record.getColumnValue("name")).thenReturn(null);
 
@@ -216,6 +270,7 @@ class ParquetDataGeneratorTest {
         KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
         when(idValue.getValue()).thenReturn(123);
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
+        when(record.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(record.getColumnValue("id")).thenReturn(idValue);
 
         when(intConverter.toParquetValue(idValue, schema.getColumns().get(0))).thenReturn(123);
@@ -256,6 +311,7 @@ class ParquetDataGeneratorTest {
         KafkaMessageColumnValue idValue1 = mock(KafkaMessageColumnValue.class);
         when(idValue1.getValue()).thenReturn(1);
         AbstractFireboltRecord good = mock(AbstractFireboltRecord.class);
+        when(good.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(good.getColumnValue("id")).thenReturn(idValue1);
         when(intConverter.toParquetValue(idValue1, schema.getColumns().get(0))).thenReturn(1);
 
@@ -263,6 +319,7 @@ class ParquetDataGeneratorTest {
         KafkaMessageColumnValue idValue2 = mock(KafkaMessageColumnValue.class);
         when(idValue2.getValue()).thenReturn(2);
         AbstractFireboltRecord bad = mock(AbstractFireboltRecord.class);
+        when(bad.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(bad.getColumnValue("id")).thenReturn(idValue2);
         when(intConverter.toParquetValue(idValue2, schema.getColumns().get(0)))
                 .thenThrow(new ColumnConversionFailedException("id", "integer", "bad"));
@@ -312,6 +369,7 @@ class ParquetDataGeneratorTest {
         KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
         when(idValue.getValue()).thenReturn(123);
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
+        when(record.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(record.getColumnValue("id")).thenReturn(idValue);
         when(intConverter.toParquetValue(idValue, schema.getColumns().get(0))).thenReturn(123);
 
@@ -352,6 +410,7 @@ class ParquetDataGeneratorTest {
         KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
         when(idValue.getValue()).thenReturn(2);
         AbstractFireboltRecord bad = mock(AbstractFireboltRecord.class);
+        when(bad.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(bad.getColumnValue("id")).thenReturn(idValue);
         when(intConverter.toParquetValue(idValue, schema.getColumns().get(0)))
                 .thenThrow(new ColumnConversionFailedException("id", "integer", "bad"));
