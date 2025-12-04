@@ -23,7 +23,7 @@ class ParquetAvroSchemaProviderTest {
             "__,record",
             "my$table$name,my_table_name"
     })
-    void recordName_isSanitizedToValidAvroName(String tableName, String expectedRecordName) {
+    void recordNameIsSanitizedToValidAvroName(String tableName, String expectedRecordName) {
         TableSchema tableSchema = new TableSchema(tableName);
         tableSchema.addColumn("id", "int", java.sql.Types.INTEGER, false);
 
@@ -36,7 +36,7 @@ class ParquetAvroSchemaProviderTest {
     }
 
     @Test
-    void emptyTableName_defaultsToRecord() {
+    void emptyTableNameDefaultsToRecord() {
         TableSchema tableSchema = new TableSchema("");
         tableSchema.addColumn("id", "int", java.sql.Types.INTEGER, false);
 
@@ -77,6 +77,24 @@ class ParquetAvroSchemaProviderTest {
         List<Schema> types = field.schema().getTypes();
         assertEquals(Schema.Type.NULL, types.get(0).getType());
         assertEquals(Schema.Type.STRING, types.get(1).getType());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "bad-name,bad_name",
+            "my$table,my_table",
+            "1abc,_1abc",
+            "naïve,na_ve"
+    })
+    void columnNameIsSanitizedToValidAvroFieldName(String columnName, String expectedFieldName) {
+        TableSchema schema = new TableSchema("t");
+        schema.addColumn(columnName, "VARCHAR", Types.VARCHAR, false);
+
+        ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
+        Schema avro = provider.get(schema);
+
+        assertNull(avro.getField(columnName));
+        assertNotNull(avro.getField(expectedFieldName));
     }
 
     @Test

@@ -9,15 +9,19 @@ import java.io.OutputStream;
 import java.sql.Types;
 import java.util.Collections;
 import java.util.List;
+import org.apache.avro.AvroRuntimeException;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
@@ -28,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,6 +46,8 @@ class ParquetDataGeneratorTest {
     @Mock
     private ParquetAvroSchemaProvider mockSchemaProvider;
     @Mock
+    private AvroNameSanitizer mockAvroNameSanitizer;
+    @Mock
     private ColumnDataTypeConverterFactory mockConverterFactory;
     @Mock
     private AvroParquetWriterProvider mockWriterProvider;
@@ -47,6 +55,11 @@ class ParquetDataGeneratorTest {
     private ParquetWriter<GenericData.Record> mockWriter;
     @Mock
     private ErrorReporter mockErrorReporter;
+
+    @BeforeEach
+    void setUpSanitizerIdentity() {
+        lenient().when(mockAvroNameSanitizer.toValidAvroName(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
 
     private static class TestWriterProvider extends AvroParquetWriterProvider {
         private final ParquetWriter<GenericData.Record> writer;
@@ -65,6 +78,7 @@ class ParquetDataGeneratorTest {
                 mockSchemaProvider,
                 mockConverterFactory,
                 new TestWriterProvider(mock(ParquetWriter.class)),
+                mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
                 mockErrorReporter,
                 true
@@ -76,6 +90,59 @@ class ParquetDataGeneratorTest {
         assertEquals(0, baos.size());
 
         verifyNoInteractions(mockSchemaProvider, mockConverterFactory, mockWriterProvider);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "bad-name,bad_name",
+            "my$table,my_table",
+            "1abc,_1abc",
+            "naïve,na_ve"
+    })
+    void writesValueUnderSanitizedFieldName(String columnName, String avroFieldName) throws Exception {
+        TableSchema schema = new TableSchema("orders");
+        schema.addColumn(columnName, "text", Types.VARCHAR, true);
+
+        Schema avro = SchemaBuilder.record("orders")
+                .namespace("com.firebolt.kafka.connect")
+                .fields()
+                .name(avroFieldName).type(Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.STRING))).noDefault()
+                .endRecord();
+
+        when(mockSchemaProvider.get(schema)).thenReturn(avro);
+        @SuppressWarnings("unchecked")
+        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
+                (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(stringConverter);
+        when(stringConverter.toParquetValue(any(KafkaMessageColumnValue.class), eq(schema.getColumns().get(0))))
+                .thenAnswer(inv -> ((KafkaMessageColumnValue) inv.getArgument(0)).getValue());
+
+        KafkaMessageColumnValue nameValue = mock(KafkaMessageColumnValue.class);
+        when(nameValue.getValue()).thenReturn("value");
+        AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
+        when(record.getColumnValue(columnName)).thenReturn(nameValue);
+
+        when(mockAvroNameSanitizer.toValidAvroName(columnName)).thenReturn(avroFieldName);
+        doNothing().when(mockWriter).close();
+
+        ParquetDataGenerator generator = new ParquetDataGenerator(
+                mockSchemaProvider,
+                mockConverterFactory,
+                new TestWriterProvider(mockWriter),
+                mockAvroNameSanitizer,
+                new ParquetDataGenerator.InMemoryFileProvider(),
+                mockErrorReporter,
+                true
+        );
+
+        OutputStream out = generator.generate(List.of(record), schema);
+        assertNotNull(out);
+
+        ArgumentCaptor<GenericData.Record> captor = ArgumentCaptor.forClass(GenericData.Record.class);
+        verify(mockWriter).write(captor.capture());
+        GenericData.Record written = captor.getValue();
+        assertEquals("value", written.get(avroFieldName));
+        assertThrows(AvroRuntimeException.class, () -> written.get(columnName));
     }
 
     @Test
@@ -92,6 +159,7 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
+        
         @SuppressWarnings("unchecked")
         ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
@@ -104,11 +172,12 @@ class ParquetDataGeneratorTest {
 
         when(intConverter.toParquetValue(idValue, schema.getColumns().get(0))).thenReturn(123);
 
-        org.mockito.Mockito.doNothing().when(mockWriter).close();
+        doNothing().when(mockWriter).close();
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
                 mockConverterFactory,
                 new TestWriterProvider(mockWriter),
+                mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
                 mockErrorReporter,
                 true
@@ -142,7 +211,7 @@ class ParquetDataGeneratorTest {
         @SuppressWarnings("unchecked")
         ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
-        org.mockito.Mockito.doNothing().when(mockWriter).close();
+        doNothing().when(mockWriter).close();
 
         KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
         when(idValue.getValue()).thenReturn(123);
@@ -156,6 +225,7 @@ class ParquetDataGeneratorTest {
                 mockSchemaProvider,
                 mockConverterFactory,
                 new TestWriterProvider(mockWriter),
+                mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
                 mockErrorReporter,
                 true
@@ -180,7 +250,7 @@ class ParquetDataGeneratorTest {
         ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
                 (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
-        org.mockito.Mockito.doNothing().when(mockWriter).close();
+        doNothing().when(mockWriter).close();
 
         // Good record
         KafkaMessageColumnValue idValue1 = mock(KafkaMessageColumnValue.class);
@@ -201,6 +271,7 @@ class ParquetDataGeneratorTest {
                 mockSchemaProvider,
                 mockConverterFactory,
                 new TestWriterProvider(mockWriter),
+                mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
                 mockErrorReporter,
                 true
@@ -248,6 +319,7 @@ class ParquetDataGeneratorTest {
                 mockSchemaProvider,
                 mockConverterFactory,
                 mockWriterProvider,
+                mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
                 mockErrorReporter,
                 true
@@ -288,6 +360,7 @@ class ParquetDataGeneratorTest {
                 mockSchemaProvider,
                 mockConverterFactory,
                 mockWriterProvider,
+                mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
                 mockErrorReporter,
                 false

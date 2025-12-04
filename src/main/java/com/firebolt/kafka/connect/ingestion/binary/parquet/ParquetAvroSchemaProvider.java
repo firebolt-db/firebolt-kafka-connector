@@ -1,14 +1,28 @@
 package com.firebolt.kafka.connect.ingestion.binary.parquet;
 
 import com.firebolt.kafka.connect.TableSchema;
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.Types;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 
+@Slf4j
 public class ParquetAvroSchemaProvider {
 
     private static final String SCHEMA_NAMESPACE = "com.firebolt.kafka.connect";
+
+    private AvroNameSanitizer avroNameSanitizer;
+
+    public ParquetAvroSchemaProvider() {
+        this(new AvroNameSanitizer());
+    }
+
+    @VisibleForTesting
+    ParquetAvroSchemaProvider(AvroNameSanitizer avroNameSanitizer) {
+        this.avroNameSanitizer = avroNameSanitizer;
+    }
 
     /**
      * Generates the avro parquet schema based on the table schema
@@ -18,37 +32,17 @@ public class ParquetAvroSchemaProvider {
      */
     public Schema get(TableSchema tableSchema) {
         // Use a sanitized Avro record name; field names come from table columns.
-        String avroRecordTableName = toValidAvroName(tableSchema.getTableName());
+        String avroRecordTableName = avroNameSanitizer.toValidAvroName(tableSchema.getTableName());
         SchemaBuilder.FieldAssembler<Schema> fields = SchemaBuilder.record(avroRecordTableName)
                 .namespace(SCHEMA_NAMESPACE)
                 .fields();
 
         for (TableSchema.Column column : tableSchema.getColumns()) {
-            String name = column.getName();
+            String name = avroNameSanitizer.toValidAvroName(column.getName());
             Schema fieldSchema = mapSqlTypeToAvro(column);
             fields.name(name).type(fieldSchema).noDefault();
         }
         return fields.endRecord();
-    }
-
-    /**
-     * Avro record and field names must match [A-Za-z_][A-Za-z0-9_]*.
-     * This helper converts any unsupported character to underscore and ensures a valid starting character.
-     */
-    private String toValidAvroName(String candidate) {
-        if (candidate == null || candidate.isEmpty()) {
-            return "record";
-        }
-        String sanitized = candidate.replaceAll("[^A-Za-z0-9_]", "_");
-        // If everything became underscores, fall back to a safe prefix
-        if (sanitized.chars().allMatch(ch -> ch == '_')) {
-            return "record";
-        }
-        char first = sanitized.charAt(0);
-        if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_')) {
-            sanitized = "_" + sanitized;
-        }
-        return sanitized;
     }
 
     /**

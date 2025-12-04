@@ -32,11 +32,13 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
     private InMemoryFileProvider inMemoryFileProvider;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
+    private AvroNameSanitizer avroNameSanitizer ;
 
     public ParquetDataGenerator(ErrorReporter errorReporter, boolean errorToleranceAll) {
         this(new ParquetAvroSchemaProvider(),
                 ColumnDataTypeFactoryProvider.getInstance(),
                 new AvroParquetWriterProvider(),
+                new AvroNameSanitizer(),
                 new InMemoryFileProvider(),
                 errorReporter, errorToleranceAll
         );
@@ -46,12 +48,14 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
     ParquetDataGenerator(ParquetAvroSchemaProvider parquetAvroSchemaProvider,
                          ColumnDataTypeConverterFactory columnDataTypeConverterFactory,
                          AvroParquetWriterProvider avroParquetWriterProvider,
+                         AvroNameSanitizer avroNameSanitizer,
                          InMemoryFileProvider inMemoryFileProvider,
                          ErrorReporter errorReporter,
                          boolean errorToleranceAll) {
         this.parquetAvroSchemaProvider = parquetAvroSchemaProvider;
         this.columnDataTypeConverterFactory = columnDataTypeConverterFactory;
         this.avroParquetWriterProvider = avroParquetWriterProvider;
+        this.avroNameSanitizer = avroNameSanitizer;
         this.inMemoryFileProvider = inMemoryFileProvider;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
@@ -117,7 +121,7 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
 
             try {
                 Object convertedValue = columnDataTypeConverterFactory.getConverter(column).toParquetValue(kafkaMessageColumnValue, column);
-                avroRecord.put(columnName, convertedValue);
+                avroRecord.put(avroNameSanitizer.toValidAvroName(columnName), convertedValue);
             } catch (ColumnConversionFailedException e) {
                 // as of now we are failing at the first column conversion failure. We could try to convert all the columns so we give all the data in one record convertion exception.
                 throw RecordConversionFailedException.builder()
