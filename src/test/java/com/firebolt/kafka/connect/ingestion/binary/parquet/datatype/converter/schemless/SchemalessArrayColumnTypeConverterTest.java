@@ -118,14 +118,14 @@ class SchemalessArrayColumnTypeConverterTest {
 	void convertsMixedElementsToDecimalBytes() {
 		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
 		SchemalessDecimalColumnDataTypeConverter decimalConverter = new SchemalessDecimalColumnDataTypeConverter();
-		TableSchema.Column arrayDecimalColumn = new TableSchema.Column("amounts", "array(numeric)", Types.ARRAY, false);
+		TableSchema.Column arrayDecimalColumn = new TableSchema.Column("amounts", "array(numeric)", Types.ARRAY, false,30, 7);
 
 		arrayConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalConverter);
 		List<Object> input = Arrays.asList("12.5", 7, 3.14d, null);
 		List<?> result = arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(input), arrayDecimalColumn);
-		java.math.BigDecimal d0 = decodeDecimal((ByteBuffer) result.get(0), 38, 9);
-		java.math.BigDecimal d1 = decodeDecimal((ByteBuffer) result.get(1), 38, 9);
-		java.math.BigDecimal d2 = decodeDecimal((ByteBuffer) result.get(2), 38, 9);
+		java.math.BigDecimal d0 = decodeDecimal((ByteBuffer) result.get(0), 30, 7);
+		java.math.BigDecimal d1 = decodeDecimal((ByteBuffer) result.get(1), 30, 7);
+		java.math.BigDecimal d2 = decodeDecimal((ByteBuffer) result.get(2), 30, 7);
 		assertEquals(0, new java.math.BigDecimal("12.5").compareTo(d0));
 		assertEquals(0, java.math.BigDecimal.valueOf(7).compareTo(d1));
 		assertEquals(0, java.math.BigDecimal.valueOf(3.14d).compareTo(d2));

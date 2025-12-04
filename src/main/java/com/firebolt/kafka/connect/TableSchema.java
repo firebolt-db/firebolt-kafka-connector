@@ -25,6 +25,10 @@ public class TableSchema {
         columns.add(new Column(name, dataType, sqlType, nullable));
     }
 
+    public void addColumn(String name, String dataType, int sqlType, boolean nullable, int precision, int scale) {
+        columns.add(new Column(name, dataType, sqlType, nullable, precision, scale));
+    }
+
     /**
      * Represents a column in the table schema.
      */
@@ -35,12 +39,20 @@ public class TableSchema {
         private final String dataType;
         private final int sqlType;
         private final boolean nullable;
+        private final int precision;
+        private final int scale;
 
         public Column(String name, String dataType, int sqlType, boolean nullable) {
+            this(name, dataType, sqlType, nullable, 0, 0);
+        }
+
+        public Column(String name, String dataType, int sqlType, boolean nullable, int precision, int scale) {
             this.name = name;
             this.dataType = dataType;
             this.sqlType = sqlType;
             this.nullable = nullable;
+            this.precision = precision;
+            this.scale = scale;
         }
     }
 }

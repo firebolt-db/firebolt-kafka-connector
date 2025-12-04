@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 import java.sql.Types;
 import java.util.List;
 import org.apache.avro.Schema;
+import org.apache.avro.LogicalTypes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -130,13 +131,24 @@ class ParquetAvroSchemaProviderTest {
         Schema.Type expectedBase = Schema.Type.valueOf(expectedAvroTypeName);
 
         TableSchema schema = new TableSchema("t");
-        schema.addColumn("col", sqlTypeName, sqlType, false);
+        if ("NUMERIC".equals(sqlTypeName)) {
+            schema.addColumn("col", sqlTypeName, sqlType, false, 20, 5);
+        } else {
+            schema.addColumn("col", sqlTypeName, sqlType, false);
+        }
 
         ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
         Schema avro = provider.get(schema);
         Schema.Field field = avro.getField("col");
         assertNotNull(field);
         assertEquals(expectedBase, field.schema().getType());
+        if ("NUMERIC".equals(sqlTypeName)) {
+            assertNotNull(field.schema().getLogicalType());
+            assertEquals("decimal", field.schema().getLogicalType().getName());
+            LogicalTypes.Decimal dec = (LogicalTypes.Decimal) field.schema().getLogicalType();
+            assertEquals(20, dec.getPrecision());
+            assertEquals(5, dec.getScale());
+        }
     }
 
     @ParameterizedTest
@@ -159,7 +171,11 @@ class ParquetAvroSchemaProviderTest {
         Schema.Type expectedBase = Schema.Type.valueOf(expectedAvroTypeName);
 
         TableSchema schema = new TableSchema("t");
-        schema.addColumn("col", sqlTypeName, sqlType, true);
+        if ("NUMERIC".equals(sqlTypeName)) {
+            schema.addColumn("col", sqlTypeName, sqlType, true, 18, 4);
+        } else {
+            schema.addColumn("col", sqlTypeName, sqlType, true);
+        }
 
         ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
         Schema avro = provider.get(schema);
@@ -171,6 +187,13 @@ class ParquetAvroSchemaProviderTest {
         assertEquals(2, types.size());
         assertEquals(Schema.Type.NULL, types.get(0).getType());
         assertEquals(expectedBase, types.get(1).getType());
+        if ("NUMERIC".equals(sqlTypeName)) {
+            assertNotNull(types.get(1).getLogicalType());
+            assertEquals("decimal", types.get(1).getLogicalType().getName());
+            LogicalTypes.Decimal dec = (LogicalTypes.Decimal) types.get(1).getLogicalType();
+            assertEquals(18, dec.getPrecision());
+            assertEquals(4, dec.getScale());
+        }
     }
 
     private static int sqlTypeConstant(String name) throws Exception {
@@ -350,9 +373,9 @@ class ParquetAvroSchemaProviderTest {
     }
 
     @Test
-    void nonNullableArrayDecimalHasItemUnionNullString() {
+    void nonNullableArrayDecimalHasItemUnionNullDecimalBytesWithPrecisionScale() {
         TableSchema schema = new TableSchema("t");
-        schema.addColumn("arr_dec", "array(numeric)", Types.ARRAY, false);
+        schema.addColumn("arr_dec", "array(numeric)", Types.ARRAY, false, 22, 6);
 
         ParquetAvroSchemaProvider provider = new ParquetAvroSchemaProvider();
         Schema avro = provider.get(schema);
@@ -365,6 +388,11 @@ class ParquetAvroSchemaProviderTest {
         List<Schema> itemTypes = element.getTypes();
         assertEquals(Schema.Type.NULL, itemTypes.get(0).getType());
         assertEquals(Schema.Type.BYTES, itemTypes.get(1).getType());
+        assertNotNull(itemTypes.get(1).getLogicalType());
+        assertEquals("decimal", itemTypes.get(1).getLogicalType().getName());
+        LogicalTypes.Decimal dec = (LogicalTypes.Decimal) itemTypes.get(1).getLogicalType();
+        assertEquals(22, dec.getPrecision());
+        assertEquals(6, dec.getScale());
     }
 
     @Test

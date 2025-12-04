@@ -3,6 +3,11 @@ package com.firebolt.kafka.connect.service;
 import com.firebolt.kafka.connect.JdbcConfig;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+import java.sql.Types;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import com.google.common.collect.Sets;
 import java.sql.Connection;
@@ -18,6 +23,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Service for handling all database operations with Firebolt.
@@ -29,6 +35,10 @@ public class FireboltDbService {
     // JDBC property names
     private static final String JDBC_CLIENT_ID = "client_id";
     private static final String JDBC_CLIENT_SECRET = "client_secret";
+
+    private static final Pattern NUMERIC_PATTERN = Pattern.compile("(?i)numeric\\s*\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
+    private static final int DEFAULT_PRECISION = 38;
+    private static final int DEFAULT_SCALE = 9;
 
     /**
      * Discovers schemas for all specified tables.
@@ -82,6 +92,16 @@ public class FireboltDbService {
     private TableSchema discoverTableSchema(Connection connection, String tableName) throws SQLException {
         log.debug("Discovering schema for table '{}'", tableName);
 
+        // this is a workaround to the fact that the array data type is compacted when used in metaData.getColumn() and we are losing the precision and scale. The actual type is ARRAY(NUMERIC(38,9)) and the compacted version is ARRAY(NUMERIC)
+        Map<String,String> columnToFullDataTypeMap = new HashMap<>();
+        try (PreparedStatement statement = connection.prepareStatement("select column_name, data_type from information_schema.columns where table_schema='public' and table_name=?")) {
+            statement.setString(1, tableName);
+            ResultSet resultSet = statement.executeQuery();
+            while (resultSet.next()) {
+                columnToFullDataTypeMap.put(resultSet.getString(1), resultSet.getString(2));
+            }
+        }
+
         DatabaseMetaData metaData = connection.getMetaData();
 
         try (ResultSet rs = metaData.getColumns(null, "public", tableName, null)) {
@@ -95,13 +115,31 @@ public class FireboltDbService {
                 int sqlType = rs.getInt("DATA_TYPE");
                 boolean nullable = rs.getBoolean("NULLABLE");
 
-                schema.addColumn(columnName, dataType, sqlType, nullable);
+                int precision     = rs.getInt("COLUMN_SIZE");    // for DECIMAL/NUMERIC: precision
+                int scale         = rs.getInt("DECIMAL_DIGITS");
+
+                // for numeric array get the scale and precision from the full data type
+                if (sqlType == Types.ARRAY && columnToFullDataTypeMap.get(columnName).contains("NUMERIC")) {
+                    Pair<Integer, Integer> precisionAndScalePair = parsePrecisionAndScale(columnToFullDataTypeMap.get(columnName));
+                    precision = precisionAndScalePair.getLeft();
+                    scale = precisionAndScalePair.getRight();
+                }
+
+                schema.addColumn(columnName, dataType, sqlType, nullable, precision, scale);
                 log.debug("Found column in table '{}': {} ({}, SQL type: {}, nullable: {})",
                         tableName, columnName, dataType, sqlType, nullable);
             }
 
             return hasColumns ? schema : null;
         }
+    }
+
+    private Pair<Integer, Integer> parsePrecisionAndScale(String numericFullArrayDataType) {
+        Matcher n = NUMERIC_PATTERN.matcher(numericFullArrayDataType);
+        if (n.find()) {
+            return Pair.of(Integer.parseInt(n.group(1)), Integer.parseInt(n.group(2)));
+        }
+        return Pair.of(DEFAULT_PRECISION, DEFAULT_SCALE);
     }
 
     /**
