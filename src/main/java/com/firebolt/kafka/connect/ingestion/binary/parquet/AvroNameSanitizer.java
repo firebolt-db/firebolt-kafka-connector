@@ -16,7 +16,7 @@ public class AvroNameSanitizer {
             return "record";
         }
         char first = sanitized.charAt(0);
-        if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_')) {
+		if (first >= '0' && first <= '9') {
             sanitized = "_" + sanitized;
         }
         return sanitized;
