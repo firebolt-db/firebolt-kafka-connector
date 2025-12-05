@@ -60,87 +60,43 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
     @ParameterizedTest
     @MethodSource("sqlIngestionOnly")
 //    @MethodSource("sqlAndBinaryIngestionTypes")
-    void testCaseInsensitiveColumnNamesSerialization(Map<String, String> connectorOverrides, String description) throws Exception {
-        log.info("Running test with column names with case sensitive{}", description);
+    void testColumnNamesSerialization(Map<String, String> connectorOverrides, String description) throws Exception {
+        log.info("Running test with column names (case-insensitive and special chars) {}", description);
 
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, columnNameCaseInsensitiveTableSchema(), connectorOverrides);
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, columnNameCombinedTableSchema(), connectorOverrides);
 
         producer = initializeSchemalessJsonProducer();
 
-        List<ColumnNameCaseRecord> testRecords = List.of(aValidCaseTestRecord(1).build());
+        List<ColumnNameRecord> testRecords = List.of(aValidColumnNameRecord(1).build());
 
         // publish the messages to kafka topic
-        publishCaseMessages(testRecords);
+        publishColumnNameMessages(testRecords);
 
         waitForDataInFirebolt(TABLE_NAME, testRecords.size());
 
         // check that all the records have the expected value
-        verifyColumnCaseRecords(testRecords);
+        verifyColumnRecords(testRecords);
     }
 
-    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
-    // until then we will run these tests locally against core
-    @ParameterizedTest
-    @MethodSource("sqlIngestionOnly")
-//    @MethodSource("sqlAndBinaryIngestionTypes")
-    void testColumNamesWithSpecialCharacters(Map<String, String> connectorOverrides, String description) throws Exception {
-        log.info("Running test with special chars in column names {}", description);
-
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, columnNameSpecialCharsTableSchema(), connectorOverrides);
-
-        producer = initializeSchemalessJsonProducer();
-
-        List<ColumnNameWithSpecialCharsRecord> testRecords = List.of(aValidSpecialCharsTestRecord(1).build());
-
-        // publish the messages to kafka topic
-        publishSpecialCharsMessages(testRecords);
-
-        waitForDataInFirebolt(TABLE_NAME, testRecords.size());
-
-        // check that all the records have the expected value
-        verifyColumnSpecialCharsRecords(testRecords);
-    }
-
-    private Supplier<String> columnNameCaseInsensitiveTableSchema() {
+    private Supplier<String> columnNameCombinedTableSchema() {
         return () -> "CREATE TABLE \"%s\" (" +
                 "\"id\" INTEGER NOT NULL, " +
                 "\"TEXT\" TEXT NOT NULL, " +
                 "\"localDate\" DATE NOT NULL, " +
-                "\"BigInt\" BIGINT NOT NULL " +
-                ")";
-    }
-
-    private Supplier<String> columnNameSpecialCharsTableSchema() {
-        return () -> "CREATE TABLE \"%s\" (" +
-                "\"id\" INTEGER NOT NULL, " +
+                "\"BigInt\" BIGINT NOT NULL, " +
                 "\"column-with-dashes\" TEXT NULL, " +
                 "\"column.with.dots\" TEXT NULL, " +
                 "\"column with spaces\" TEXT NULL, " +
                 "\"column_with_underscores\" TEXT NULL, " +
+                "\"case-insensitive-column-with-dashes\" TEXT NULL, " +
                 "\"über\" TEXT NULL " +
                 ")";
     }
 
-    private void publishCaseMessages(List<ColumnNameCaseRecord> records) throws Exception {
+    private void publishColumnNameMessages(List<ColumnNameRecord> records) throws Exception {
         List<ProducerRecord<String,String>> producerRecords = records.stream()
                 .map(record -> {
-                    String key = "column-name-casing-test-key-" + record.getId();
-                    try {
-                        return new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
-                    } catch (JsonProcessingException e) {
-                        throw new RuntimeException(e);
-                    }
-
-                })
-                .collect(Collectors.toList());
-
-        publishRecords(producerRecords);
-    }
-
-    private void publishSpecialCharsMessages(List<ColumnNameWithSpecialCharsRecord> records) throws Exception {
-        List<ProducerRecord<String,String>> producerRecords = records.stream()
-                .map(record -> {
-                    String key = "column-name-special-chars-test-key-" + record.getId();
+                    String key = "column-name-test-key-" + record.getId();
                     try {
                         return new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
                     } catch (JsonProcessingException e) {
@@ -168,7 +124,7 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
         producer.flush();
     }
 
-    private void verifyColumnCaseRecords(List<ColumnNameCaseRecord> expectedRecords) throws SQLException {
+    private void verifyColumnRecords(List<ColumnNameRecord> expectedRecords) throws SQLException {
         // Count total records
         int actualCount = fireboltDefaultDbClient.countRows(TABLE_NAME);
         assertEquals(expectedRecords.size(), actualCount,
@@ -176,7 +132,9 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
 
         // Verify specific records by recordId
         String selectQuery = String.format(
-                "SELECT \"id\", \"TEXT\", \"localDate\", \"BigInt\" " +
+                "SELECT \"id\", \"TEXT\", \"localDate\", \"BigInt\", " +
+                        "\"column-with-dashes\", \"column.with.dots\", \"column with spaces\", \"column_with_underscores\", " +
+                        "\"case-insensitive-column-with-dashes\", \"über\" " +
                         "FROM \"%s\" ORDER BY \"id\"", TABLE_NAME);
 
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -186,49 +144,18 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
                 assertTrue(recordIndex < expectedRecords.size(),
                         "More records found in database than expected");
 
-                ColumnNameCaseRecord expected = expectedRecords.get(recordIndex);
+                ColumnNameRecord expected = expectedRecords.get(recordIndex);
 
                 // Verify each field
                 assertEquals(expected.getId(), rs.getInt("id"));
                 assertEquals(expected.getText(), rs.getString("TEXT"));
                 assertEquals(expected.getLocalDate(), rs.getDate("localDate").toLocalDate());
                 assertEquals(expected.getBigInt(), rs.getObject("BigInt", Long.class));
-
-                recordIndex++;
-            }
-
-            assertEquals(expectedRecords.size(), recordIndex,
-                    "Expected to verify " + expectedRecords.size() + " records, but only found " + recordIndex);
-        }
-    }
-
-    private void verifyColumnSpecialCharsRecords(List<ColumnNameWithSpecialCharsRecord> expectedRecords) throws SQLException {
-        // Count total records
-        int actualCount = fireboltDefaultDbClient.countRows(TABLE_NAME);
-        assertEquals(expectedRecords.size(), actualCount,
-                "Expected " + expectedRecords.size() + " records but found " + actualCount);
-
-        // Verify specific records by recordId
-        String selectQuery = String.format(
-                "SELECT \"id\", " +
-                        "\"column-with-dashes\", \"column.with.dots\", \"column with spaces\", \"column_with_underscores\", \"über\" " +
-                        "FROM \"%s\" ORDER BY \"id\"", TABLE_NAME);
-
-        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
-            int recordIndex = 0;
-
-            while (rs.next()) {
-                assertTrue(recordIndex < expectedRecords.size(),
-                        "More records found in database than expected");
-
-                ColumnNameWithSpecialCharsRecord expected = expectedRecords.get(recordIndex);
-
-                // Verify each field
-                assertEquals(expected.getId(), rs.getInt("id"));
                 assertEquals(expected.getColumnWithDashes(), rs.getString("column-with-dashes"));
                 assertEquals(expected.getColumnWithDots(), rs.getString("column.with.dots"));
                 assertEquals(expected.getColumnWithSpaces(), rs.getString("column with spaces"));
                 assertEquals(expected.getColumnWithUnderscore(), rs.getString("column_with_underscores"));
+                assertEquals(expected.getCaseInsensitiveColumnWithDashes(), rs.getString("case-insensitive-column-with-dashes"));
                 assertEquals(expected.getUeber(), rs.getString("über"));
 
                 recordIndex++;
@@ -239,21 +166,17 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
         }
     }
 
-    private ColumnNameCaseRecord.ColumnNameCaseRecordBuilder aValidCaseTestRecord(int recordId) {
-        return ColumnNameCaseRecord.builder()
+    private ColumnNameRecord.ColumnNameRecordBuilder aValidColumnNameRecord(int recordId) {
+        return ColumnNameRecord.builder()
                 .id(recordId)
                 .bigInt(100L)
                 .text("some text")
-                .localDate(LocalDate.of(2024, 12, 31));
-    }
-
-    private ColumnNameWithSpecialCharsRecord.ColumnNameWithSpecialCharsRecordBuilder aValidSpecialCharsTestRecord(int recordId) {
-        return ColumnNameWithSpecialCharsRecord.builder()
-                .id(recordId)
+                .localDate(LocalDate.of(2024, 12, 31))
                 .columnWithDashes("dash-value")
                 .columnWithDots("dot.value")
                 .columnWithSpaces("space value")
                 .columnWithUnderscore("under_score")
+                .caseInsensitiveColumnWithDashes("ci-dash-value")
                 .ueber("umlaut value");
     }
 
@@ -262,7 +185,7 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    private static class ColumnNameCaseRecord {
+    private static class ColumnNameRecord {
 
         @JsonProperty("ID")
         private Integer id;
@@ -275,16 +198,6 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
 
         @JsonProperty("bigInt")
         private Long bigInt;
-    }
-
-    @Getter
-    @Setter
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    private static class ColumnNameWithSpecialCharsRecord {
-
-        private Integer id;
 
         @JsonProperty("column-with-dashes")
         private String columnWithDashes;
@@ -297,6 +210,9 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
 
         @JsonProperty("column_with_underscores")
         private String columnWithUnderscore;
+
+        @JsonProperty("Case-Insensitive-Column-With-Dashes")
+        private String caseInsensitiveColumnWithDashes;
 
         @JsonProperty("über")
         private String ueber;

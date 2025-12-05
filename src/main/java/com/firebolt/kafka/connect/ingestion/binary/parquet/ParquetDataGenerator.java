@@ -13,9 +13,14 @@ import java.io.OutputStream;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.io.OutputFile;
 import org.apache.parquet.io.PositionOutputStream;
@@ -92,6 +97,7 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
 
     private List<GenericData.Record> processRecords(List<AbstractFireboltRecord> records, TableSchema tableSchema, Schema avroSchema) {
         List<GenericData.Record> avroRecords = new ArrayList<>();
+
         for (AbstractFireboltRecord record : records) {
             try {
                 GenericData.Record processedRecords = processRecord(record, tableSchema, avroSchema);
@@ -110,18 +116,33 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
 
     private GenericData.Record processRecord(AbstractFireboltRecord record, TableSchema tableSchema, Schema avroSchema) {
         GenericData.Record avroRecord = new GenericData.Record(avroSchema);
+
+        // key is the lower case record name columns and value is the actual column name
+        Map<String,String> recordAttributeNames = record.getColumnNames().stream().collect(Collectors.toMap(name -> name.toLowerCase(), Function.identity()));
+
         for (TableSchema.Column column : tableSchema.getColumns()) {
-            String columnName = column.getName();
-            KafkaMessageColumnValue kafkaMessageColumnValue = record.getColumnValue(columnName);
+            String tableColumnName = column.getName();
+
+            // look up the column names using case insensitive search
+            String recordAttributeName = recordAttributeNames.get(tableColumnName.toLowerCase());
+
+            // only process the attributes from the record that match a column name in the table
+            if (StringUtils.isBlank(recordAttributeName)) {
+                continue;
+            }
+
+            KafkaMessageColumnValue kafkaMessageColumnValue = record.getColumnValue(recordAttributeName);
 
             if (kafkaMessageColumnValue == null || kafkaMessageColumnValue.getValue()== null) {
-                avroRecord.put(columnName, null);
+                avroRecord.put(tableColumnName, null);
                 continue;
             }
 
             try {
                 Object convertedValue = columnDataTypeConverterFactory.getConverter(column).toParquetValue(kafkaMessageColumnValue, column);
-                avroRecord.put(avroNameSanitizer.toValidAvroName(columnName), convertedValue);
+
+                // avro schema is using the column name from the table schema
+                avroRecord.put(avroNameSanitizer.toValidAvroName(tableColumnName), convertedValue);
             } catch (ColumnConversionFailedException e) {
                 // as of now we are failing at the first column conversion failure. We could try to convert all the columns so we give all the data in one record convertion exception.
                 throw RecordConversionFailedException.builder()
