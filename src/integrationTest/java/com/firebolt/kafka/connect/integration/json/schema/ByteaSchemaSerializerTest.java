@@ -58,7 +58,7 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
 
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testByteaSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for bytea data type", testDescription);
 

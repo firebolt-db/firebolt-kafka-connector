@@ -56,7 +56,7 @@ public class TextSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testTextSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for text data type", testDescription);
 

@@ -543,32 +543,24 @@ public abstract class BaseIntegrationTest {
      * This represents a provider for those tests
      * @return
      */
-    protected static Stream<Arguments> sqlAndBinaryTestSetupWithOrWithoutNulls() {
-        return Stream.of(
-                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
-                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values"),
-                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"),
-                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values")
-        );
-    }
-
-    protected static Stream<Arguments> sqlIngestionTypeWithOrWithoutNulls() {
+    protected static Stream<Arguments> ingestionTypesWithOrWithoutNulls() {
         return Stream.of(
                 Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
                 Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values")
+                // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
+                // until then we will run these tests locally against core
+//                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"),
+//                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values")
         );
     }
 
-    protected static Stream<Arguments> sqlAndBinaryIngestionTypes() {
-        return Stream.of(
-                Arguments.of( Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
-                Arguments.of( Map.of("ingestion.type", "binary"), "sql ingestion without null values")
-        );
-    }
-
-    protected static Stream<Arguments> sqlIngestionOnly() {
+    protected static Stream<Arguments> ingestionTypes() {
         return Stream.of(
                 Arguments.of( Map.of("ingestion.type", "sql"), "sql ingestion with null values")
+                // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
+                // until then we will run these tests locally against core
+//                Arguments.of( Map.of("ingestion.type", "binary"), "sql ingestion without null values")
         );
     }
+
 }

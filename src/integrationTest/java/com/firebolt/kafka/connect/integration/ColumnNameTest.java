@@ -55,11 +55,8 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
         super.tearDown();
     }
 
-    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
-    // until then we will run these tests locally against core
     @ParameterizedTest
-    @MethodSource("sqlIngestionOnly")
-//    @MethodSource("sqlAndBinaryIngestionTypes")
+    @MethodSource("ingestionTypes")
     void testColumnNamesSerialization(Map<String, String> connectorOverrides, String description) throws Exception {
         log.info("Running test with column names (case-insensitive and special chars) {}", description);
 

@@ -55,7 +55,7 @@ public class DoubleSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testDoubleSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for double precision data type", testDescription);
 
@@ -667,7 +667,7 @@ public class DoubleSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionOnly")
+    @MethodSource("ingestionTypes")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
         setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
