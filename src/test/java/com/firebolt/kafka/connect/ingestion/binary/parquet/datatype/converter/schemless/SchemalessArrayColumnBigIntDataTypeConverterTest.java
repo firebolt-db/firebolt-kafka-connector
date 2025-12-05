@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.Types;
 import java.util.Arrays;
@@ -19,7 +20,7 @@ class SchemalessArrayColumnBigIntDataTypeConverterTest {
 
     @Test
     void convertsMixedNumericElementsToLongs() {
-        arrayConverter.addConverter(Long.class, bigIntConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.BIGINT, bigIntConverter);
         List<Object> input = Arrays.asList(1, 2L, "3", " 4 ", null, (short) 5, (byte) 6);
         List<?> result = arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(input), arrayBigintColumn);
         assertEquals(Arrays.asList(1L, 2L, 3L, 4L, null, 5L, 6L), result);
@@ -27,7 +28,7 @@ class SchemalessArrayColumnBigIntDataTypeConverterTest {
 
     @Test
     void invalidElementCausesFailure() {
-        arrayConverter.addConverter(Long.class, bigIntConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.BIGINT, bigIntConverter);
         List<Object> input = Arrays.asList(1, "not-a-number", 3);
         assertThrows(ColumnConversionFailedException.class,
                 () -> arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(input), arrayBigintColumn));

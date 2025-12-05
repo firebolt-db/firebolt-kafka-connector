@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,7 +21,7 @@ class SchemalessArrayColumnTextDataTypeConverterTest {
 
     @Test
     void convertsMixedElementsToStrings() throws Exception {
-        arrayConverter.addConverter(String.class, textConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.TEXT, textConverter);
 
         Map<String, Object> m = new HashMap<>();
         m.put("a", 1);

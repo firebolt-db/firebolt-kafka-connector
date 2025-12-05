@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.Types;
 import java.util.Arrays;
@@ -19,7 +20,7 @@ class SchemalessArrayColumnBooleanDataTypeConverterTest {
 
     @Test
     void convertsMixedElementsToBooleans() {
-        arrayConverter.addConverter(Boolean.class, boolConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.BOOLEAN, boolConverter);
         List<Object> in = Arrays.asList("true", "FALSE", 1, 0, true, false, null, "t", "f");
         List<?> out = arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(in), arrayBoolCol);
         assertEquals(Arrays.asList(true, false, true, false, true, false, null, true, false), out);
@@ -27,7 +28,7 @@ class SchemalessArrayColumnBooleanDataTypeConverterTest {
 
     @Test
     void invalidElementCausesFailure() {
-        arrayConverter.addConverter(Boolean.class, boolConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.BOOLEAN, boolConverter);
         List<Object> in = Arrays.asList("maybe");
         assertThrows(ColumnConversionFailedException.class,
                 () -> arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(in), arrayBoolCol));
