@@ -63,24 +63,6 @@ class SchemalessBigIntColumnDataTypeConverterTest {
         assertEquals("bigint", ex.getColumnType());
     }
 
-    private static Object testValue(String kind) {
-        switch (kind) {
-            case "BYTE":
-                return Byte.valueOf((byte) 42);
-            case "SHORT":
-                return Short.valueOf((short) 42);
-            case "INT":
-                return Integer.valueOf(42);
-            case "LONG":
-                return Long.valueOf(42L);
-            case "STRING_NUMERIC":
-                return "42";
-            case "STRING_NUMERIC_WITH_SPACES":
-                return "  42  ";
-            default:
-                throw new IllegalArgumentException(kind);
-        }
-    }
 }
 
 

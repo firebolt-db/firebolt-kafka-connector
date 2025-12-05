@@ -3,8 +3,6 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import java.math.BigDecimal;
-import java.nio.ByteBuffer;
 import java.sql.Types;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
