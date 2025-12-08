@@ -2,7 +2,7 @@ plugins {
     id 'java'
     id 'idea'
     id 'jacoco'
-    id "org.sonarqube" version "7.1.0.6387"
+    id "org.sonarqube" version "7.2.0.6526"
 }
 
 // Version and group are now defined in gradle.properties
