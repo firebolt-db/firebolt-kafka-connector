@@ -63,7 +63,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testDateSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for bytea data type", testDescription);
 
@@ -83,7 +83,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionOnly")
+    @MethodSource("ingestionTypes")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
         setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,

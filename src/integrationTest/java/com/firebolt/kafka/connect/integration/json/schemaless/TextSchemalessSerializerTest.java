@@ -57,11 +57,8 @@ public class TextSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
         super.tearDown();
     }
 
-    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
-    // until then we will run these tests locally against core
     @ParameterizedTest
-//    @MethodSource("sqlAndBinaryTestSetupWithOrWithoutNulls")
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testTextSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for text data type (schemaless)", testDescription);
 

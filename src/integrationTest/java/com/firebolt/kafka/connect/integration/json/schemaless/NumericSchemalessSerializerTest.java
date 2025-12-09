@@ -57,7 +57,7 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testNumericSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for numeric data type (schemaless)", testDescription);
 
@@ -76,7 +76,7 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionOnly")
+    @MethodSource("ingestionTypes")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
         setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, numericTableSchema(), connectorOverrides);

@@ -56,7 +56,7 @@ public class BooleanSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testBooleanSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for boolean data type", testDescription);
 
@@ -76,7 +76,7 @@ public class BooleanSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionOnly")
+    @MethodSource("ingestionTypes")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
         setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,

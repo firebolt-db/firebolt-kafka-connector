@@ -56,11 +56,8 @@ public class RealSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
         super.tearDown();
     }
 
-    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
-    // until then we will run these tests locally against core
     @ParameterizedTest
-//    @MethodSource("sqlAndBinaryTestSetupWithOrWithoutNulls")
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testRealSerialization(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for real data type (schemaless)", testDescription);
 
@@ -78,11 +75,8 @@ public class RealSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
         verifyRealRecordsInFirebolt(testRecords);
     }
 
-    // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryIngestionTypes
-    // until then we will run these tests locally against core
     @ParameterizedTest
-//    @MethodSource("sqlAndBinaryIngestionTypes")
-    @MethodSource("sqlIngestionOnly")
+    @MethodSource("ingestionTypes")
     void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
         // Setup test resources using centralized method
         setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, realTableSchema(), connectorOverrides);

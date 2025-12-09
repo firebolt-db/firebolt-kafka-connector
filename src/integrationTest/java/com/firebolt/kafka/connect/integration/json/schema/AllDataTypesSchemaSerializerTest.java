@@ -65,7 +65,7 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
     }
 
     @ParameterizedTest
-    @MethodSource("sqlIngestionTypeWithOrWithoutNulls")
+    @MethodSource("ingestionTypesWithOrWithoutNulls")
     void testAllDataTypesJsonSchemaSerializationAndKafkaConnectProcessing(boolean includeNulls, Map<String, String> connectorOverrides, String testDescription) throws Exception {
         log.info("Running {} for all data types", testDescription);
 
