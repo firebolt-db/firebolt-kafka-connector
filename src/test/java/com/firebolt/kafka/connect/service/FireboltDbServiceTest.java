@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -48,17 +49,6 @@ class FireboltDbServiceTest {
      * Helper method to create JdbcConfig from connection URL for tests
      */
     private JdbcConfig createJdbcConfig(String connectionUrl) {
-        return JdbcConfig.builder()
-                .jdbcConnectionUrl(connectionUrl)
-                .clientId(Optional.empty())
-                .clientSecret(Optional.empty())
-                .build();
-    }
-    
-    /**
-     * Helper method to create JdbcConfig for invalid URL tests
-     */
-    private JdbcConfig createInvalidJdbcConfig(String connectionUrl) {
         return JdbcConfig.builder()
                 .jdbcConnectionUrl(connectionUrl)
                 .clientId(Optional.empty())
@@ -547,6 +537,12 @@ class FireboltDbServiceTest {
                 mockedDriverManager.when(() -> DriverManager.getConnection(anyString(), any(Properties.class)))
                         .thenReturn(mockConnection);
                 
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
+                
                 when(mockConnection.getMetaData()).thenReturn(mockMetaData);
                 when(mockMetaData.getColumns(eq(null), eq("public"), eq("test_table"), eq(null)))
                         .thenReturn(mockColumnResultSet);
@@ -602,6 +598,12 @@ class FireboltDbServiceTest {
             try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
                 mockedDriverManager.when(() -> DriverManager.getConnection(anyString(), any(Properties.class)))
                         .thenReturn(mockConnection);
+                
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
                 
                 when(mockConnection.getMetaData()).thenReturn(mockMetaData);
                 
@@ -721,6 +723,11 @@ class FireboltDbServiceTest {
                         .thenReturn(mockConnection);
                 
                 when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
                 SQLException sqlException = new SQLException("Schema discovery failed");
                 when(mockMetaData.getColumns(anyString(), anyString(), anyString(), anyString()))
                         .thenThrow(sqlException);
@@ -746,6 +753,11 @@ class FireboltDbServiceTest {
                         .thenReturn(mockConnection);
                 
                 when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
                 when(mockMetaData.getColumns(eq(null), eq("public"), eq("empty_table"), eq(null)))
                         .thenReturn(mockResultSet);
                 when(mockResultSet.next()).thenReturn(false); // No columns found
@@ -771,6 +783,11 @@ class FireboltDbServiceTest {
                         .thenReturn(mockConnection);
                 
                 when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
                 when(mockMetaData.getColumns(eq(null), eq("public"), eq("complex_table"), eq(null)))
                         .thenReturn(mockResultSet);
                 
@@ -835,6 +852,11 @@ class FireboltDbServiceTest {
                         .thenReturn(mockConnection);
                 
                 when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
                 
                 // Mock existing table with columns
                 when(mockMetaData.getColumns(eq(null), eq("public"), eq("existing_table"), eq(null)))
@@ -867,7 +889,7 @@ class FireboltDbServiceTest {
         @Test
         void shouldUseCorrectSchemaAndCatalogParameters() throws SQLException {
             Set<String> tableNames = Set.of("test_table");
-            
+
             Connection mockConnection = mock(Connection.class);
             DatabaseMetaData mockMetaData = mock(DatabaseMetaData.class);
             ResultSet mockResultSet = mock(ResultSet.class);
@@ -875,8 +897,13 @@ class FireboltDbServiceTest {
             try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
                 mockedDriverManager.when(() -> DriverManager.getConnection(anyString(), any(Properties.class)))
                         .thenReturn(mockConnection);
-                
+
                 when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
                 when(mockMetaData.getColumns(eq(null), eq("public"), eq("test_table"), eq(null)))
                         .thenReturn(mockResultSet);
                 when(mockResultSet.next()).thenReturn(false); // No columns for simplicity
@@ -890,6 +917,98 @@ class FireboltDbServiceTest {
                     eq("test_table"), // table name
                     eq(null)        // column name pattern
                 );
+            }
+        }
+
+        @Test
+        void shouldCapturePrecisionAndScaleForNumericAndVarcharColumns() throws SQLException {
+            Set<String> tableNames = Set.of("metrics");
+
+            Connection mockConnection = mock(Connection.class);
+            DatabaseMetaData mockMetaData = mock(DatabaseMetaData.class);
+            ResultSet mockResultSet = mock(ResultSet.class);
+
+            try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
+                mockedDriverManager.when(() -> DriverManager.getConnection(anyString(), any(Properties.class)))
+                        .thenReturn(mockConnection);
+
+                when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
+                when(mockMetaData.getColumns(eq(null), eq("public"), eq("metrics"), eq(null)))
+                        .thenReturn(mockResultSet);
+
+                // Two columns: amount NUMERIC(20,5), name VARCHAR(255)
+                when(mockResultSet.next()).thenReturn(true, true, false);
+                when(mockResultSet.getString("COLUMN_NAME")).thenReturn("amount", "name");
+                when(mockResultSet.getString("TYPE_NAME")).thenReturn("NUMERIC", "VARCHAR");
+                when(mockResultSet.getInt("DATA_TYPE")).thenReturn(3, 12);
+                when(mockResultSet.getBoolean("NULLABLE")).thenReturn(true, true);
+                when(mockResultSet.getInt("COLUMN_SIZE")).thenReturn(20, 255);
+                when(mockResultSet.getInt("DECIMAL_DIGITS")).thenReturn(5, 0);
+
+                Map<String, com.firebolt.kafka.connect.TableSchema> result =
+                        fireboltDbService.discoverTableSchemas(jdbcConfig, tableNames);
+
+                com.firebolt.kafka.connect.TableSchema schema = result.get("metrics");
+                assertNotNull(schema);
+                assertEquals(2, schema.getColumns().size());
+
+                com.firebolt.kafka.connect.TableSchema.Column amount = schema.getColumns().get(0);
+                assertEquals("amount", amount.getName());
+                assertEquals(20, amount.getPrecision());
+                assertEquals(5, amount.getScale());
+
+                com.firebolt.kafka.connect.TableSchema.Column name = schema.getColumns().get(1);
+                assertEquals("name", name.getName());
+                assertEquals(255, name.getPrecision());
+                assertEquals(0, name.getScale());
+            }
+        }
+
+        @Test
+        void shouldDefaultPrecisionAndScaleToZeroWhenMetadataIsNull() throws SQLException {
+            Set<String> tableNames = Set.of("prod");
+
+            Connection mockConnection = mock(Connection.class);
+            DatabaseMetaData mockMetaData = mock(DatabaseMetaData.class);
+            ResultSet mockResultSet = mock(ResultSet.class);
+
+            try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
+                mockedDriverManager.when(() -> DriverManager.getConnection(anyString(), any(Properties.class)))
+                        .thenReturn(mockConnection);
+
+                when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+                PreparedStatement mockPs = mock(PreparedStatement.class);
+                ResultSet mockPsRs = mock(ResultSet.class);
+                when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+                when(mockPs.executeQuery()).thenReturn(mockPsRs);
+                when(mockPsRs.next()).thenReturn(false);
+                when(mockMetaData.getColumns(eq(null), eq("public"), eq("prod"), eq(null)))
+                        .thenReturn(mockResultSet);
+
+                // One column where COLUMN_SIZE and DECIMAL_DIGITS return SQL NULL -> Mockito getInt returns 0 by default
+                when(mockResultSet.next()).thenReturn(true, false);
+                when(mockResultSet.getString("COLUMN_NAME")).thenReturn("description");
+                when(mockResultSet.getString("TYPE_NAME")).thenReturn("TEXT");
+                when(mockResultSet.getInt("DATA_TYPE")).thenReturn(12);
+                when(mockResultSet.getBoolean("NULLABLE")).thenReturn(true);
+                // Intentionally do not stub COLUMN_SIZE/DECIMAL_DIGITS to simulate NULL -> 0
+
+                Map<String, com.firebolt.kafka.connect.TableSchema> result =
+                        fireboltDbService.discoverTableSchemas(jdbcConfig, tableNames);
+
+                com.firebolt.kafka.connect.TableSchema schema = result.get("prod");
+                assertNotNull(schema);
+                assertEquals(1, schema.getColumns().size());
+
+                com.firebolt.kafka.connect.TableSchema.Column description = schema.getColumns().get(0);
+                assertEquals("description", description.getName());
+                assertEquals(0, description.getPrecision());
+                assertEquals(0, description.getScale());
             }
         }
     }

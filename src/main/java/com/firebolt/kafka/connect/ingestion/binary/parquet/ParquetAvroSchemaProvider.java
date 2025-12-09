@@ -105,8 +105,7 @@ public class ParquetAvroSchemaProvider {
                 base = createArraySchema(tableColumn);
                 break;
             case Types.NUMERIC:
-                // TODO read the precision and scale from the table column
-                base = LogicalTypes.decimal(38, 9)
+                base = LogicalTypes.decimal(tableColumn.getPrecision(), tableColumn.getScale())
                         .addToSchema(Schema.create(Schema.Type.BYTES));
                 break;
             case Types.VARCHAR:
@@ -155,8 +154,7 @@ public class ParquetAvroSchemaProvider {
         } else if (isDoubleArray) {
             itemSchema = SchemaBuilder.unionOf().nullType().and().doubleType().endUnion();
         } else if (isDecimalArray) {
-            // TODO read the precision and scale from the column
-            Schema decimal = LogicalTypes.decimal(38, 9)
+            Schema decimal = LogicalTypes.decimal(tableColumn.getPrecision(), tableColumn.getScale())
                     .addToSchema(Schema.create(Schema.Type.BYTES));
             itemSchema = SchemaBuilder.unionOf().nullType().and().type(decimal).endUnion();
         } else if (isDateArray) {
