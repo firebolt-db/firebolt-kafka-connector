@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.FireboltTimestampConverter;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.sql.Types;
@@ -23,7 +24,7 @@ class SchemalessArrayColumnTimestampDataTypeConverterTest {
 
     @Test
     void convertsMixedElementsToMicros() {
-        arrayConverter.setTimestampConverter(tsConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.TIMESTAMP, tsConverter);
         String iso = "2025-01-02T00:00:00";
         long expectedFromIso = toMicros(FireboltTimestampConverter.parseIsoLocalDateTime(iso));
         long millis = 1_700_000_000_000L;
@@ -36,7 +37,7 @@ class SchemalessArrayColumnTimestampDataTypeConverterTest {
 
     @Test
     void invalidElementCausesFailure() {
-        arrayConverter.setTimestampConverter(tsConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.TIMESTAMP, tsConverter);
         List<Object> input = Arrays.asList("not-iso");
         assertThrows(ColumnConversionFailedException.class,
                 () -> arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(input), arrayTsColumn));

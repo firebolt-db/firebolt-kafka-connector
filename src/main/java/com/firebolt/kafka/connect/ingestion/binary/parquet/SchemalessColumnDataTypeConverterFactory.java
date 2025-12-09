@@ -15,7 +15,6 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBooleanColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessByteaColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
-import java.nio.ByteBuffer;
 
 public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeConverterFactory {
 
@@ -76,20 +75,21 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         // need to populate the array column data type with the values that it can convert
-        arrayColumnDataTypeConverter.addConverter(Integer.class, integerDataTypeConverter);
-        arrayColumnDataTypeConverter.addConverter(Long.class, bigIntDataTypeConverter);
-        arrayColumnDataTypeConverter.addConverter(Float.class, realDataTypeConverter);
-        arrayColumnDataTypeConverter.addConverter(ByteBuffer.class, decimalDataTypeConverter);
-        arrayColumnDataTypeConverter.addConverter(Double.class, doubleDataTypeConverter);
-        arrayColumnDataTypeConverter.addConverter(Integer.class, dateDataTypeConverter);
-        arrayColumnDataTypeConverter.addConverter(String.class, textDataTypeConverter);
-        arrayColumnDataTypeConverter.addConverter(Boolean.class, booleanDataTypeConverter);
-        arrayColumnDataTypeConverter.setTimestampConverter(timestampDataTypeConverter);
-        arrayColumnDataTypeConverter.setTimestamptzConverter(timestamptzDataTypeConverter);
-        arrayColumnDataTypeConverter.setByteaConverter(byteaDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.INTEGER, integerDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.BIGINT, bigIntDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.REAL, realDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DOUBLE, doubleDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DATE, dateDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.TEXT, textDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.BOOLEAN, booleanDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.TIMESTAMP, timestampDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.TIMESTAMPTZ, timestamptzDataTypeConverter);
+        arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.BYTEA, byteaDataTypeConverter);
     }
 
     @Override
+    @SuppressWarnings("rawtypes")
     public ColumnDataTypeConverter getConverter(TableSchema.Column fireboltTableColumn) {
         FireboltColumnDataType fireboltColumnDataType = FireboltColumnDataType.fromString(fireboltTableColumn.getDataType());
 
@@ -118,6 +118,10 @@ public class SchemalessColumnDataTypeConverterFactory implements ColumnDataTypeC
                 return byteaDataTypeConverter;
             case ARRAY:
                 return arrayColumnDataTypeConverter;
+            case STRUCT:
+                break;
+            case GEOGRAPHY:
+                break;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());

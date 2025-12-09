@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -18,7 +19,7 @@ class SchemalessArrayColumnDateDataTypeConverterTest {
 
     @Test
     void convertsMixedElementsToDaysSinceEpoch() {
-        arrayConverter.addConverter(Integer.class, dateConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.DATE, dateConverter);
         String s = "2025-01-02";
         int days = (int) LocalDate.parse(s).toEpochDay();
         List<Object> input = Arrays.asList(s, 19700, null);

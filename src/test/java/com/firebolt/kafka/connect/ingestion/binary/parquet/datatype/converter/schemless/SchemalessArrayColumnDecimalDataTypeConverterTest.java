@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import java.nio.ByteBuffer;
 import java.sql.Types;
@@ -20,7 +21,7 @@ class SchemalessArrayColumnDecimalDataTypeConverterTest {
 
     @Test
     void convertsMixedElementsToDecimalBytes() {
-        arrayConverter.addConverter(ByteBuffer.class, decimalConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalConverter);
         List<Object> input = Arrays.asList("12.5", 7, 3.14d, null);
         List<?> result = arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(input), arrayDecimalColumn);
         // decode and assert with scale=0 rounding HALF_UP
@@ -35,7 +36,7 @@ class SchemalessArrayColumnDecimalDataTypeConverterTest {
 
     @Test
     void invalidElementCausesFailure() {
-        arrayConverter.addConverter(ByteBuffer.class, decimalConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalConverter);
         List<Object> input = Arrays.asList("not-a-decimal");
         assertThrows(ColumnConversionFailedException.class,
                 () -> arrayConverter.toParquetValue(new SchemalessKafkaMessageColumnValue(input), arrayDecimalColumn));

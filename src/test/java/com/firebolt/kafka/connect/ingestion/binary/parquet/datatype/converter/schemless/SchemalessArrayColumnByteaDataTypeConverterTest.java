@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Types;
@@ -20,7 +21,7 @@ class SchemalessArrayColumnByteaDataTypeConverterTest {
 
     @Test
     void convertsMixedElements() {
-        arrayConverter.setByteaConverter(byteaConverter);
+        arrayConverter.addConverter(FireboltColumnDataType.BYTEA, byteaConverter);
         List<Object> input = Arrays.asList(
                 "hi",
                 "a".getBytes(StandardCharsets.UTF_8),
