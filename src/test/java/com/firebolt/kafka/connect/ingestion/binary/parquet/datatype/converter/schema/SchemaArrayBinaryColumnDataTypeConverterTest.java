@@ -67,6 +67,38 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
     }
 
     @Test
+    void convertsBigintArrayElements() {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+
+        BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long> longConverter =
+                (BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long>) mock(BinaryColumnDataTypeConverter.class);
+        arrayConverter.addConverter(FireboltColumnDataType.BIGINT, longConverter);
+
+        TableSchema.Column col = new TableSchema.Column("longs", "array(bigint)", Types.ARRAY, true);
+
+        List<Object> elements = Arrays.asList(1, 2L, "3", null);
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.INT64)
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        when(longConverter.toParquetValue(any(SchemaKafkaMessageColumnValue.class), eq(col)))
+                .thenAnswer(inv -> {
+                    Object v = ((SchemaKafkaMessageColumnValue) inv.getArgument(0)).getValue();
+                    if (v == null) return null;
+                    if (v instanceof Number) {
+                        return ((Number) v).longValue();
+                    }
+                    return Long.parseLong(v.toString());
+                });
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        assertEquals(Arrays.asList(1L, 2L, 3L, null), result);
+    }
+
+    @Test
     void returnsEmptyListWhenElementsEmpty() {
         SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
         BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Integer> intConverter =
