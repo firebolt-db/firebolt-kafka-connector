@@ -1,17 +1,13 @@
-package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless;
+package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter;
 
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryColumnTypeConverter;
 
-/**
- * Converts a schemaless kafka message column value to an integer that can be written to a parquet data format
- */
-public class SchemalessIntegerBinaryColumnDataTypeConverter extends AbstractBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, Integer> {
+public abstract class AbstractIntegerBinaryColumnTypeConverter<T extends SchemalessKafkaMessageColumnValue> extends AbstractBinaryColumnTypeConverter<T, Integer> {
 
-    @Override
-    public Integer toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws ColumnConversionFailedException {
+    protected Integer toParquetValueInternal(T schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws ColumnConversionFailedException {
         Object value = schemalessKafkaMessageColumnValue.getValue();
 
         if (value instanceof Byte || value instanceof Short || value instanceof Integer) {

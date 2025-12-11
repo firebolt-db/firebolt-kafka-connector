@@ -2,6 +2,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet;
 
 import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
@@ -30,7 +31,6 @@ import org.apache.parquet.io.PositionOutputStream;
 public class ParquetDataGenerator implements BinaryDataGenerator {
 
     private ParquetAvroSchemaProvider parquetAvroSchemaProvider;
-    private BinaryColumnDataTypeConverterFactory binaryColumnDataTypeConverterFactory;
     private AvroParquetWriterProvider avroParquetWriterProvider;
     private InMemoryFileProvider inMemoryFileProvider;
     private ErrorReporter errorReporter;
@@ -39,7 +39,6 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
 
     public ParquetDataGenerator(ErrorReporter errorReporter, boolean errorToleranceAll) {
         this(new ParquetAvroSchemaProvider(),
-                BinaryColumnDataTypeFactoryProvider.getInstance(),
                 new AvroParquetWriterProvider(),
                 new AvroNameSanitizer(),
                 new InMemoryFileProvider(),
@@ -49,14 +48,12 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
 
     @VisibleForTesting
     ParquetDataGenerator(ParquetAvroSchemaProvider parquetAvroSchemaProvider,
-                         BinaryColumnDataTypeConverterFactory binaryColumnDataTypeConverterFactory,
                          AvroParquetWriterProvider avroParquetWriterProvider,
                          AvroNameSanitizer avroNameSanitizer,
                          InMemoryFileProvider inMemoryFileProvider,
                          ErrorReporter errorReporter,
                          boolean errorToleranceAll) {
         this.parquetAvroSchemaProvider = parquetAvroSchemaProvider;
-        this.binaryColumnDataTypeConverterFactory = binaryColumnDataTypeConverterFactory;
         this.avroParquetWriterProvider = avroParquetWriterProvider;
         this.avroNameSanitizer = avroNameSanitizer;
         this.inMemoryFileProvider = inMemoryFileProvider;
@@ -137,7 +134,8 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
             }
 
             try {
-                Object convertedValue = binaryColumnDataTypeConverterFactory.getConverter(column).toParquetValue(kafkaMessageColumnValue, column);
+                boolean hasSchema = kafkaMessageColumnValue instanceof SchemaKafkaMessageColumnValue;
+                Object convertedValue = BinaryColumnDataTypeFactoryProvider.getInstance(hasSchema).getConverter(column).toParquetValue(kafkaMessageColumnValue, column);
 
                 // avro schema is using the column name from the table schema
                 avroRecord.put(avroNameSanitizer.toValidAvroName(tableColumnName), convertedValue);

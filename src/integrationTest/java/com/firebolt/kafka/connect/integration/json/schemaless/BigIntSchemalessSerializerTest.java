@@ -113,7 +113,7 @@ public class BigIntSchemalessSerializerTest extends SchemalessBaseIntegrationTes
 
         verifyBigIntRecordsInFirebolt(expectedRecords);
     }
-    
+
     private List<BigIntTestRecord> createTestRecords() {
         return Arrays.asList(
             // Complete record with typical values

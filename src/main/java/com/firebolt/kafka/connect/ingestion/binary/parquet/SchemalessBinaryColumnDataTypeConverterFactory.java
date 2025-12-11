@@ -4,7 +4,7 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBigIntBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealBinaryColumnDataTypeConverter;
@@ -18,7 +18,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryColumnDataTypeConverterFactory {
 
-    private SchemalessIntegerBinaryColumnDataTypeConverter integerDataTypeConverter;
+    private SchemalessIntegerBinaryBinaryColumnDataTypeConverter integerDataTypeConverter;
     private SchemalessBigIntBinaryColumnDataTypeConverter bigIntDataTypeConverter;
     private SchemalessTimestampBinaryColumnDataTypeConverter timestampDataTypeConverter;
     private SchemalessTimestamptzBinaryColumnDataTypeConverter timestamptzDataTypeConverter;
@@ -33,7 +33,7 @@ public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryCol
 
     public SchemalessBinaryColumnDataTypeConverterFactory() {
         this(
-                new SchemalessIntegerBinaryColumnDataTypeConverter(),
+                new SchemalessIntegerBinaryBinaryColumnDataTypeConverter(),
                 new SchemalessBigIntBinaryColumnDataTypeConverter(),
                 new SchemalessTimestampBinaryColumnDataTypeConverter(),
                 new SchemalessTimestamptzBinaryColumnDataTypeConverter(),
@@ -49,7 +49,7 @@ public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryCol
     }
 
     @VisibleForTesting
-    SchemalessBinaryColumnDataTypeConverterFactory(SchemalessIntegerBinaryColumnDataTypeConverter integerDataTypeConverter,
+    SchemalessBinaryColumnDataTypeConverterFactory(SchemalessIntegerBinaryBinaryColumnDataTypeConverter integerDataTypeConverter,
                                                    SchemalessBigIntBinaryColumnDataTypeConverter bigIntDataTypeConverter,
                                                    SchemalessTimestampBinaryColumnDataTypeConverter timestampDataTypeConverter,
                                                    SchemalessTimestamptzBinaryColumnDataTypeConverter timestamptzDataTypeConverter,

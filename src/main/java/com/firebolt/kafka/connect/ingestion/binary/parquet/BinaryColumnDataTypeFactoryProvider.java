@@ -5,18 +5,19 @@ public class BinaryColumnDataTypeFactoryProvider {
 
     private static BinaryColumnDataTypeFactoryProvider instance;
 
+    private SchemaBinaryColumnDataTypeConverterFactory schemaColumnDataTypeFactory;
     private SchemalessBinaryColumnDataTypeConverterFactory schemalessColumnDataTypeFactory;
 
     private BinaryColumnDataTypeFactoryProvider() {
+        this.schemaColumnDataTypeFactory = new SchemaBinaryColumnDataTypeConverterFactory();
         this.schemalessColumnDataTypeFactory = new SchemalessBinaryColumnDataTypeConverterFactory();
     }
 
-    public static BinaryColumnDataTypeConverterFactory getInstance() {
+    public static BinaryColumnDataTypeConverterFactory getInstance(boolean hasSchema) {
         if (instance == null) {
             instance = new BinaryColumnDataTypeFactoryProvider();
         }
 
-        // will implement the schema as well, for now assume schemaless
-        return instance.schemalessColumnDataTypeFactory;
+        return hasSchema ? instance.schemaColumnDataTypeFactory : instance.schemalessColumnDataTypeFactory;
     }
 }
