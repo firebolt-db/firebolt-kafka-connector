@@ -11,9 +11,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessByteaColumnDataTypeConverterTest {
+class SchemalessByteaBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessByteaColumnDataTypeConverter converter = new SchemalessByteaColumnDataTypeConverter();
+    private final SchemalessByteaBinaryColumnDataTypeConverter converter = new SchemalessByteaBinaryColumnDataTypeConverter();
     private final TableSchema.Column byteaCol = new TableSchema.Column("b", "bytea", Types.BINARY, false);
 
     @Test

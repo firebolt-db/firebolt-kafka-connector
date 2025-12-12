@@ -48,7 +48,7 @@ class ParquetDataGeneratorTest {
     @Mock
     private AvroNameSanitizer mockAvroNameSanitizer;
     @Mock
-    private ColumnDataTypeConverterFactory mockConverterFactory;
+    private BinaryColumnDataTypeConverterFactory mockConverterFactory;
     @Mock
     private AvroParquetWriterProvider mockWriterProvider;
     @Mock
@@ -111,8 +111,8 @@ class ParquetDataGeneratorTest {
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
-                (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
+                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(stringConverter);
         when(stringConverter.toParquetValue(any(KafkaMessageColumnValue.class), eq(schema.getColumns().get(0))))
                 .thenAnswer(inv -> ((KafkaMessageColumnValue) inv.getArgument(0)).getValue());
@@ -163,8 +163,8 @@ class ParquetDataGeneratorTest {
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
-                (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
+                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(stringConverter);
         when(stringConverter.toParquetValue(any(KafkaMessageColumnValue.class), eq(schema.getColumns().get(0))))
                 .thenAnswer(inv -> ((KafkaMessageColumnValue) inv.getArgument(0)).getValue());
@@ -214,7 +214,7 @@ class ParquetDataGeneratorTest {
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
         
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
 
         KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
@@ -263,7 +263,7 @@ class ParquetDataGeneratorTest {
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         doNothing().when(mockWriter).close();
 
@@ -302,8 +302,8 @@ class ParquetDataGeneratorTest {
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
-                (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
+                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         doNothing().when(mockWriter).close();
 
@@ -360,8 +360,8 @@ class ParquetDataGeneratorTest {
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
-                (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
+                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         // Throw when obtaining the writer (inside try-with-resources)
         when(mockWriterProvider.get(eq(avro), any())).thenThrow(new IOException("create failed"));
@@ -402,8 +402,8 @@ class ParquetDataGeneratorTest {
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
-                (ColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(ColumnDataTypeConverter.class);
+        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
+                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
         when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         // no writer provider stubbing; writer is not used when conversion fails
 

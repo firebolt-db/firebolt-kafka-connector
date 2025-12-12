@@ -10,9 +10,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessDateColumnDataTypeConverterTest {
+class SchemalessDateBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessDateColumnDataTypeConverter converter = new SchemalessDateColumnDataTypeConverter();
+    private final SchemalessDateBinaryColumnDataTypeConverter converter = new SchemalessDateBinaryColumnDataTypeConverter();
     private final TableSchema.Column dateColumn = new TableSchema.Column("d", "date", Types.DATE, false);
 
     @Test

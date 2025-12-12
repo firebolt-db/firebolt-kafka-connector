@@ -1,13 +1,13 @@
 package com.firebolt.kafka.connect.ingestion.binary.parquet;
 
 import com.firebolt.kafka.connect.TableSchema;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDecimalColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDoubleColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDecimalBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDoubleBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzBinaryColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class SchemalessColumnDataTypeConverterFactoryTest {
+class SchemalessBinaryBinaryColumnDataTypeConverterFactoryTest {
 
-    private final SchemalessColumnDataTypeConverterFactory factory =
-            new SchemalessColumnDataTypeConverterFactory();
+    private final SchemalessBinaryColumnDataTypeConverterFactory factory =
+            new SchemalessBinaryColumnDataTypeConverterFactory();
 
     @ParameterizedTest
     @CsvSource({
@@ -28,8 +28,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsIntegerConverterForIntegerAliases(String dataType) {
         TableSchema.Column col = new TableSchema.Column("count", dataType, java.sql.Types.INTEGER, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessIntegerColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessIntegerBinaryColumnDataTypeConverter.class, converter);
     }
 
     // bigint support is covered elsewhere; focusing on timestamptz additions here
@@ -40,8 +40,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsTimestampConverterForTimestamp(String dataType) {
         TableSchema.Column col = new TableSchema.Column("createdAt", dataType, java.sql.Types.TIMESTAMP, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessTimestampColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessTimestampBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -50,8 +50,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsArrayConverterForArrayTimestamp(String dataType) {
         TableSchema.Column col = new TableSchema.Column("eventsTs", dataType, java.sql.Types.ARRAY, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -60,8 +60,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsTimestamptzConverterForTimestamptz(String dataType) {
         TableSchema.Column col = new TableSchema.Column("createdAtZ", dataType, java.sql.Types.TIMESTAMP_WITH_TIMEZONE, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessTimestamptzColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessTimestamptzBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -70,8 +70,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsRealConverterForReal(String dataType) {
         TableSchema.Column col = new TableSchema.Column("price", dataType, java.sql.Types.REAL, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessRealColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessRealBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -80,8 +80,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsArrayConverterForArrayTimestamptz(String dataType) {
         TableSchema.Column col = new TableSchema.Column("eventsTsZ", dataType, java.sql.Types.ARRAY, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -90,8 +90,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsArrayConverterForArrayReal(String dataType) {
         TableSchema.Column col = new TableSchema.Column("prices", dataType, java.sql.Types.ARRAY, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -100,8 +100,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsDoubleConverterForDouble(String dataType) {
         TableSchema.Column col = new TableSchema.Column("ratio", dataType, java.sql.Types.DOUBLE, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessDoubleColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessDoubleBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -110,8 +110,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsArrayConverterForArrayDouble(String dataType) {
         TableSchema.Column col = new TableSchema.Column("ratios", dataType, java.sql.Types.ARRAY, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -120,8 +120,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsDecimalConverterForDecimal(String dataType) {
         TableSchema.Column col = new TableSchema.Column("amount", dataType, java.sql.Types.NUMERIC, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessDecimalColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessDecimalBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
@@ -130,8 +130,8 @@ class SchemalessColumnDataTypeConverterFactoryTest {
     })
     void returnsArrayConverterForArrayDecimal(String dataType) {
         TableSchema.Column col = new TableSchema.Column("amounts", dataType, java.sql.Types.ARRAY, false);
-        ColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessArrayColumnDataTypeConverter.class, converter);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessArrayBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest

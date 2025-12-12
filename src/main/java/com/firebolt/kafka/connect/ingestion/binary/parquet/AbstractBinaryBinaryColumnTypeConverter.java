@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 
-public abstract class AbstractColumnTypeConverter<T extends KafkaMessageColumnValue, R> implements ColumnDataTypeConverter<T, R> {
+public abstract class AbstractBinaryBinaryColumnTypeConverter<T extends KafkaMessageColumnValue, R> implements BinaryColumnDataTypeConverter<T, R> {
 
     private static final DateTimeFormatter ISO_DATE_STRICT =
             DateTimeFormatter.ISO_LOCAL_DATE.withResolverStyle(ResolverStyle.STRICT);

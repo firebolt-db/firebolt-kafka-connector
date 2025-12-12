@@ -18,9 +18,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessDecimalColumnDataTypeConverterTest {
+class SchemalessDecimalBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessDecimalColumnDataTypeConverter converter = new SchemalessDecimalColumnDataTypeConverter();
+    private final SchemalessDecimalBinaryColumnDataTypeConverter converter = new SchemalessDecimalBinaryColumnDataTypeConverter();
     private static final TableSchema.Column decColumnDefaultPrecisionAndScale = new TableSchema.Column("amount", "decimal", Types.NUMERIC, false, 38, 9);
     private static final TableSchema.Column decColumnDefaultPrecision30AndScale7 = new TableSchema.Column("amount", "decimal", Types.NUMERIC, false, 30, 7);
 

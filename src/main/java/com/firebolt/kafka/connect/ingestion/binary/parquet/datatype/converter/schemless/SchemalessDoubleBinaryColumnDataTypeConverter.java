@@ -3,12 +3,12 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractColumnTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryBinaryColumnTypeConverter;
 
 /**
  * Converts a schemaless kafka message column value to a double precision (Double) for parquet/avro
  */
-public class SchemalessDoubleColumnDataTypeConverter extends AbstractColumnTypeConverter<SchemalessKafkaMessageColumnValue, Double> {
+public class SchemalessDoubleBinaryColumnDataTypeConverter extends AbstractBinaryBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, Double> {
 
     @Override
     public Double toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws ColumnConversionFailedException {

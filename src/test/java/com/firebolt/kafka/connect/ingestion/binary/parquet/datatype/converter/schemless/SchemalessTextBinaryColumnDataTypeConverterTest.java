@@ -10,9 +10,9 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class SchemalessTextColumnDataTypeConverterTest {
+class SchemalessTextBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessTextColumnDataTypeConverter converter = new SchemalessTextColumnDataTypeConverter();
+    private final SchemalessTextBinaryColumnDataTypeConverter converter = new SchemalessTextBinaryColumnDataTypeConverter();
     private final TableSchema.Column textColumn = new TableSchema.Column("txt", "text", Types.VARCHAR, false);
 
     @Test

@@ -3,14 +3,14 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractColumnTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryBinaryColumnTypeConverter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Converts a schemaless kafka message column value to a real (float) that can be written to a parquet data format
  */
 @Slf4j
-public class SchemalessRealColumnDataTypeConverter extends AbstractColumnTypeConverter<SchemalessKafkaMessageColumnValue, Float> {
+public class SchemalessRealBinaryColumnDataTypeConverter extends AbstractBinaryBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, Float> {
 
     @Override
     public Float toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws ColumnConversionFailedException {
