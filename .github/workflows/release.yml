@@ -53,7 +53,7 @@ jobs:
 
       - name: Push changes
         run: |
-          git push origin master
+          git push origin main
 
   build:
     needs: bump-version
