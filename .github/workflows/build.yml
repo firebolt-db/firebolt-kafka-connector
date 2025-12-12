@@ -29,8 +29,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      uber-jar: uber-jar
-      sources-jar: sources-jar
+      uber-jar: ${{ steps.artifact_names.outputs.uber_name }}
+      sources-jar: ${{ steps.artifact_names.outputs.sources_name }}
     
     strategy:
       matrix:
@@ -74,15 +74,17 @@ jobs:
     - name: Build sources JAR
       if: ${{ inputs.buildArtifacts }}
       run: ./gradlew sourcesJar --no-daemon
-
-    - name: Determine artifact paths
+    
+    - name: Compute artifact names
       if: ${{ inputs.buildArtifacts }}
-      id: artifact_paths
+      id: artifact_names
       run: |
         BASE=$(grep '^archivesBaseName=' gradle.properties | sed 's/archivesBaseName=//')
         VERSION=$(grep '^version=' gradle.properties | sed 's/version=//')
-        echo "uber=build/libs/${BASE}-${VERSION}.jar" >> $GITHUB_OUTPUT
-        echo "sources=build/libs/${BASE}-${VERSION}-sources.jar" >> $GITHUB_OUTPUT
+        echo "uber_name=${BASE}-${VERSION}.jar" >> $GITHUB_OUTPUT
+        echo "sources_name=${BASE}-${VERSION}-sources.jar" >> $GITHUB_OUTPUT
+        echo "uber_path=build/libs/${BASE}-${VERSION}.jar" >> $GITHUB_OUTPUT
+        echo "sources_path=build/libs/${BASE}-${VERSION}-sources.jar" >> $GITHUB_OUTPUT
               
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -92,21 +94,22 @@ jobs:
         path: |
           build/test-results/
           build/reports/tests/
-    
+        overwrite: true
+        
     - name: Upload uber JAR artifact
       if: ${{ inputs.buildArtifacts }}
       uses: actions/upload-artifact@v4
       with:
-        name: uber-jar
-        path: ${{ steps.artifact_paths.outputs.uber }}
+        name: ${{ steps.artifact_names.outputs.uber_name }}
+        path: ${{ steps.artifact_names.outputs.uber_path }}
         if-no-files-found: error
 
     - name: Upload sources JAR artifact
       if: ${{ inputs.buildArtifacts }}
       uses: actions/upload-artifact@v4
       with:
-        name: sources-jar
-        path: ${{ steps.artifact_paths.outputs.sources }}
+        name: ${{ steps.artifact_names.outputs.sources_name }}
+        path: ${{ steps.artifact_names.outputs.sources_path }}
         if-no-files-found: error
           
     - name: Upload build reports
@@ -115,3 +118,4 @@ jobs:
       with:
         name: build-reports-${{ matrix.java }}
         path: build/reports/
+        overwrite: true
