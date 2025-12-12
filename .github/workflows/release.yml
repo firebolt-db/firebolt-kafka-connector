@@ -31,7 +31,7 @@ jobs:
 
       - name: Bump version in gradle.properties
         run: |
-          newVersion=$(echo $newVersion | sed 's/^v//')
+          newVersion=$(echo $RELEASE_TAG | sed 's/^v//')
           sed -i.bak "s/^version=.*/version=$newVersion/" gradle.properties
           rm gradle.properties.bak
 
