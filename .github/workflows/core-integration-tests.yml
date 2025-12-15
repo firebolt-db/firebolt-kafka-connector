@@ -133,7 +133,7 @@ jobs:
         echo "Docker services stopped"
         
     - name: Upload test results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: integration-test-results-${{ inputs.kafka_connect_version }}
@@ -143,14 +143,14 @@ jobs:
           logs/
           
     - name: Upload test reports
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: integration-test-reports-${{ inputs.kafka_connect_version }}
         path: build/reports/
         
     - name: Upload Docker logs
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: docker-logs-${{ inputs.kafka_connect_version }}
