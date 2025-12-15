@@ -4,7 +4,7 @@ import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryBinaryColumnTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryColumnTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.BinaryColumnDataTypeConverter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 
 @Slf4j
-public class SchemalessArrayBinaryColumnDataTypeConverter extends AbstractBinaryBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, List<? extends Object>> {
+public class SchemalessArrayBinaryColumnDataTypeConverter extends AbstractBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, List<? extends Object>> {
 
     private static final String INTEGER_TYPE_NAME = "integer";
     private static final String BIGINT_TYPE_NAME = "bigint";

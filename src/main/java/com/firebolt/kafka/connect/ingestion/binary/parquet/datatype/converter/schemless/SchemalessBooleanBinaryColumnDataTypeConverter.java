@@ -3,7 +3,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.s
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryBinaryColumnTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryColumnTypeConverter;
 
 /**
  * Converts a schemaless kafka message column value to a boolean (true/false) for parquet/avro.
@@ -12,7 +12,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryBinaryC
  *  - String values: "true","false","t","f","1","0" (case-insensitive)
  *  - Numeric values: 0 -> false, 1 -> true (others rejected)
  */
-public class SchemalessBooleanBinaryColumnDataTypeConverter extends AbstractBinaryBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, Boolean> {
+public class SchemalessBooleanBinaryColumnDataTypeConverter extends AbstractBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, Boolean> {
 
     @Override
     public Boolean toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws ColumnConversionFailedException {
