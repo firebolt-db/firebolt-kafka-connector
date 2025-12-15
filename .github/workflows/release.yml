@@ -15,7 +15,19 @@ env:
   RELEASE_TAG: ${{ github.event.inputs.tag_name}}
 
 jobs:
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure workflow runs from main branch
+        run: |
+          echo "github.ref=$GITHUB_REF"
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Releases must be triggered from the main branch. Current ref: $GITHUB_REF"
+            exit 1
+          fi
+
   pre-release-testing:
+     needs: validation
      uses: ./.github/workflows/pre-release-test.yml
      secrets: inherit
 
@@ -59,7 +71,8 @@ jobs:
     needs: bump-version
     uses: ./.github/workflows/build.yml
     with:
-      branch: ${{ env.RELEASE_TAG }}
+      # will resolve the git sha from the tag that was just created with this name
+      ref: refs/tags/${{ env.RELEASE_TAG }}
       buildArtifacts: true
 
   publish:
@@ -69,7 +82,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.tag_name }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
       - name: Download uber-jar
         uses: actions/download-artifact@v7.0.0
