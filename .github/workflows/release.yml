@@ -71,8 +71,8 @@ jobs:
     needs: bump-version
     uses: ./.github/workflows/build.yml
     with:
-      # will resolve the git sha from the tag that was just created with this name
-      ref: refs/tags/${{ env.RELEASE_TAG }}
+      # build from the exact tag that was created and pushed above
+      branch: refs/tags/${{ github.event.inputs.tag_name }}
       buildArtifacts: true
 
   publish:
@@ -82,7 +82,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/${{ env.RELEASE_TAG }}
+          ref: refs/tags/${{ github.event.inputs.tag_name }}
 
       - name: Download uber-jar
         uses: actions/download-artifact@v7.0.0
