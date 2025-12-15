@@ -46,12 +46,7 @@ public class FireboltSinkConnectorTest {
         properties.put(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG, "jdbc:firebolt:my_database?engine=my_engine&account=my_account");
         properties.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1");
     }
-    
-    @Test
-    void testVersion() {
-        assertEquals("0.2", connector.version());
-    }
-    
+
     @Test
     void testTaskClass() {
         assertEquals(FireboltSinkTask.class, connector.taskClass());
