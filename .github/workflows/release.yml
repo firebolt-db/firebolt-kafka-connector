@@ -78,6 +78,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      release_version: ${{ steps.release_version.outputs.value }}
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -156,4 +158,9 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             channel: ${{ matrix.channel }}
-            text: "Firebolt Sink Connector ${{ steps.release_version.outputs.value }} has been released: <https://github.com/${{ github.repository }}/releases/tag/${{ env.RELEASE_TAG }}|Release notes>"
+            text: "Firebolt Sink Connector `${{ needs.publish.outputs.release_version }}` has been released: <https://github.com/${{ github.repository }}/releases/tag/${{ env.RELEASE_TAG }}|Release notes>"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: ":tada: Firebolt Sink Connector `${{ needs.publish.outputs.release_version }}` has been released — <https://github.com/${{ github.repository }}/releases/tag/${{ env.RELEASE_TAG }}|Release notes>"
