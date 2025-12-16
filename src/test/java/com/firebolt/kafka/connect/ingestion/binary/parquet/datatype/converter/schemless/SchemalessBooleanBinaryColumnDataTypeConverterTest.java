@@ -11,9 +11,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessBooleanColumnDataTypeConverterTest {
+class SchemalessBooleanBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessBooleanColumnDataTypeConverter converter = new SchemalessBooleanColumnDataTypeConverter();
+    private final SchemalessBooleanBinaryColumnDataTypeConverter converter = new SchemalessBooleanBinaryColumnDataTypeConverter();
     private final TableSchema.Column boolCol = new TableSchema.Column("flag", "boolean", Types.BOOLEAN, false);
 
     @ParameterizedTest

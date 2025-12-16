@@ -4,8 +4,8 @@ import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractColumnTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.ColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryColumnTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.BinaryColumnDataTypeConverter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 
 @Slf4j
-public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeConverter<SchemalessKafkaMessageColumnValue, List<? extends Object>> {
+public class SchemalessArrayBinaryColumnDataTypeConverter extends AbstractBinaryColumnTypeConverter<SchemalessKafkaMessageColumnValue, List<? extends Object>> {
 
     private static final String INTEGER_TYPE_NAME = "integer";
     private static final String BIGINT_TYPE_NAME = "bigint";
@@ -30,7 +30,7 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private static final String BYTEA_TYPE_NAME = "bytea";
     private static final String BOOLEAN_TYPE_NAME = "boolean";
 
-    private Map<FireboltColumnDataType, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
+    private Map<FireboltColumnDataType, BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ?>> converters = new HashMap<>();
 
     @Override
     public List<? extends Object> toParquetValue(SchemalessKafkaMessageColumnValue schemalessKafkaMessageColumnValue, TableSchema.Column tableColumn) throws ColumnConversionFailedException {
@@ -87,7 +87,7 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         return clazz;
     }
 
-    public <R> void addConverter(FireboltColumnDataType type, ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, R> converter) {
+    public <R> void addConverter(FireboltColumnDataType type, BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, R> converter) {
         converters.put(type, converter);
     }
     // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
@@ -96,8 +96,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         List<Integer> integers = new ArrayList<>();
 
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(FireboltColumnDataType.INTEGER);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(FireboltColumnDataType.INTEGER);
 
         for (Object element : elements) {
             if (element == null) {
@@ -114,8 +114,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         List<Long> longs = new ArrayList<>();
 
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.BIGINT);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.BIGINT);
 
         for (Object element : elements) {
             if (element == null) {
@@ -131,8 +131,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private List<? extends Object> asTimestampArray(List<?> elements, TableSchema.Column tableColumn) {
         List<Long> timestamps = new ArrayList<>();
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.TIMESTAMP);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.TIMESTAMP);
         for (Object element : elements) {
             if (element == null) {
                 timestamps.add(null);
@@ -147,8 +147,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private List<? extends Object> asTimestamptzArray(List<?> elements, TableSchema.Column tableColumn){
             List<Long> timestamps = new ArrayList<>();
             @SuppressWarnings("unchecked")
-            ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
-                    (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.TIMESTAMPTZ);
+            BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long> converter =
+                    (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.TIMESTAMPTZ);
             for (Object element : elements) {
                 if (element == null) {
                     timestamps.add(null);
@@ -164,8 +164,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         List<Float> floats = new ArrayList<>();
 
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Float> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Float>) converters.get(FireboltColumnDataType.REAL);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Float> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Float>) converters.get(FireboltColumnDataType.REAL);
 
         for (Object element : elements) {
             if (element == null) {
@@ -182,8 +182,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         List<ByteBuffer> decimals = new ArrayList<>();
 
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer>) converters.get(FireboltColumnDataType.DECIMAL);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer>) converters.get(FireboltColumnDataType.DECIMAL);
 
         for (Object element : elements) {
             if (element == null) {
@@ -200,8 +200,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         List<Double> doubles = new ArrayList<>();
 
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Double> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Double>) converters.get(FireboltColumnDataType.DOUBLE);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Double> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Double>) converters.get(FireboltColumnDataType.DOUBLE);
 
         for (Object element : elements) {
             if (element == null) {
@@ -218,8 +218,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         List<Integer> days = new ArrayList<>();
 
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(FireboltColumnDataType.DATE);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Integer>) converters.get(FireboltColumnDataType.DATE);
 
         for (Object element : elements) {
             if (element == null) {
@@ -236,8 +236,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
         List<String> strings = new ArrayList<>();
 
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, String> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, String>) converters.get(FireboltColumnDataType.TEXT);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, String> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, String>) converters.get(FireboltColumnDataType.TEXT);
 
         for (Object element : elements) {
             if (element == null) {
@@ -253,8 +253,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private List<? extends Object> asByteaArray(List<?> elements, TableSchema.Column tableColumn) {
         List<ByteBuffer> bufs = new ArrayList<>();
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer>) converters.get(FireboltColumnDataType.BYTEA);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, ByteBuffer>) converters.get(FireboltColumnDataType.BYTEA);
         for (Object element : elements) {
             if (element == null) {
                 bufs.add(null);
@@ -268,8 +268,8 @@ public class SchemalessArrayColumnDataTypeConverter extends AbstractColumnTypeCo
     private List<? extends Object> asBooleanArray(List<?> elements, TableSchema.Column tableColumn) {
         List<Boolean> values = new ArrayList<>();
         @SuppressWarnings("unchecked")
-        ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Boolean> converter =
-                (ColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Boolean>) converters.get(FireboltColumnDataType.BOOLEAN);
+        BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Boolean> converter =
+                (BinaryColumnDataTypeConverter<SchemalessKafkaMessageColumnValue, Boolean>) converters.get(FireboltColumnDataType.BOOLEAN);
         for (Object element : elements) {
             if (element == null) {
                 values.add(null);

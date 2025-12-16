@@ -11,9 +11,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessRealColumnDataTypeConverterTest {
+class SchemalessRealBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessRealColumnDataTypeConverter converter = new SchemalessRealColumnDataTypeConverter();
+    private final SchemalessRealBinaryColumnDataTypeConverter converter = new SchemalessRealBinaryColumnDataTypeConverter();
     private final TableSchema.Column realColumn = new TableSchema.Column("amount", "real", Types.REAL, false);
 
     @ParameterizedTest

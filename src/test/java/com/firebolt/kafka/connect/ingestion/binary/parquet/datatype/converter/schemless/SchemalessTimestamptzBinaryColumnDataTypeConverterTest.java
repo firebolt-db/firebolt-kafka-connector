@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessTimestamptzColumnDataTypeConverterTest {
+class SchemalessTimestamptzBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessTimestamptzColumnDataTypeConverter converter = new SchemalessTimestamptzColumnDataTypeConverter();
+    private final SchemalessTimestamptzBinaryColumnDataTypeConverter converter = new SchemalessTimestamptzBinaryColumnDataTypeConverter();
     private final TableSchema.Column col = new TableSchema.Column("tsz", "timestamptz", Types.TIMESTAMP_WITH_TIMEZONE, false);
 
     @Test

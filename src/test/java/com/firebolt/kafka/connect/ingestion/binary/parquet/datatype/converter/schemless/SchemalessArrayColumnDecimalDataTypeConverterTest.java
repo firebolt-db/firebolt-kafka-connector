@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SchemalessArrayColumnDecimalDataTypeConverterTest {
 
-    private final SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-    private final SchemalessDecimalColumnDataTypeConverter decimalConverter = new SchemalessDecimalColumnDataTypeConverter();
+    private final SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+    private final SchemalessDecimalBinaryColumnDataTypeConverter decimalConverter = new SchemalessDecimalBinaryColumnDataTypeConverter();
     private final TableSchema.Column arrayDecimalColumn = new TableSchema.Column("amounts", "array(numeric)", Types.ARRAY, false, 30, 7);
 
     @Test

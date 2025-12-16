@@ -11,9 +11,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessDoubleColumnDataTypeConverterTest {
+class SchemalessDoubleBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessDoubleColumnDataTypeConverter converter = new SchemalessDoubleColumnDataTypeConverter();
+    private final SchemalessDoubleBinaryColumnDataTypeConverter converter = new SchemalessDoubleBinaryColumnDataTypeConverter();
     private final TableSchema.Column doubleColumn = new TableSchema.Column("val", "double", Types.DOUBLE, false);
 
     @ParameterizedTest

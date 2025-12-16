@@ -11,9 +11,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessBigIntColumnDataTypeConverterTest {
+class SchemalessBigIntBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessBigIntColumnDataTypeConverter converter = new SchemalessBigIntColumnDataTypeConverter();
+    private final SchemalessBigIntBinaryColumnDataTypeConverter converter = new SchemalessBigIntBinaryColumnDataTypeConverter();
     private final TableSchema.Column bigintColumn = new TableSchema.Column("count64", "bigint", Types.BIGINT, false);
 
     @ParameterizedTest

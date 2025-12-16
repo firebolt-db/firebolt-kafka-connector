@@ -15,9 +15,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessTimestampColumnDataTypeConverterTest {
+class SchemalessTimestampBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessTimestampColumnDataTypeConverter converter = new SchemalessTimestampColumnDataTypeConverter();
+    private final SchemalessTimestampBinaryColumnDataTypeConverter converter = new SchemalessTimestampBinaryColumnDataTypeConverter();
     private final TableSchema.Column tsColumn = new TableSchema.Column("ts", "timestamp", Types.TIMESTAMP, false);
 
     @ParameterizedTest

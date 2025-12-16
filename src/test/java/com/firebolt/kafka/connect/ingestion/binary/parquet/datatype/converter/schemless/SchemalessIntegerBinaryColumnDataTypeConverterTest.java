@@ -11,9 +11,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class SchemalessIntegerColumnDataTypeConverterTest {
+class SchemalessIntegerBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessIntegerColumnDataTypeConverter converter = new SchemalessIntegerColumnDataTypeConverter();
+    private final SchemalessIntegerBinaryColumnDataTypeConverter converter = new SchemalessIntegerBinaryColumnDataTypeConverter();
     private final TableSchema.Column intColumn = new TableSchema.Column("count", "integer", Types.INTEGER, false);
 
     @ParameterizedTest

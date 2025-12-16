@@ -27,8 +27,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedElementsToMicros() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessTimestampColumnDataTypeConverter tsConverter = new SchemalessTimestampColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessTimestampBinaryColumnDataTypeConverter tsConverter = new SchemalessTimestampBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayTsColumn = new TableSchema.Column("timestamps", "array(timestamp)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.TIMESTAMP, tsConverter);
@@ -44,8 +44,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void invalidTimestampElementCausesFailure() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessTimestampColumnDataTypeConverter tsConverter = new SchemalessTimestampColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessTimestampBinaryColumnDataTypeConverter tsConverter = new SchemalessTimestampBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayTsColumn = new TableSchema.Column("timestamps", "array(timestamp)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.TIMESTAMP, tsConverter);
@@ -56,8 +56,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedElementsToStrings() throws Exception {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessTextColumnDataTypeConverter textConverter = new SchemalessTextColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessTextBinaryColumnDataTypeConverter textConverter = new SchemalessTextBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayTextColumn = new TableSchema.Column("txts", "array(text)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.TEXT, textConverter);
@@ -80,8 +80,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedElementsToFloats() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessRealColumnDataTypeConverter realConverter = new SchemalessRealColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessRealBinaryColumnDataTypeConverter realConverter = new SchemalessRealBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayRealColumn = new TableSchema.Column("amounts", "array(real)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.REAL, realConverter);
@@ -92,8 +92,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void invalidRealElementCausesFailure() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessRealColumnDataTypeConverter realConverter = new SchemalessRealColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessRealBinaryColumnDataTypeConverter realConverter = new SchemalessRealBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayRealColumn = new TableSchema.Column("amounts", "array(real)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.REAL, realConverter);
@@ -104,8 +104,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedElementsToDoubles() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessDoubleColumnDataTypeConverter doubleConverter = new SchemalessDoubleColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessDoubleBinaryColumnDataTypeConverter doubleConverter = new SchemalessDoubleBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayDoubleColumn = new TableSchema.Column("vals", "array(double precision)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.DOUBLE, doubleConverter);
@@ -116,8 +116,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedElementsToDecimalBytes() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessDecimalColumnDataTypeConverter decimalConverter = new SchemalessDecimalColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessDecimalBinaryColumnDataTypeConverter decimalConverter = new SchemalessDecimalBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayDecimalColumn = new TableSchema.Column("amounts", "array(numeric)", Types.ARRAY, false,30, 7);
 
 		arrayConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalConverter);
@@ -134,8 +134,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void invalidDecimalElementCausesFailure() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessDecimalColumnDataTypeConverter decimalConverter = new SchemalessDecimalColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessDecimalBinaryColumnDataTypeConverter decimalConverter = new SchemalessDecimalBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayDecimalColumn = new TableSchema.Column("amounts", "array(numeric)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalConverter);
@@ -146,8 +146,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedElementsToDaysSinceEpoch() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessDateColumnDataTypeConverter dateConverter = new SchemalessDateColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessDateBinaryColumnDataTypeConverter dateConverter = new SchemalessDateBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayDateColumn = new TableSchema.Column("ds", "array(date)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.DATE, dateConverter);
@@ -160,8 +160,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedByteaElements() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessByteaColumnDataTypeConverter byteaConverter = new SchemalessByteaColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessByteaBinaryColumnDataTypeConverter byteaConverter = new SchemalessByteaBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayCol = new TableSchema.Column("bytes", "array(bytea)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.BYTEA, byteaConverter);
@@ -181,8 +181,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedElementsToBooleans() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessBooleanColumnDataTypeConverter boolConverter = new SchemalessBooleanColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessBooleanBinaryColumnDataTypeConverter boolConverter = new SchemalessBooleanBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayBoolCol = new TableSchema.Column("flags", "array(boolean)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.BOOLEAN, boolConverter);
@@ -193,8 +193,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void invalidBooleanElementCausesFailure() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessBooleanColumnDataTypeConverter boolConverter = new SchemalessBooleanColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessBooleanBinaryColumnDataTypeConverter boolConverter = new SchemalessBooleanBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayBoolCol = new TableSchema.Column("flags", "array(boolean)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.BOOLEAN, boolConverter);
@@ -205,8 +205,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void convertsMixedNumericElementsToLongs() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessBigIntColumnDataTypeConverter bigIntConverter = new SchemalessBigIntColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessBigIntBinaryColumnDataTypeConverter bigIntConverter = new SchemalessBigIntBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayBigintColumn = new TableSchema.Column("counts", "array(bigint)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.BIGINT, bigIntConverter);
@@ -217,8 +217,8 @@ class SchemalessArrayColumnTypeConverterTest {
 
 	@Test
 	void invalidBigintElementCausesFailure() {
-		SchemalessArrayColumnDataTypeConverter arrayConverter = new SchemalessArrayColumnDataTypeConverter();
-		SchemalessBigIntColumnDataTypeConverter bigIntConverter = new SchemalessBigIntColumnDataTypeConverter();
+		SchemalessArrayBinaryColumnDataTypeConverter arrayConverter = new SchemalessArrayBinaryColumnDataTypeConverter();
+		SchemalessBigIntBinaryColumnDataTypeConverter bigIntConverter = new SchemalessBigIntBinaryColumnDataTypeConverter();
 		TableSchema.Column arrayBigintColumn = new TableSchema.Column("counts", "array(bigint)", Types.ARRAY, false);
 
 		arrayConverter.addConverter(FireboltColumnDataType.BIGINT, bigIntConverter);
