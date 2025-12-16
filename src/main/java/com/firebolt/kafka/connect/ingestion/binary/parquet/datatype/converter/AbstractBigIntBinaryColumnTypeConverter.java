@@ -1,0 +1,37 @@
+package com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter;
+
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
+import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryColumnTypeConverter;
+
+public abstract class AbstractBigIntBinaryColumnTypeConverter<T extends SchemalessKafkaMessageColumnValue> extends AbstractBinaryColumnTypeConverter<T, Long> {
+
+    protected Long toParquetValueInternal(T kafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws ColumnConversionFailedException {
+        Object value = kafkaMessageColumnValue.getValue();
+
+        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
+            return ((Number) value).longValue();
+        }
+
+        if (value instanceof String) {
+            String stringValue = (String) value;
+            try {
+                long parsed = Long.parseLong(stringValue.trim());
+                return parsed;
+            } catch (NumberFormatException e) {
+                throw new ColumnConversionFailedException(
+                        fireboltColumn.getName(), fireboltColumn.getDataType(),
+                        "Cannot convert kafka message attribute to a bigint due to NumberFormatException: " + e.getMessage());
+            }
+        }
+
+        throw aColumnConversionFailedException(fireboltColumn, value);
+    }
+
+    @Override
+    public Class<Long> getConvertedType() {
+        return Long.class;
+    }
+}
+

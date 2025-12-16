@@ -19,6 +19,7 @@ import org.apache.kafka.connect.data.Schema;
 public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColumnTypeConverter<SchemaKafkaMessageColumnValue, List<? extends Object>> {
 
     private static final String INTEGER_TYPE_NAME = "integer";
+    private static final String BIGINT_TYPE_NAME = "bigint";
 
     private Map<FireboltColumnDataType, BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, ?>> converters = new HashMap<>();
 
@@ -34,6 +35,8 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
         if (typeName.equals(INTEGER_TYPE_NAME)) {
             return asIntArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
+        } else if (typeName.equals(BIGINT_TYPE_NAME)) {
+            return asLongArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -71,10 +74,30 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
         return integers;
     }
 
+    private List<? extends Object> asLongArray(List<?> elements, TableSchema.Column tableColumn, Schema.Type schemaType, Schema.Type schemaSubType, Map<String, String> schemaTypeParams) {
+        List<Long> longs = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long> converter =
+                (BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.BIGINT);
+
+        for (Object element : elements) {
+            if (element == null) {
+                longs.add(null);
+            } else {
+                Long convertedValue = converter.toParquetValue(SchemaKafkaMessageColumnValue.builder().schemaType(schemaType).schemaSubType(schemaSubType).value(element).build(), tableColumn);
+                longs.add(convertedValue);
+            }
+        }
+        return longs;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
             return INTEGER_TYPE_NAME;
+        } else if (fireboltColumn.getDataType().equals("array(bigint)")) {
+            return BIGINT_TYPE_NAME;
         }
 
         // add more data types
