@@ -6,7 +6,7 @@ import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionF
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.AbstractIntegerBinaryColumnTypeConverter;
 
 /**
- * Schema-based adapter for integer conversion that reuses the schemaless converter logic.
+ * Schema-based adapter for integer conversion.
  */
 public class SchemaIntegerBinaryColumnDataTypeConverter extends AbstractIntegerBinaryColumnTypeConverter<SchemaKafkaMessageColumnValue> {
 
