@@ -118,6 +118,41 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
         verifyNoInteractions(intConverter);
     }
 
+    @Test
+    void convertsTimestampArrayElements() {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+
+        @SuppressWarnings("unchecked")
+        BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long> tsConverter =
+                (BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long>) mock(BinaryColumnDataTypeConverter.class);
+        arrayConverter.addConverter(FireboltColumnDataType.TIMESTAMP, tsConverter);
+
+        TableSchema.Column col = new TableSchema.Column("ts_arr", "array(timestamp)", Types.ARRAY, true);
+
+        List<Object> elements = Arrays.asList(1_700_000_000_000L, 1_700_000_000_000_000L, "2025-01-02T03:04:05", null);
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.INT64)
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        when(tsConverter.toParquetValue(any(SchemaKafkaMessageColumnValue.class), eq(col)))
+                .thenAnswer(inv -> {
+                    Object v = ((SchemaKafkaMessageColumnValue) inv.getArgument(0)).getValue();
+                    if (v == null) return null;
+                    if (v instanceof Number) {
+                        long n = ((Number) v).longValue();
+                        return n > 10_000_000_000_000L ? n : n * 1_000L;
+                    }
+                    // return a known micros value for the example string
+                    long seconds = 1735787045L; // 2025-01-02T03:04:05Z
+                    return seconds * 1_000_000L;
+                });
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        assertEquals(Arrays.asList(1_700_000_000_000_000L, 1_700_000_000_000_000L, 1_735_787_045_000_000L, null), result);
+    }
 
 }
 
