@@ -225,5 +225,25 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
 		List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
 		assertEquals(Arrays.asList(1.0f, 2.5f, 3.75f, null, 4.5f), result);
 	}
+
+	@Test
+	void convertsDoubleArrayElements() {
+		SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+		SchemaDoubleBinaryColumnDataTypeConverter doubleConverter = new SchemaDoubleBinaryColumnDataTypeConverter();
+		arrayConverter.addConverter(FireboltColumnDataType.DOUBLE, doubleConverter);
+
+		TableSchema.Column col = new TableSchema.Column("doubles", "array(double precision)", Types.ARRAY, true);
+
+		List<Object> elements = Arrays.asList(1, 2.5d, "3.75", null, Float.valueOf(4.5f));
+		SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+				.schemaType(Schema.Type.ARRAY)
+				.schemaSubType(Schema.Type.FLOAT64)
+				.schemaTypeParams(Collections.emptyMap())
+				.value(elements)
+				.build();
+
+		List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+		assertEquals(Arrays.asList(1.0d, 2.5d, 3.75d, null, 4.5d), result);
+	}
 }
 
