@@ -2,7 +2,10 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet;
 
 import com.firebolt.kafka.connect.AbstractFireboltRecord;
 import com.firebolt.kafka.connect.KafkaMessageColumnValue;
+import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
+import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
+import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -14,17 +17,14 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.parquet.hadoop.ParquetWriter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
-import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -35,7 +35,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,8 +46,6 @@ class ParquetDataGeneratorTest {
     private ParquetAvroSchemaProvider mockSchemaProvider;
     @Mock
     private AvroNameSanitizer mockAvroNameSanitizer;
-    @Mock
-    private BinaryColumnDataTypeConverterFactory mockConverterFactory;
     @Mock
     private AvroParquetWriterProvider mockWriterProvider;
     @Mock
@@ -76,7 +73,6 @@ class ParquetDataGeneratorTest {
     void returnsEmptyStreamWhenNoRecords() {
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 new TestWriterProvider(mock(ParquetWriter.class)),
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -89,7 +85,7 @@ class ParquetDataGeneratorTest {
         ByteArrayOutputStream baos = (ByteArrayOutputStream) out;
         assertEquals(0, baos.size());
 
-        verifyNoInteractions(mockSchemaProvider, mockConverterFactory, mockWriterProvider);
+        verifyNoInteractions(mockSchemaProvider, mockWriterProvider);
     }
 
     @ParameterizedTest
@@ -110,15 +106,8 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        @SuppressWarnings("unchecked")
-        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
-                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
-        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(stringConverter);
-        when(stringConverter.toParquetValue(any(KafkaMessageColumnValue.class), eq(schema.getColumns().get(0))))
-                .thenAnswer(inv -> ((KafkaMessageColumnValue) inv.getArgument(0)).getValue());
 
-        KafkaMessageColumnValue value = mock(KafkaMessageColumnValue.class);
-        when(value.getValue()).thenReturn("v");
+        KafkaMessageColumnValue value = new SchemalessKafkaMessageColumnValue("v");
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
         when(record.getColumnNames()).thenReturn(java.util.Set.of(recordAttributeName));
         when(record.getColumnValue(recordAttributeName)).thenReturn(value);
@@ -127,7 +116,6 @@ class ParquetDataGeneratorTest {
 
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 new TestWriterProvider(mockWriter),
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -162,15 +150,8 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        @SuppressWarnings("unchecked")
-        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> stringConverter =
-                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
-        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(stringConverter);
-        when(stringConverter.toParquetValue(any(KafkaMessageColumnValue.class), eq(schema.getColumns().get(0))))
-                .thenAnswer(inv -> ((KafkaMessageColumnValue) inv.getArgument(0)).getValue());
 
-        KafkaMessageColumnValue nameValue = mock(KafkaMessageColumnValue.class);
-        when(nameValue.getValue()).thenReturn("value");
+        KafkaMessageColumnValue nameValue = new SchemalessKafkaMessageColumnValue("value");
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
         when(record.getColumnNames()).thenReturn(java.util.Set.of(columnName));
         when(record.getColumnValue(columnName)).thenReturn(nameValue);
@@ -180,7 +161,6 @@ class ParquetDataGeneratorTest {
 
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 new TestWriterProvider(mockWriter),
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -212,24 +192,16 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        
-        @SuppressWarnings("unchecked")
-        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
-        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
 
-        KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
-        when(idValue.getValue()).thenReturn(123);
+        KafkaMessageColumnValue idValue = new SchemalessKafkaMessageColumnValue(123);
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
         when(record.getColumnNames()).thenReturn(java.util.Set.of("id", "name"));
         when(record.getColumnValue("id")).thenReturn(idValue);
         when(record.getColumnValue("name")).thenReturn(null);
 
-        when(intConverter.toParquetValue(idValue, schema.getColumns().get(0))).thenReturn(123);
-
         doNothing().when(mockWriter).close();
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 new TestWriterProvider(mockWriter),
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -245,9 +217,6 @@ class ParquetDataGeneratorTest {
         GenericData.Record written = captor.getValue();
         assertEquals(123, written.get("id"));
         assertEquals(null, written.get("name"));
-
-        verify(mockConverterFactory).getConverter(schema.getColumns().get(0));
-        verify(mockConverterFactory, never()).getConverter(schema.getColumns().get(1));
     }
 
     @Test
@@ -262,23 +231,17 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        @SuppressWarnings("unchecked")
-        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter = (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
-        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         doNothing().when(mockWriter).close();
 
-        KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
-        when(idValue.getValue()).thenReturn(123);
+        KafkaMessageColumnValue idValue = new SchemalessKafkaMessageColumnValue(123);
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
         when(record.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(record.getColumnValue("id")).thenReturn(idValue);
 
-        when(intConverter.toParquetValue(idValue, schema.getColumns().get(0))).thenReturn(123);
         org.mockito.Mockito.doThrow(new IOException("disk full")).when(mockWriter).write(any(GenericData.Record.class));
 
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 new TestWriterProvider(mockWriter),
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -301,32 +264,22 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        @SuppressWarnings("unchecked")
-        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
-                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
-        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         doNothing().when(mockWriter).close();
 
         // Good record
-        KafkaMessageColumnValue idValue1 = mock(KafkaMessageColumnValue.class);
-        when(idValue1.getValue()).thenReturn(1);
+        KafkaMessageColumnValue idValue1 = new SchemalessKafkaMessageColumnValue(1);
         AbstractFireboltRecord good = mock(AbstractFireboltRecord.class);
         when(good.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(good.getColumnValue("id")).thenReturn(idValue1);
-        when(intConverter.toParquetValue(idValue1, schema.getColumns().get(0))).thenReturn(1);
 
         // Bad record - converter throws ColumnConversionFailedException
-        KafkaMessageColumnValue idValue2 = mock(KafkaMessageColumnValue.class);
-        when(idValue2.getValue()).thenReturn(2);
+        KafkaMessageColumnValue idValue2 = new SchemalessKafkaMessageColumnValue("bad");
         AbstractFireboltRecord bad = mock(AbstractFireboltRecord.class);
         when(bad.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(bad.getColumnValue("id")).thenReturn(idValue2);
-        when(intConverter.toParquetValue(idValue2, schema.getColumns().get(0)))
-                .thenThrow(new ColumnConversionFailedException("id", "integer", "bad"));
 
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 new TestWriterProvider(mockWriter),
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -359,23 +312,16 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        @SuppressWarnings("unchecked")
-        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
-                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
-        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         // Throw when obtaining the writer (inside try-with-resources)
         when(mockWriterProvider.get(eq(avro), any())).thenThrow(new IOException("create failed"));
 
-        KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
-        when(idValue.getValue()).thenReturn(123);
+        KafkaMessageColumnValue idValue = new SchemalessKafkaMessageColumnValue(123);
         AbstractFireboltRecord record = mock(AbstractFireboltRecord.class);
         when(record.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(record.getColumnValue("id")).thenReturn(idValue);
-        when(intConverter.toParquetValue(idValue, schema.getColumns().get(0))).thenReturn(123);
 
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 mockWriterProvider,
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -401,23 +347,15 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        @SuppressWarnings("unchecked")
-        BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object> intConverter =
-                (BinaryColumnDataTypeConverter<KafkaMessageColumnValue, Object>) mock(BinaryColumnDataTypeConverter.class);
-        when(mockConverterFactory.getConverter(schema.getColumns().get(0))).thenReturn(intConverter);
         // no writer provider stubbing; writer is not used when conversion fails
 
-        KafkaMessageColumnValue idValue = mock(KafkaMessageColumnValue.class);
-        when(idValue.getValue()).thenReturn(2);
+        KafkaMessageColumnValue idValue = new SchemalessKafkaMessageColumnValue("bad");
         AbstractFireboltRecord bad = mock(AbstractFireboltRecord.class);
         when(bad.getColumnNames()).thenReturn(java.util.Set.of("id"));
         when(bad.getColumnValue("id")).thenReturn(idValue);
-        when(intConverter.toParquetValue(idValue, schema.getColumns().get(0)))
-                .thenThrow(new ColumnConversionFailedException("id", "integer", "bad"));
 
         ParquetDataGenerator generator = new ParquetDataGenerator(
                 mockSchemaProvider,
-                mockConverterFactory,
                 mockWriterProvider,
                 mockAvroNameSanitizer,
                 new ParquetDataGenerator.InMemoryFileProvider(),
@@ -429,5 +367,4 @@ class ParquetDataGeneratorTest {
         verifyNoInteractions(mockWriter);
     }
 }
-
 

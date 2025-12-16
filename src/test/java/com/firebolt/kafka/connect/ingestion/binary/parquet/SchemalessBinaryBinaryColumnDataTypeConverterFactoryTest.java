@@ -4,7 +4,7 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDecimalBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDoubleBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzBinaryColumnDataTypeConverter;
@@ -29,7 +29,7 @@ class SchemalessBinaryBinaryColumnDataTypeConverterFactoryTest {
     void returnsIntegerConverterForIntegerAliases(String dataType) {
         TableSchema.Column col = new TableSchema.Column("count", dataType, java.sql.Types.INTEGER, false);
         BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
-        assertInstanceOf(SchemalessIntegerBinaryColumnDataTypeConverter.class, converter);
+        assertInstanceOf(SchemalessIntegerBinaryBinaryColumnDataTypeConverter.class, converter);
     }
 
     // bigint support is covered elsewhere; focusing on timestamptz additions here

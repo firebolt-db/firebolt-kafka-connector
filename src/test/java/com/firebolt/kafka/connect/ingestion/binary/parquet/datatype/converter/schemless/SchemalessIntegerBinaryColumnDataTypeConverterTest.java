@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SchemalessIntegerBinaryColumnDataTypeConverterTest {
 
-    private final SchemalessIntegerBinaryColumnDataTypeConverter converter = new SchemalessIntegerBinaryColumnDataTypeConverter();
+    private final SchemalessIntegerBinaryBinaryColumnDataTypeConverter converter = new SchemalessIntegerBinaryBinaryColumnDataTypeConverter();
     private final TableSchema.Column intColumn = new TableSchema.Column("count", "integer", Types.INTEGER, false);
 
     @ParameterizedTest
