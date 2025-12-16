@@ -154,5 +154,56 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
         assertEquals(Arrays.asList(1_700_000_000_000_000L, 1_700_000_000_000_000L, 1_735_787_045_000_000L, null), result);
     }
 
+    @Test
+    void convertsTimestamptzArrayElements() {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+
+        @SuppressWarnings("unchecked")
+        BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long> tzConverter =
+                (BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long>) mock(BinaryColumnDataTypeConverter.class);
+        arrayConverter.addConverter(FireboltColumnDataType.TIMESTAMPTZ, tzConverter);
+
+        TableSchema.Column col = new TableSchema.Column("tz_arr", "array(timestamptz)", Types.ARRAY, true);
+
+        List<Object> elements = Arrays.asList(
+                1_700_000_000_000L,               // millis
+                1_700_000_000_000_000L,           // micros
+                "2025-01-02T03:04:05Z",           // ISO Z
+                "2025-01-02 05:04:05+02:00",      // offset
+                null
+        );
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRING) // elements can be strings for timestamptz
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        when(tzConverter.toParquetValue(any(SchemaKafkaMessageColumnValue.class), eq(col)))
+                .thenAnswer(inv -> {
+                    Object v = ((SchemaKafkaMessageColumnValue) inv.getArgument(0)).getValue();
+                    if (v == null) return null;
+                    if (v instanceof Number) {
+                        long n = ((Number) v).longValue();
+                        return n > 10_000_000_000_000L ? n : n * 1_000L;
+                    }
+                    // for strings return deterministic micros for assertion
+                    if ("2025-01-02T03:04:05Z".equals(v)) {
+                        return 1_735_787_045_000_000L;
+                    } else {
+                        // 05:04:05+02:00 == 03:04:05Z
+                        return 1_735_787_045_000_000L;
+                    }
+                });
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        assertEquals(Arrays.asList(
+                1_700_000_000_000_000L,
+                1_700_000_000_000_000L,
+                1_735_787_045_000_000L,
+                1_735_787_045_000_000L,
+                null
+        ), result);
+    }
 }
 
