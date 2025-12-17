@@ -11,6 +11,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Date;
 import org.apache.kafka.connect.data.Schema;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -278,6 +281,34 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
         org.apache.avro.LogicalTypes.Decimal lt = org.apache.avro.LogicalTypes.decimal(precision, scale);
         org.apache.avro.Schema schema = lt.addToSchema(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES));
         return new org.apache.avro.Conversions.DecimalConversion().fromBytes(buf, schema, lt);
+    }
+
+    @Test
+    void convertsDateArrayElements() {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+        SchemaDateBinaryColumnDataTypeConverter dateConverter = new SchemaDateBinaryColumnDataTypeConverter();
+        arrayConverter.addConverter(FireboltColumnDataType.DATE, dateConverter);
+
+        TableSchema.Column col = new TableSchema.Column("dates", "array(date)", Types.ARRAY, true);
+
+        LocalDate ld1 = LocalDate.of(2023, 1, 2);
+        Date utilDate = Date.from(ld1.atStartOfDay(ZoneOffset.UTC).toInstant());
+
+        List<Object> elements = Arrays.asList("2023-01-01", utilDate, 5, null);
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRING)
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        assertEquals(Arrays.asList(
+                (int) LocalDate.of(2023, 1, 1).toEpochDay(),
+                (int) ld1.toEpochDay(),
+                5,
+                null
+        ), result);
     }
 }
 
