@@ -13,6 +13,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaDateBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTextBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaByteaBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaBooleanBinaryColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 
 public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnDataTypeConverterFactory {
@@ -27,6 +28,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
     private SchemaDateBinaryColumnDataTypeConverter dateDataTypeConverter;
     private SchemaTextBinaryColumnDataTypeConverter textDataTypeConverter;
     private SchemaByteaBinaryColumnDataTypeConverter byteaDataTypeConverter;
+    private SchemaBooleanBinaryColumnDataTypeConverter booleanDataTypeConverter;
     private SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemaBinaryColumnDataTypeConverterFactory() {
@@ -40,6 +42,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
              new SchemaDateBinaryColumnDataTypeConverter(),
              new SchemaTextBinaryColumnDataTypeConverter(),
              new SchemaByteaBinaryColumnDataTypeConverter(),
+             new SchemaBooleanBinaryColumnDataTypeConverter(),
              new SchemaArrayBinaryColumnDataTypeConverter());
     }
 
@@ -54,6 +57,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                                                SchemaDateBinaryColumnDataTypeConverter dateDataTypeConverter,
                                                SchemaTextBinaryColumnDataTypeConverter textDataTypeConverter,
                                                SchemaByteaBinaryColumnDataTypeConverter byteaDataTypeConverter,
+                                               SchemaBooleanBinaryColumnDataTypeConverter booleanDataTypeConverter,
                                                SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
@@ -65,6 +69,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
         this.dateDataTypeConverter = dateDataTypeConverter;
         this.textDataTypeConverter = textDataTypeConverter;
         this.byteaDataTypeConverter = byteaDataTypeConverter;
+        this.booleanDataTypeConverter = booleanDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.INTEGER, integerDataTypeConverter);
@@ -77,6 +82,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DATE, dateDataTypeConverter);
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.TEXT, textDataTypeConverter);
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.BYTEA, byteaDataTypeConverter);
+        this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.BOOLEAN, booleanDataTypeConverter);
     }
 
     @Override
@@ -100,6 +106,8 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                 return textDataTypeConverter;
             case BYTEA:
                 return byteaDataTypeConverter;
+            case BOOLEAN:
+                return booleanDataTypeConverter;
             case TIMESTAMP:
                 return timestampDataTypeConverter;
             case TIMESTAMPTZ:

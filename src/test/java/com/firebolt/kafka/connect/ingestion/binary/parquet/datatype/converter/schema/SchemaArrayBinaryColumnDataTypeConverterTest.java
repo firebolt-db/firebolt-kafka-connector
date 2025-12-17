@@ -373,5 +373,25 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
         dup.get(out);
         return out;
     }
+
+    @Test
+    void convertsBooleanArrayElements() {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+        SchemaBooleanBinaryColumnDataTypeConverter boolConverter = new SchemaBooleanBinaryColumnDataTypeConverter();
+        arrayConverter.addConverter(FireboltColumnDataType.BOOLEAN, boolConverter);
+
+        TableSchema.Column col = new TableSchema.Column("bools", "array(boolean)", Types.ARRAY, true);
+
+        List<Object> elements = Arrays.asList(true, "false", 1, 0, "t", "f", "1", "0", null);
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRING)
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        assertEquals(Arrays.asList(true, false, true, false, true, false, true, false, null), result);
+    }
 }
 
