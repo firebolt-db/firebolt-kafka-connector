@@ -5,30 +5,36 @@ import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaArrayBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaBigIntBinaryBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaIntegerBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestampBinaryColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 
 public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnDataTypeConverterFactory {
 
     private SchemaIntegerBinaryColumnDataTypeConverter integerDataTypeConverter;
     private SchemaBigIntBinaryBinaryColumnDataTypeConverter bigIntDataTypeConverter;
+    private SchemaTimestampBinaryColumnDataTypeConverter timestampDataTypeConverter;
     private SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemaBinaryColumnDataTypeConverterFactory() {
         this(new SchemaIntegerBinaryColumnDataTypeConverter(),
              new SchemaBigIntBinaryBinaryColumnDataTypeConverter(),
+             new SchemaTimestampBinaryColumnDataTypeConverter(),
              new SchemaArrayBinaryColumnDataTypeConverter());
     }
 
     @VisibleForTesting
     SchemaBinaryColumnDataTypeConverterFactory(SchemaIntegerBinaryColumnDataTypeConverter integerDataTypeConverter,
                                                SchemaBigIntBinaryBinaryColumnDataTypeConverter bigIntDataTypeConverter,
+                                               SchemaTimestampBinaryColumnDataTypeConverter timestampDataTypeConverter,
                                                SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
+        this.timestampDataTypeConverter = timestampDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.INTEGER, integerDataTypeConverter);
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.BIGINT, bigIntDataTypeConverter);
+        this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.TIMESTAMP, timestampDataTypeConverter);
     }
 
     @Override
@@ -40,6 +46,8 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                 return integerDataTypeConverter;
             case BIGINT:
                 return bigIntDataTypeConverter;
+            case TIMESTAMP:
+                return timestampDataTypeConverter;
             case ARRAY:
                 return arrayColumnDataTypeConverter;
             case STRUCT:

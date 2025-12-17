@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaBigIntBinaryBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaIntegerBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestampBinaryColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -35,5 +36,17 @@ public class SchemaBinaryColumnDataTypeConverterFactoryTest {
         TableSchema.Column col = new TableSchema.Column("count64", dataType, java.sql.Types.BIGINT, false);
         BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
         assertInstanceOf(SchemaBigIntBinaryBinaryColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "timestamp",
+            "TIMESTAMP",
+            "Timestamp"
+    })
+    void returnsTimestampConverterForTimestampAliases(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("ts", dataType, java.sql.Types.TIMESTAMP, false);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemaTimestampBinaryColumnDataTypeConverter.class, converter);
     }
 }
