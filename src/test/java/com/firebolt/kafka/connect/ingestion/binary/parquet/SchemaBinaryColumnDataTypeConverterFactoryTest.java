@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.ingestion.binary.parquet;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaBigIntBinaryBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaIntegerBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaDecimalBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaRealBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestampBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestamptzBinaryColumnDataTypeConverter;
@@ -75,4 +76,17 @@ public class SchemaBinaryColumnDataTypeConverterFactoryTest {
 		BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
 		assertInstanceOf(SchemaRealBinaryColumnDataTypeConverter.class, converter);
 	}
+
+    @ParameterizedTest
+    @CsvSource({
+            "numeric",
+            "decimal",
+            "NUMERIC",
+            "DECIMAL"
+    })
+    void returnsDecimalConverterForAliases(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("amount", dataType, java.sql.Types.NUMERIC, false, 38, 9);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemaDecimalBinaryColumnDataTypeConverter.class, converter);
+    }
 }

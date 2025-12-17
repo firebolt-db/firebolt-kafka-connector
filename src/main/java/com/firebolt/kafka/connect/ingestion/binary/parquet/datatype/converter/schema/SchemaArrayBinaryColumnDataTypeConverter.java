@@ -6,6 +6,7 @@ import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryColumnTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.BinaryColumnDataTypeConverter;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,6 +25,7 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
     private static final String TIMESTAMPTZ_TYPE_NAME = "timestamptz";
     private static final String REAL_TYPE_NAME = "real";
     private static final String DOUBLE_TYPE_NAME = "double";
+    private static final String DECIMAL_TYPE_NAME = "numeric";
 
     private Map<FireboltColumnDataType, BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, ?>> converters = new HashMap<>();
 
@@ -49,6 +51,8 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
 			return asRealArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
         } else if (typeName.equals(DOUBLE_TYPE_NAME)) {
             return asDoubleArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
+        } else if (typeName.equals(DECIMAL_TYPE_NAME)) {
+            return asDecimalArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -200,6 +204,30 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
 		return doubles;
 	}
 
+    private List<? extends Object> asDecimalArray(List<?> elements, TableSchema.Column tableColumn, Schema.Type schemaType, Schema.Type schemaSubType, Map<String, String> schemaTypeParams) {
+        List<ByteBuffer> decimals = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, ByteBuffer> converter =
+                (BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, ByteBuffer>) converters.get(FireboltColumnDataType.DECIMAL);
+
+        for (Object element : elements) {
+            if (element == null) {
+                decimals.add(null);
+            } else {
+                SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue = SchemaKafkaMessageColumnValue.builder()
+                        .schemaType(schemaType)
+                        .schemaSubType(schemaSubType)
+                        .schemaTypeParams(schemaTypeParams)
+                        .value(element)
+                        .build();
+                ByteBuffer converted = converter.toParquetValue(schemaKafkaMessageColumnValue, tableColumn);
+                decimals.add(converted);
+            }
+        }
+        return decimals;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
@@ -214,6 +242,8 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
 			return REAL_TYPE_NAME;
         } else if (fireboltColumn.getDataType().equals("array(double precision)")) {
             return DOUBLE_TYPE_NAME;
+        } else if (fireboltColumn.getDataType().equals("array(numeric)") || fireboltColumn.getDataType().equals("array(decimal)")) {
+            return DECIMAL_TYPE_NAME;
         }
 
         // add more data types
