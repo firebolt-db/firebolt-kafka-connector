@@ -21,6 +21,7 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
     private static final String INTEGER_TYPE_NAME = "integer";
     private static final String BIGINT_TYPE_NAME = "bigint";
     private static final String TIMESTAMP_TYPE_NAME = "timestamp";
+    private static final String TIMESTAMPTZ_TYPE_NAME = "timestamptz";
 
     private Map<FireboltColumnDataType, BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, ?>> converters = new HashMap<>();
 
@@ -40,6 +41,8 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
             return asLongArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
         } else if (typeName.equals(TIMESTAMP_TYPE_NAME)) {
             return asTimestampArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
+        } else if (typeName.equals(TIMESTAMPTZ_TYPE_NAME)) {
+            return asTimestamptzArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
         }
 
         log.warn("Could not resolve type name: {}", typeName);
@@ -119,6 +122,30 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
         return longs;
     }
 
+    private List<? extends Object> asTimestamptzArray(List<?> elements, TableSchema.Column tableColumn, Schema.Type schemaSubType, Map<String, String> schemaTypeParams) {
+        List<Long> longs = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long> converter =
+                (BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, Long>) converters.get(FireboltColumnDataType.TIMESTAMPTZ);
+
+        for (Object element : elements) {
+            if (element == null) {
+                longs.add(null);
+            } else {
+                SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue = SchemaKafkaMessageColumnValue.builder()
+                        .schemaType(schemaSubType)
+                        .schemaTypeParams(schemaTypeParams)
+                        .value(element)
+                        .build();
+
+                Long convertedValue = converter.toParquetValue(schemaKafkaMessageColumnValue, tableColumn);
+                longs.add(convertedValue);
+            }
+        }
+        return longs;
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
         // NOTE once this https://packboard.atlassian.net/browse/FIR-50959 we need to check the inner data type rather than array(integer)
         if (fireboltColumn.getDataType().equals("array(integer)")) {
@@ -127,6 +154,8 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
             return BIGINT_TYPE_NAME;
         } else if (fireboltColumn.getDataType().equals("array(timestamp)")) {
             return TIMESTAMP_TYPE_NAME;
+        } else if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
+            return TIMESTAMPTZ_TYPE_NAME;
         }
 
         // add more data types
