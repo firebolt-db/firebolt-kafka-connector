@@ -205,5 +205,25 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
                 null
         ), result);
     }
+
+	@Test
+	void convertsRealArrayElements() {
+		SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+		SchemaRealBinaryColumnDataTypeConverter realConverter = new SchemaRealBinaryColumnDataTypeConverter();
+		arrayConverter.addConverter(FireboltColumnDataType.REAL, realConverter);
+
+		TableSchema.Column col = new TableSchema.Column("reals", "array(real)", Types.ARRAY, true);
+
+		List<Object> elements = Arrays.asList(1, 2.5d, "3.75", null, Float.valueOf(4.5f));
+		SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+				.schemaType(Schema.Type.ARRAY)
+				.schemaSubType(Schema.Type.FLOAT32)
+				.schemaTypeParams(Collections.emptyMap())
+				.value(elements)
+				.build();
+
+		List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+		assertEquals(Arrays.asList(1.0f, 2.5f, 3.75f, null, 4.5f), result);
+	}
 }
 
