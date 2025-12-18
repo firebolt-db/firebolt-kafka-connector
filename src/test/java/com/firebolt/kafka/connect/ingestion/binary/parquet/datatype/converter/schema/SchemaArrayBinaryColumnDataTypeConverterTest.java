@@ -4,6 +4,8 @@ import com.firebolt.kafka.connect.SchemaKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.BinaryColumnDataTypeConverter;
+import java.nio.ByteBuffer;
+import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.Collections;
@@ -245,5 +247,37 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
 		List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
 		assertEquals(Arrays.asList(1.0d, 2.5d, 3.75d, null, 4.5d), result);
 	}
+
+    @Test
+    void convertsDecimalArrayElements() {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+        SchemaDecimalBinaryColumnDataTypeConverter decimalConverter = new SchemaDecimalBinaryColumnDataTypeConverter();
+        arrayConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalConverter);
+
+        TableSchema.Column col = new TableSchema.Column("amounts", "array(numeric)", Types.ARRAY, false, 30, 7);
+
+        List<Object> elements = Arrays.asList("12.5", 7, 3.14d, null);
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRING)
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        BigDecimal d0 = decodeDecimal((ByteBuffer) result.get(0), 30, 7);
+        BigDecimal d1 = decodeDecimal((ByteBuffer) result.get(1), 30, 7);
+        BigDecimal d2 = decodeDecimal((ByteBuffer) result.get(2), 30, 7);
+        assertEquals(0, new BigDecimal("12.5").compareTo(d0));
+        assertEquals(0, BigDecimal.valueOf(7).compareTo(d1));
+        assertEquals(0, BigDecimal.valueOf(3.14d).compareTo(d2));
+        assertEquals(null, result.get(3));
+    }
+
+    private static BigDecimal decodeDecimal(ByteBuffer buf, int precision, int scale) {
+        org.apache.avro.LogicalTypes.Decimal lt = org.apache.avro.LogicalTypes.decimal(precision, scale);
+        org.apache.avro.Schema schema = lt.addToSchema(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES));
+        return new org.apache.avro.Conversions.DecimalConversion().fromBytes(buf, schema, lt);
+    }
 }
 

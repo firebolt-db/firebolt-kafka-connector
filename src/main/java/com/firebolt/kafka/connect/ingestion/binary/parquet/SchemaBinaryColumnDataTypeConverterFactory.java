@@ -7,6 +7,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaIntegerBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaRealBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaDoubleBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaDecimalBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestampBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestamptzBinaryColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
@@ -19,6 +20,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
     private SchemaTimestamptzBinaryColumnDataTypeConverter timestamptzDataTypeConverter;
     private SchemaRealBinaryColumnDataTypeConverter realDataTypeConverter;
     private SchemaDoubleBinaryColumnDataTypeConverter doubleDataTypeConverter;
+    private SchemaDecimalBinaryColumnDataTypeConverter decimalDataTypeConverter;
     private SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemaBinaryColumnDataTypeConverterFactory() {
@@ -28,6 +30,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
              new SchemaTimestamptzBinaryColumnDataTypeConverter(),
              new SchemaRealBinaryColumnDataTypeConverter(),
              new SchemaDoubleBinaryColumnDataTypeConverter(),
+             new SchemaDecimalBinaryColumnDataTypeConverter(),
              new SchemaArrayBinaryColumnDataTypeConverter());
     }
 
@@ -38,6 +41,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                                                SchemaTimestamptzBinaryColumnDataTypeConverter timestamptzDataTypeConverter,
                                                SchemaRealBinaryColumnDataTypeConverter realDataTypeConverter,
                                                SchemaDoubleBinaryColumnDataTypeConverter doubleDataTypeConverter,
+                                               SchemaDecimalBinaryColumnDataTypeConverter decimalDataTypeConverter,
                                                SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
@@ -45,6 +49,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
         this.timestamptzDataTypeConverter = timestamptzDataTypeConverter;
         this.realDataTypeConverter = realDataTypeConverter;
         this.doubleDataTypeConverter = doubleDataTypeConverter;
+        this.decimalDataTypeConverter = decimalDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.INTEGER, integerDataTypeConverter);
@@ -53,6 +58,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.TIMESTAMPTZ, timestamptzDataTypeConverter);
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.REAL, realDataTypeConverter);
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DOUBLE, doubleDataTypeConverter);
+        this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalDataTypeConverter);
     }
 
     @Override
@@ -68,6 +74,8 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                 return realDataTypeConverter;
             case DOUBLE:
                 return doubleDataTypeConverter;
+            case DECIMAL:
+                return decimalDataTypeConverter;
             case TIMESTAMP:
                 return timestampDataTypeConverter;
             case TIMESTAMPTZ:
