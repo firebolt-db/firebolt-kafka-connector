@@ -338,5 +338,40 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
         assertEquals("42", result.get(2));
         assertEquals(null, result.get(3));
     }
+
+    @Test
+    void convertsByteaArrayElements() {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+        SchemaByteaBinaryColumnDataTypeConverter byteaConverter = new SchemaByteaBinaryColumnDataTypeConverter();
+        arrayConverter.addConverter(FireboltColumnDataType.BYTEA, byteaConverter);
+
+        TableSchema.Column col = new TableSchema.Column("bytes", "array(bytea)", Types.ARRAY, true);
+
+        byte[] a = "a".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap("b".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        List<Object> elements = Arrays.asList(a, bb, "c", null);
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.BYTES)
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        byte[] r0 = toArray((ByteBuffer) result.get(0));
+        byte[] r1 = toArray((ByteBuffer) result.get(1));
+        byte[] r2 = toArray((ByteBuffer) result.get(2));
+        assertEquals("a", new String(r0, java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals("b", new String(r1, java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals("c", new String(r2, java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(null, result.get(3));
+    }
+
+    private static byte[] toArray(ByteBuffer buf) {
+        ByteBuffer dup = buf.slice();
+        byte[] out = new byte[dup.remaining()];
+        dup.get(out);
+        return out;
+    }
 }
 
