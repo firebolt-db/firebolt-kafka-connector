@@ -29,6 +29,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
@@ -570,8 +571,7 @@ public abstract class BaseIntegrationTest {
     private static boolean runsOnCloud() {
         String clientId = System.getProperty("clientId");
         String clientSecret = System.getProperty("clientSecret");
-        return clientId != null && !clientId.trim().isEmpty()
-                && clientSecret != null && !clientSecret.trim().isEmpty();
+        return StringUtils.isNoneBlank(clientId, clientSecret);
     }
 
 }
