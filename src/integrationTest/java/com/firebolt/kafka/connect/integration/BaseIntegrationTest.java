@@ -544,23 +544,34 @@ public abstract class BaseIntegrationTest {
      * @return
      */
     protected static Stream<Arguments> ingestionTypesWithOrWithoutNulls() {
-        return Stream.of(
-                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
-                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values")
-                // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
-                // until then we will run these tests locally against core
-//                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"),
-//                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values")
-        );
+        Stream.Builder<Arguments> builder = Stream.builder();
+        builder.add(Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"));
+        builder.add(Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values"));
+        
+        if (runsOnCloud()) {
+            builder.add(Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"));
+            builder.add(Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values"));
+        }
+
+        return builder.build();
     }
 
     protected static Stream<Arguments> ingestionTypes() {
-        return Stream.of(
-                Arguments.of( Map.of("ingestion.type", "sql"), "sql ingestion with null values")
-                // When we have a way to run firebolt-core with the image that has the fix we can uncomment and use sqlAndBinaryTestSetupWithOrWithoutNulls
-                // until then we will run these tests locally against core
-//                Arguments.of( Map.of("ingestion.type", "binary"), "sql ingestion without null values")
-        );
+        Stream.Builder<Arguments> builder = Stream.builder();
+        builder.add(Arguments.of(Map.of("ingestion.type", "sql"), "sql ingestion with null values"));
+
+        if (runsOnCloud()) {
+            builder.add(Arguments.of(Map.of("ingestion.type", "binary"), "binary ingestion with null values"));
+        }
+
+        return builder.build();
+    }
+
+    private static boolean runsOnCloud() {
+        String clientId = System.getProperty("clientId");
+        String clientSecret = System.getProperty("clientSecret");
+        return clientId != null && !clientId.trim().isEmpty()
+                && clientSecret != null && !clientSecret.trim().isEmpty();
     }
 
 }
