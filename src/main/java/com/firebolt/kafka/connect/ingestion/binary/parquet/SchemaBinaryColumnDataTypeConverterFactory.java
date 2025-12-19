@@ -11,6 +11,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestampBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestamptzBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaDateBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTextBinaryColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 
 public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnDataTypeConverterFactory {
@@ -23,6 +24,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
     private SchemaDoubleBinaryColumnDataTypeConverter doubleDataTypeConverter;
     private SchemaDecimalBinaryColumnDataTypeConverter decimalDataTypeConverter;
     private SchemaDateBinaryColumnDataTypeConverter dateDataTypeConverter;
+    private SchemaTextBinaryColumnDataTypeConverter textDataTypeConverter;
     private SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemaBinaryColumnDataTypeConverterFactory() {
@@ -34,6 +36,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
              new SchemaDoubleBinaryColumnDataTypeConverter(),
              new SchemaDecimalBinaryColumnDataTypeConverter(),
              new SchemaDateBinaryColumnDataTypeConverter(),
+             new SchemaTextBinaryColumnDataTypeConverter(),
              new SchemaArrayBinaryColumnDataTypeConverter());
     }
 
@@ -46,6 +49,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                                                SchemaDoubleBinaryColumnDataTypeConverter doubleDataTypeConverter,
                                                SchemaDecimalBinaryColumnDataTypeConverter decimalDataTypeConverter,
                                                SchemaDateBinaryColumnDataTypeConverter dateDataTypeConverter,
+                                               SchemaTextBinaryColumnDataTypeConverter textDataTypeConverter,
                                                SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
@@ -55,6 +59,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
         this.doubleDataTypeConverter = doubleDataTypeConverter;
         this.decimalDataTypeConverter = decimalDataTypeConverter;
         this.dateDataTypeConverter = dateDataTypeConverter;
+        this.textDataTypeConverter = textDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.INTEGER, integerDataTypeConverter);
@@ -65,6 +70,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DOUBLE, doubleDataTypeConverter);
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DECIMAL, decimalDataTypeConverter);
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.DATE, dateDataTypeConverter);
+        this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.TEXT, textDataTypeConverter);
     }
 
     @Override
@@ -84,6 +90,8 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                 return decimalDataTypeConverter;
             case DATE:
                 return dateDataTypeConverter;
+            case TEXT:
+                return textDataTypeConverter;
             case TIMESTAMP:
                 return timestampDataTypeConverter;
             case TIMESTAMPTZ:

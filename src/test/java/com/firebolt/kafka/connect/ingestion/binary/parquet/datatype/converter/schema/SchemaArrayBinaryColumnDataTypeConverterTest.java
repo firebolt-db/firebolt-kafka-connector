@@ -14,6 +14,7 @@ import java.util.Map;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Date;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.connect.data.Schema;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -309,6 +310,33 @@ class SchemaArrayBinaryColumnDataTypeConverterTest {
                 5,
                 null
         ), result);
+    }
+
+    @Test
+    void convertsTextArrayElements() throws Exception {
+        SchemaArrayBinaryColumnDataTypeConverter arrayConverter = new SchemaArrayBinaryColumnDataTypeConverter();
+        SchemaTextBinaryColumnDataTypeConverter textConverter = new SchemaTextBinaryColumnDataTypeConverter();
+        arrayConverter.addConverter(FireboltColumnDataType.TEXT, textConverter);
+
+        TableSchema.Column col = new TableSchema.Column("texts", "array(text)", Types.ARRAY, true);
+
+        Map<String, Object> m = Map.of("a", 1, "b", "x");
+        List<Object> elements = Arrays.asList(m, "hi", 42, null);
+        SchemaKafkaMessageColumnValue arrayValue = SchemaKafkaMessageColumnValue.builder()
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRING)
+                .schemaTypeParams(Collections.emptyMap())
+                .value(elements)
+                .build();
+
+        List<? extends Object> result = arrayConverter.toParquetValue(arrayValue, col);
+        ObjectMapper om = new ObjectMapper();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> back = om.readValue((String) result.get(0), Map.class);
+        assertEquals(m, back);
+        assertEquals("hi", result.get(1));
+        assertEquals("42", result.get(2));
+        assertEquals(null, result.get(3));
     }
 }
 

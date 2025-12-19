@@ -23,6 +23,7 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
     private static final String BIGINT_TYPE_NAME = "bigint";
     private static final String TIMESTAMP_TYPE_NAME = "timestamp";
     private static final String TIMESTAMPTZ_TYPE_NAME = "timestamptz";
+    private static final String TEXT_TYPE_NAME = "string";
     private static final String DATE_TYPE_NAME = "date";
     private static final String REAL_TYPE_NAME = "real";
     private static final String DOUBLE_TYPE_NAME = "double";
@@ -50,6 +51,8 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
             return asTimestamptzArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
         } else if (typeName.equals(DATE_TYPE_NAME)) {
             return asDateArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
+        } else if (typeName.equals(TEXT_TYPE_NAME)) {
+            return asTextArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
 		} else if (typeName.equals(REAL_TYPE_NAME)) {
 			return asRealArray(elements, tableColumn, schemaKafkaMessageColumnValue.getSchemaType(), schemaKafkaMessageColumnValue.getSchemaSubType(), schemaKafkaMessageColumnValue.getSchemaTypeParams());
         } else if (typeName.equals(DOUBLE_TYPE_NAME)) {
@@ -183,6 +186,30 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
         return days;
     }
 
+    private List<? extends Object> asTextArray(List<?> elements, TableSchema.Column tableColumn, Schema.Type schemaType, Schema.Type schemaSubType, Map<String, String> schemaTypeParams) {
+        List<String> strings = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, String> converter =
+                (BinaryColumnDataTypeConverter<SchemaKafkaMessageColumnValue, String>) converters.get(FireboltColumnDataType.TEXT);
+
+        for (Object element : elements) {
+            if (element == null) {
+                strings.add(null);
+            } else {
+                SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue = SchemaKafkaMessageColumnValue.builder()
+                        .schemaType(schemaType)
+                        .schemaSubType(schemaSubType)
+                        .schemaTypeParams(schemaTypeParams)
+                        .value(element)
+                        .build();
+                String converted = converter.toParquetValue(schemaKafkaMessageColumnValue, tableColumn);
+                strings.add(converted);
+            }
+        }
+        return strings;
+    }
+
 	private List<? extends Object> asRealArray(List<?> elements, TableSchema.Column tableColumn, Schema.Type schemaType, Schema.Type schemaSubType, Map<String, String> schemaTypeParams) {
 		List<Float> floats = new ArrayList<>();
 
@@ -267,6 +294,8 @@ public class SchemaArrayBinaryColumnDataTypeConverter extends AbstractBinaryColu
             return TIMESTAMPTZ_TYPE_NAME;
         } else if (fireboltColumn.getDataType().equals("array(date)")) {
             return DATE_TYPE_NAME;
+        } else if (fireboltColumn.getDataType().equals("array(text)")) {
+            return TEXT_TYPE_NAME;
 		} else if (fireboltColumn.getDataType().equals("array(real)")) {
 			return REAL_TYPE_NAME;
         } else if (fireboltColumn.getDataType().equals("array(double precision)")) {
