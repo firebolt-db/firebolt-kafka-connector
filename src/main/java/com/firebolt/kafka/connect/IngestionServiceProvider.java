@@ -1,6 +1,7 @@
 package com.firebolt.kafka.connect;
 
 import com.firebolt.kafka.connect.ingestion.binary.BinaryIngestionService;
+import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.InsertPreparedStatement;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.sql.Connection;
 import java.util.Optional;
