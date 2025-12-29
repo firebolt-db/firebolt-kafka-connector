@@ -34,6 +34,7 @@ on:
           - '8-column-with-default-timestamp'
           - '80-column'
           - '400-column'
+          - '1000-column'
       ingestion_type:
         description: 'Ingestion type to use (sql or binary)'
         required: false
