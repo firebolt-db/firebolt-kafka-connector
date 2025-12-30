@@ -700,6 +700,8 @@ tasks.register('runLoadTest', JavaExec) {
         println "   Message Count: ${System.getProperty('loadtest.message.count', '[using default]')}"
         println "   Table Schema: ${System.getProperty('loadtest.table.schema', '[using default]')}"
         println "   Ingestion: ${System.getProperty('loadtest.ingestion.type', '[using default]')}"
+        println "   Message Type: ${System.getProperty('loadtest.message.type', '[using default]')}"
+        println "   Has Schema: ${System.getProperty('loadtest.has.schema', '[using default]')}"
         println "   Min Fetch (MB): ${System.getProperty('loadtest.fetch.min.megabytes', '[using default]')}"
         println "   Max Wait Time (ms): ${System.getProperty('loadtest.fetch.max.wait.ms', '[using default]')}"
         println "   Max Records Poll: ${System.getProperty('loadtest.max.poll.records', '[using default]')}"

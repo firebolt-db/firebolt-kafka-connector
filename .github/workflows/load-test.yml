@@ -42,6 +42,15 @@ on:
         options:
           - 'sql'
           - 'binary'
+      message_type:
+        description: 'Message type to publish (default: json)'
+        required: false
+        default: 'json'
+      has_schema:
+        description: 'Whether messages have schema (default: true)'
+        required: false
+        type: boolean
+        default: true
       min_fetch_megabytes:
         description: 'Minimum fetch size in MB (maps to consumer.override.fetch.min.bytes)'
         required: false
@@ -95,6 +104,8 @@ jobs:
             -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
             -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}" \
             -Dloadtest.ingestion.type="${{ github.event.inputs.ingestion_type || 'sql' }}" \
+            -Dloadtest.message.type="${{ github.event.inputs.message_type || 'json' }}" \
+            -Dloadtest.has.schema="${{ github.event.inputs.has_schema || 'true' }}" \
             -Dloadtest.fetch.min.megabytes="${{ github.event.inputs.min_fetch_megabytes || '20' }}" \
             -Dloadtest.fetch.max.wait.ms="${{ github.event.inputs.max_wait_time_ms || '2000' }}" \
             -Dloadtest.max.poll.records="${{ github.event.inputs.max_records_poll || '10000' }}"
