@@ -1,0 +1,4 @@
+{
+  "description" : "A table with 470 columns no schema with json payload messages. The sample contains 10k records",
+  "hasSchema" : false
+}
