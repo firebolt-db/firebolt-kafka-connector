@@ -1,4 +1,4 @@
-CREATE TABLE "customer1_schema_table1" (
+  "colInteger" INTEGER NOT NULL,
   "lbxqcwms_fm" BIGINT NULL,
   "sajlpko_bg" TEXT NULL,
   "dsfu_mmpclf" TEXT NULL,
@@ -471,4 +471,3 @@ CREATE TABLE "customer1_schema_table1" (
   "jdvis_zx_ayylpvnf_zxi" TEXT NULL,
   "bqsjpvqeot_hp" TEXT NULL,
   "ksldxbwxwd_jq_ka_zurdn_jwsl" TEXT NULL
-) PRIMARY INDEX "lbxqcwms_fm";
