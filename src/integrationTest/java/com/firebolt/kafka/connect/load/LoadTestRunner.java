@@ -349,10 +349,17 @@ public class LoadTestRunner {
         log.info("Found  {} subjects.", subjects.length);
         Arrays.stream(subjects).forEach(subjectName -> log.info("Subject: {}", subjectName));
 
+        log.info("Reading the schema from path {}", schemaPathName);
         String jsonSchema = new String(Files.readAllBytes(Paths.get(schemaPathName)));
 
-        int id = schemaRegistryClient.registerSchema(subject, jsonSchema, "JSON");
-        log.info("Registered schema id {} for subject {}", id, subject);
+        log.info("Registering the schema: {} with length {}", subject, jsonSchema.length());
+        try {
+            int id = schemaRegistryClient.registerSchema(subject, jsonSchema, "JSON");
+            log.info("Registered schema id {} for subject {}", id, subject);
+        } catch (Exception e) {
+            log.error("Failed to register the schema: ", e);
+            throw e;
+        }
     }
 
     private static void setupKafkaTopic(ConfluentKafkaClient client, String topicName) throws IOException {

@@ -70,6 +70,10 @@ public class LoadTest {
                     jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-400-column-registry.txt";
                 }
                 break;
+            case "1000-column":
+                tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-1000-column-table-schema.txt";
+                jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-1000-column-registry.txt";
+                break;
 
             case "8-column-with-default-timestamp":
             default:
@@ -121,8 +125,13 @@ public class LoadTest {
 
             log.info("Running test scenario for message size: {} bytes", messageSize);
             LoadTestRunner loadTestRunner = new LoadTestRunner(testScenario);
-            LoadTestRunResult result = loadTestRunner.run();
-            log.info("For test scenario {} we have the following results {}", testScenario, result);
+            try {
+                LoadTestRunResult result = loadTestRunner.run();
+                log.info("For test scenario {} we have the following results {}", testScenario, result);
+            } catch (Exception e) {
+                log.error("Failed to complete the run", e);
+                throw e;
+            }
         }
 
         printActiveThreads();
