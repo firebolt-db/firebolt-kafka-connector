@@ -1,0 +1,40 @@
+name: Benchmark Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      connector_plugin_id:
+        description: 'Confluent Firebolt Connector Plugin ID (optional)'
+        required: false
+      min_fetch_megabytes:
+        required: false
+        type: string
+        default: '20'
+      max_wait_time_ms:
+        required: false
+        type: string
+        default: '2000'
+      max_records_poll:
+        required: false
+        type: string
+        default: '10000'
+
+jobs:
+  benchmark:
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        ingestion: [sql, binary]
+        schema: ['8-column', '80-column', '400-column', '1000-column']
+    uses: ./.github/workflows/load-test.yml
+    with:
+      table_schema: ${{ matrix.schema }}
+      ingestion_type: ${{ matrix.ingestion }}
+      connector_plugin_id: ${{ inputs.connector_plugin_id }}
+      min_fetch_megabytes: ${{ inputs.min_fetch_megabytes }}
+      max_wait_time_ms: ${{ inputs.max_wait_time_ms }}
+      max_records_poll: ${{ inputs.max_records_poll }}
+    secrets: inherit
+
+

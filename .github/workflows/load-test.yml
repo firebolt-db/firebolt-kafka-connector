@@ -65,6 +65,49 @@ on:
         required: false
         default: '10000'
 
+  workflow_call:
+    inputs:
+      firebolt_jdbc_url:
+        required: false
+        type: string
+        default: 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging'
+      connector_plugin_id:
+        required: false
+        type: string
+      confluent_environment_id:
+        required: false
+        type: string
+      confluent_cluster_id:
+        required: false
+        type: string
+      message_sizes:
+        required: false
+        type: string
+        default: '100,500,1000,5000,10000'
+      message_count:
+        required: false
+        type: string
+        default: '1000000'
+      table_schema:
+        required: false
+        type: string
+        default: '8-column'
+      ingestion_type:
+        required: false
+        type: string
+        default: 'sql'
+      min_fetch_megabytes:
+        required: false
+        type: string
+        default: '20'
+      max_wait_time_ms:
+        required: false
+        type: string
+        default: '2000'
+      max_records_poll:
+        required: false
+        type: string
+        default: '10000'
 
 jobs:
   load-test:
@@ -89,36 +132,44 @@ jobs:
       - name: Run Load Test
         run: |
           ./gradlew runLoadTest \
-            -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url }}" \
+            -Dfirebolt.jdbc.url="${{ inputs.firebolt_jdbc_url || github.event.inputs.firebolt_jdbc_url || 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging' }}" \
             -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
             -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
-            -Dconfluent.environment.id="${{ github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}" \
-            -Dconfluent.cluster.id="${{ github.event.inputs.confluent_cluster_id || vars.CONFLUENT_CLUSTER_ID }}" \
-            -Dconfluent.firebolt.connector.plugin.id="${{ github.event.inputs.connector_plugin_id || vars.CONFLUENT_CONNECTOR_PLUGIN_ID }}" \
+            -Dconfluent.environment.id="${{ inputs.confluent_environment_id || github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}" \
+            -Dconfluent.cluster.id="${{ inputs.confluent_cluster_id || github.event.inputs.confluent_cluster_id || vars.CONFLUENT_CLUSTER_ID }}" \
+            -Dconfluent.firebolt.connector.plugin.id="${{ inputs.connector_plugin_id || github.event.inputs.connector_plugin_id || vars.CONFLUENT_CONNECTOR_PLUGIN_ID }}" \
             -Dconfluent.kafka.api.key="${{ secrets.CONFLUENT_KAFKA_API_KEY }}" \
             -Dconfluent.kafka.api.secret="${{ secrets.CONFLUENT_KAFKA_API_SECRET }}" \
             -Dconfluent.schema.registry.api.key="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_KEY }}" \
             -Dconfluent.schema.registry.api.secret="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}" \
             -Dconfluent.cloud.resource.api.key="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}" \
             -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
-            -Dloadtest.message.sizes="${{ github.event.inputs.message_sizes || '100,500' }}" \
-            -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
-            -Dloadtest.table.schema="${{ github.event.inputs.table_schema || '8-column' }}" \
-            -Dloadtest.ingestion.type="${{ github.event.inputs.ingestion_type || 'sql' }}" \
+            -Dloadtest.message.sizes="${{ inputs.message_sizes || github.event.inputs.message_sizes || '100,500,1000,5000,10000' }}" \
+            -Dloadtest.message.count="${{ inputs.message_count || github.event.inputs.message_count || '1000000' }}" \
+            -Dloadtest.table.schema="${{ inputs.table_schema || github.event.inputs.table_schema || '8-column' }}" \
+            -Dloadtest.ingestion.type="${{ inputs.ingestion_type || github.event.inputs.ingestion_type || 'sql' }}" \
             -Dloadtest.message.type="${{ github.event.inputs.message_type || 'json' }}" \
             -Dloadtest.has.schema="${{ github.event.inputs.has_schema || 'true' }}" \
-            -Dloadtest.fetch.min.megabytes="${{ github.event.inputs.min_fetch_megabytes || '20' }}" \
-            -Dloadtest.fetch.max.wait.ms="${{ github.event.inputs.max_wait_time_ms || '2000' }}" \
-            -Dloadtest.max.poll.records="${{ github.event.inputs.max_records_poll || '10000' }}"
+            -Dloadtest.fetch.min.megabytes="${{ inputs.min_fetch_megabytes || github.event.inputs.min_fetch_megabytes || '20' }}" \
+            -Dloadtest.fetch.max.wait.ms="${{ inputs.max_wait_time_ms || github.event.inputs.max_wait_time_ms || '2000' }}" \
+            -Dloadtest.max.poll.records="${{ inputs.max_records_poll || github.event.inputs.max_records_poll || '10000' }}"
         env:
           # Additional environment variables if needed
           GRADLE_OPTS: "-Xmx2g"
+      
+      - name: Compute Artifact Name Vars
+        run: |
+          SCHEMA="${{ inputs.table_schema || github.event.inputs.table_schema || '8-column' }}"
+          SCHEMA_PLURAL="${SCHEMA/-column/-columns}"
+          echo "SCHEMA_PLURAL=${SCHEMA_PLURAL}" >> $GITHUB_ENV
+          ING="${{ inputs.ingestion_type || github.event.inputs.ingestion_type || 'sql' }}"
+          echo "INGESTION_TYPE=${ING}" >> $GITHUB_ENV
           
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: load-test-results-${{ github.run_number }}
+          name: load-test-results-${{ env.SCHEMA_PLURAL }}-${{ env.INGESTION_TYPE }}-${{ github.run_number }}
           path: |
             build/reports/
             build/test-results/
