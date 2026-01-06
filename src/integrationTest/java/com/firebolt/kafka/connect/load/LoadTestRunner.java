@@ -6,6 +6,7 @@ import com.firebolt.kafka.connect.clients.ConfluentResourceClient;
 import com.firebolt.kafka.connect.clients.ConfluentSchemaRegistryClient;
 import com.firebolt.kafka.connect.clients.FireboltClient;
 import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
+import com.firebolt.kafka.connect.load.publisher.KafkaMessagePublisher;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import static org.awaitility.Awaitility.await;
@@ -62,6 +64,8 @@ public class LoadTestRunner {
         String schemaApiKey = testScenario.getConfluentCloudSettings().getSchemaRegistryApiKey();
         String schemaApiSecret = testScenario.getConfluentCloudSettings().getSchemaRegistryApiSecret();
 
+        boolean hasSchema = StringUtils.isNotBlank(testScenario.getJsonSchemaRegistryDefinitionFilePath());
+
         String fireboltPluginId = testScenario.getConfluentCloudSettings().getFireboltConnectorPluginId();
 
         String topicName = testScenario.getTopicName();
@@ -96,7 +100,7 @@ public class LoadTestRunner {
                     createFireboltTable(fireboltClient, tableName);
 
                     // create a new connector from the plugin
-                    Map<String, String> connectorConfig = createDefaultConnectorConfiguration(schemaRegistryUrl);
+                    Map<String, String> connectorConfig = createDefaultConnectorConfiguration(schemaRegistryUrl, hasSchema);
 
                     // override any specific attributes of the connector definition
                     if (testScenario.getConnectorConfiguration() != null && !testScenario.getConnectorConfiguration().isEmpty()) {
@@ -127,7 +131,9 @@ public class LoadTestRunner {
                     // pause the connector (we will generate the messages first, and then we start the connector)
                     pauseConnector(confluentConnectorClient, connectorName);
 
-                    registerJsonSchema(schemaRegistryClient, subjectName, testScenario.getJsonSchemaRegistryDefinitionFilePath());
+                    if (hasSchema) {
+                        registerJsonSchema(schemaRegistryClient, subjectName, testScenario.getJsonSchemaRegistryDefinitionFilePath());
+                    }
 
                     // start publishing messages
                     publishMessages(testScenario.getNrOfKafkaMessageToProduce(), topicName, testScenario.getLoadTestKafkaMessagePublisher());
@@ -152,7 +158,9 @@ public class LoadTestRunner {
                     confluentKafkaClient.deleteTopic(topicName);
 
                     // delete schema
-                    schemaRegistryClient.deleteSubject(subjectName);
+                    if (hasSchema) {
+                        schemaRegistryClient.deleteSubject(subjectName);
+                    }
 
                     if (testScenario.isDeleteConnector() && connectorId != null) {
                         log.info("Deleting the connector {}", connectorName);
@@ -179,7 +187,7 @@ public class LoadTestRunner {
      * @param schemaRegistryUrl
      * @return
      */
-    private Map<String, String> createDefaultConnectorConfiguration(String schemaRegistryUrl) {
+    private Map<String, String> createDefaultConnectorConfiguration(String schemaRegistryUrl, boolean hasSchema) {
         String schemaApiKey = testScenario.getConfluentCloudSettings().getSchemaRegistryApiKey();
         String schemaApiSecret = testScenario.getConfluentCloudSettings().getSchemaRegistryApiSecret();
         String topicName = testScenario.getTopicName();
@@ -192,17 +200,26 @@ public class LoadTestRunner {
         
 
         Map<String, String> connectorConfig = new HashMap<>();
+        connectorConfig.put("connector.class", "com.firebolt.kafka.connect.FireboltSinkConnector");
+        connectorConfig.put("tasks.max", "1");
         connectorConfig.put("topics", topicName);
         connectorConfig.put("topic.to.table.mapping", topicName + ":" + tableName);
         connectorConfig.put("jdbc.connection.url", jdbcUrl);
         connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
-        connectorConfig.put("value.converter.schema.registry.url", schemaRegistryUrl);
-        connectorConfig.put("value.converter.basic.auth.credentials.source", "USER_INFO");
-        connectorConfig.put("value.converter.schema.registry.basic.auth.user.info", schemaApiKey+":"+schemaApiSecret);
         connectorConfig.put("key.converter", "org.apache.kafka.connect.storage.StringConverter");
-        connectorConfig.put("value.converter", "io.confluent.connect.json.JsonSchemaConverter");
-        connectorConfig.put("connector.class", "com.firebolt.kafka.connect.FireboltSinkConnector");
-        connectorConfig.put("tasks.max", "1");
+
+        String valueConverter = hasSchema ? "io.confluent.connect.json.JsonSchemaConverter" : "org.apache.kafka.connect.json.JsonConverter";
+        connectorConfig.put("value.converter", valueConverter);
+
+        if (hasSchema) {
+            connectorConfig.put("value.converter.schema.registry.url", schemaRegistryUrl);
+            connectorConfig.put("value.converter.basic.auth.credentials.source", "USER_INFO");
+            connectorConfig.put("value.converter.schema.registry.basic.auth.user.info", schemaApiKey+":"+schemaApiSecret);
+        } else {
+            connectorConfig.put("value.converter.schemas.enable", "false");
+            connectorConfig.put("schemas.enable", "false");
+        }
+
         connectorConfig.put("kafka.api.key", kafkaApiKey);
         connectorConfig.put("kafka.api.secret", kafkaApiSecret);
         connectorConfig.put("firebolt.clientId", fireboltClientId);
@@ -322,7 +339,7 @@ public class LoadTestRunner {
     }
 
     private static void publishMessages(int messageCount, String topicName,
-                                        JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> kafkaMessagePublisher) {
+                                        KafkaMessagePublisher kafkaMessagePublisher) {
         kafkaMessagePublisher.publish(topicName, messageCount);
     }
 

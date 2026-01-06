@@ -2,7 +2,10 @@ package com.firebolt.kafka.connect.load;
 
 import com.firebolt.kafka.connect.clients.ConfluentResourceClient;
 import com.firebolt.kafka.connect.load.messagegenerator.LoadTestRecordMessageGenerator;
+import com.firebolt.kafka.connect.load.messagegenerator.MessageGenerator;
 import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
+import com.firebolt.kafka.connect.load.publisher.JsonSchemalessKafkaMessagePublisher;
+import com.firebolt.kafka.connect.load.publisher.KafkaMessagePublisher;
 import com.firebolt.kafka.connect.load.verifier.LoadTestRecordFireboltTableVerifier;
 import java.io.IOException;
 import java.time.Duration;
@@ -34,6 +37,11 @@ public class LoadTest {
         // Get ingestion type from system property or use default
         String ingestionType = System.getProperty("loadtest.ingestion.type", "sql");
 
+        // message type and schema presence
+        String messageType = System.getProperty("loadtest.message.type", "json");
+        boolean hasSchema = Boolean.parseBoolean(System.getProperty("loadtest.has.schema", "true"));
+        log.info("Load test config -> messageType: {}, hasSchema: {}", messageType, hasSchema);
+
         // Tunables for consumer fetch and poll behavior
         int minFetchMegabytes = Integer.parseInt(System.getProperty("loadtest.fetch.min.megabytes", "20"));
         int maxWaitTimeMs = Integer.parseInt(System.getProperty("loadtest.fetch.max.wait.ms", "2000"));
@@ -41,26 +49,34 @@ public class LoadTest {
         
         // Select schema files based on table schema
         String tableDefinitionFilePath;
-        String jsonSchemaDefinitionFilePathPath;
+        String jsonSchemaDefinitionFilePathPath = null;
         
         switch (tableSchema) {
             case "8-column":
                 tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-8-column-table-schema.txt";
-                jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-8-column-registry.txt";
+                if (hasSchema) {
+                    jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-8-column-registry.txt";
+                }
                 break;
             case "80-column":
                 tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-80-column-table-schema.txt";
-                jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-80-column-registry.txt";
+                if (hasSchema) {
+                    jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-80-column-registry.txt";
+                }
                 break;
             case "400-column":
                 tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-400-column-table-schema.txt";
-                jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-400-column-registry.txt";
+                if (hasSchema) {
+                    jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-400-column-registry.txt";
+                }
                 break;
 
             case "8-column-with-default-timestamp":
             default:
                 tableDefinitionFilePath = "src/integrationTest/resources/load/firebolt-8-column-with-default-timestamp-table-schema.txt";
-                jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-8-column-registry.txt";
+                if (hasSchema) {
+                    jsonSchemaDefinitionFilePathPath = "src/integrationTest/resources/load/json-schema-8-column-registry.txt";
+                }
                 break;
         }
         
@@ -71,7 +87,7 @@ public class LoadTest {
             int messageSize = Integer.parseInt(messageSizeStr.trim());
 
             LoadTestRecordFireboltTableVerifier loadTestRecordFireboltTableVerifier = new LoadTestRecordFireboltTableVerifier();
-            JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> messagePublisher = createMessagePublisher(messageSize, loadTestRecordFireboltTableVerifier, messageCount, confluentCloudSettings);
+            KafkaMessagePublisher messagePublisher = createMessagePublisher(messageSize, loadTestRecordFireboltTableVerifier, messageCount, messageType, hasSchema, confluentCloudSettings);
 
             Map<String,String> connectorPropertiesOverride = new HashMap<>();
 
@@ -112,19 +128,24 @@ public class LoadTest {
         printActiveThreads();
     }
 
-    private static JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> createMessagePublisher(int messageSize, LoadTestRecordFireboltTableVerifier loadTestRecordFireboltTableVerifier, int messageCount, ConfluentCloudSettings confluentCloudSettings) throws IOException {
+    private static KafkaMessagePublisher createMessagePublisher(int messageSize, LoadTestRecordFireboltTableVerifier loadTestRecordFireboltTableVerifier, int messageCount, String messageType, boolean hasSchema, ConfluentCloudSettings confluentCloudSettings) throws IOException {
         TestRecordFactory testRecordFactory = new TestRecordFactory(messageSize);
 
         try (ConfluentResourceClient confluentResourceClient = new ConfluentResourceClient(confluentCloudSettings.getCloudResourceApiKey(), confluentCloudSettings.getCloudResourceApiSecret())) {
             String schemaRegistryUrl = confluentResourceClient.getSchemaRegistryUrl(confluentCloudSettings.getEnvironmentId());
             String bootstrapServers = confluentResourceClient.getBootstrapServerUrl(confluentCloudSettings().getClusterId(), confluentCloudSettings().getEnvironmentId());
 
-            JsonSchemaRegistryKafkaMessagePublisher<LoadTestRecord> messagePublisher = new JsonSchemaRegistryKafkaMessagePublisher<>(
+            if (!"json".equalsIgnoreCase(messageType)) {
+                throw new IllegalArgumentException("Currently we only support json message type");
+            }
+
+            // for now use the same message generator, and we will convert the record into json inside the JsonSchemalessMessagePublisher
+            MessageGenerator messageGenerator = new LoadTestRecordMessageGenerator(testRecordFactory, loadTestRecordFireboltTableVerifier, messageCount);
+
+            return hasSchema ? new JsonSchemaRegistryKafkaMessagePublisher<>(
                     bootstrapServers, confluentCloudSettings().getKafkaApiKey(), confluentCloudSettings().getKafkaApiSecret(),
                     schemaRegistryUrl, confluentCloudSettings().getSchemaRegistryApiKey(), confluentCloudSettings().getSchemaRegistryApiSecret(),
-                    new LoadTestRecordMessageGenerator(testRecordFactory, loadTestRecordFireboltTableVerifier, messageCount));
-
-            return messagePublisher;
+                    messageGenerator) : new JsonSchemalessKafkaMessagePublisher(bootstrapServers, confluentCloudSettings().getKafkaApiKey(), confluentCloudSettings().getKafkaApiSecret(), messageGenerator);
         }
     }
 
