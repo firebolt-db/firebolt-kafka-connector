@@ -102,6 +102,9 @@ public class LoadTest {
             connectorPropertiesOverride.put("consumer.override.fetch.min.bytes", String.valueOf(minFetchBytes));
             connectorPropertiesOverride.put("consumer.override.fetch.max.wait.ms", String.valueOf(maxWaitTimeMs));
             connectorPropertiesOverride.put("consumer.override.max.poll.records", String.valueOf(maxPollRecords));
+            // since we only have one partition we can just set it to hte
+            connectorPropertiesOverride.put("consumer.override.max.partition.fetch.bytes", String.valueOf(minFetchBytes));
+
             // If binary ingestion is selected, override connector ingestion.type
             if ("binary".equalsIgnoreCase(ingestionType)) {
                 connectorPropertiesOverride.put("ingestion.type", "binary");

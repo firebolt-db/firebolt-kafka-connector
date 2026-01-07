@@ -233,6 +233,9 @@ public class LoadTestRunner {
         connectorConfig.put("consumer.override.fetch.max.bytes", "20971520");
         connectorConfig.put("consumer.override.fetch.max.wait.ms", "1000");
 
+        // since we only have one partition we can just set it to hte
+        connectorConfig.put("consumer.override.max.partition.fetch.bytes", "20971520");
+
         // producer overrides
         connectorConfig.put("producer.override.max.request.size", "10485760");
         return connectorConfig;
