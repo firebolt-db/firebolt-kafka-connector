@@ -5,7 +5,6 @@ import com.firebolt.kafka.connect.clients.ConfluentKafkaClient;
 import com.firebolt.kafka.connect.clients.ConfluentResourceClient;
 import com.firebolt.kafka.connect.clients.ConfluentSchemaRegistryClient;
 import com.firebolt.kafka.connect.clients.FireboltClient;
-import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
 import com.firebolt.kafka.connect.load.publisher.KafkaMessagePublisher;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import java.io.IOException;
@@ -117,7 +116,7 @@ public class LoadTestRunner {
 
                     // create the connector
                     Map<String, Object> createdConnectorConfig = confluentConnectorClient.createConnector(environmentId, clusterId, connectorName, fireboltPluginId, connectorConfig);
-                    createdConnectorConfig.entrySet().stream().forEach(entry -> log.info("Key: {}, [value] class: {},value  {} ", entry.getKey(), entry.getValue().getClass(), entry.getValue()));
+                    logConnectorConfiguration(createdConnectorConfig);
 
                     // wait for connector to be started successfully (It takes some time until the connector is provisioned)
                     log.info("Waiting for connector to start");
@@ -457,6 +456,31 @@ public class LoadTestRunner {
 
     private static void waitForState(ConfluentConnectorClient client, String connectorName, String expectedState) {
         waitForState(client, connectorName, expectedState, Duration.ofMinutes(1));
+    }
+
+    /**
+     * In GitHub the log message size is only 1kb, after which it gets truncated. Sometimes the connector configuration log gets larger than 1kb and it gets truncated.
+     * In that case split it into multiple lines.
+     * @param createdConnectorConfig
+     */
+    private static void logConnectorConfiguration(Map<String, Object> createdConnectorConfig) {
+        for (Map.Entry<String, Object> entry : createdConnectorConfig.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if ("config".equals(key) && value instanceof Map) {
+                log.info("Key: config");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> cfgMap = (Map<String, Object>) value;
+                for (Map.Entry<String, Object> cfgEntry : cfgMap.entrySet()) {
+                    String cfgKey = String.valueOf(cfgEntry.getKey());
+                    Object rawVal = cfgEntry.getValue();
+                    String cfgVal = String.valueOf(rawVal);
+                    log.info("  {}: {}", cfgKey, cfgVal);
+                }
+            } else {
+                log.info("Key: {}, [value] class: {}, value {}", key, value != null ? value.getClass() : "null", value);
+            }
+        }
     }
 
     private static List<String> createConnectorNetworkEndpoints(Set<String> endpoints) {
