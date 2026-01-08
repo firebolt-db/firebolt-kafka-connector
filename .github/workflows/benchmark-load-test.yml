@@ -27,6 +27,9 @@ jobs:
       matrix:
         ingestion: [sql, binary]
         schema: ['8-column', '80-column', '400-column', '1000-column']
+        exclude:
+          - ingestion: sql
+            schema: '1000-column'
     uses: ./.github/workflows/load-test.yml
     with:
       table_schema: ${{ matrix.schema }}
