@@ -173,5 +173,6 @@ jobs:
           path: |
             build/reports/
             build/test-results/
+            build/load-test-logs/
             *.log
           retention-days: 30
