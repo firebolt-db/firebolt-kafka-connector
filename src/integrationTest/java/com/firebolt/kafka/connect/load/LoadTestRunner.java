@@ -8,8 +8,10 @@ import com.firebolt.kafka.connect.clients.FireboltClient;
 import com.firebolt.kafka.connect.load.publisher.KafkaMessagePublisher;
 import com.firebolt.kafka.connect.utils.JdbcConnectionParser;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -25,6 +27,11 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 
 import static org.awaitility.Awaitility.await;
 
@@ -161,6 +168,19 @@ public class LoadTestRunner {
                         schemaRegistryClient.deleteSubject(subjectName);
                     }
 
+                    // attempt to export connector logs BEFORE deletion
+                    try {
+                        if (connectorId != null) {
+                            String bootstrapServers = confluentResourceClient.getBootstrapServerUrl(clusterId, environmentId);
+                            String connectorLogsTopicName = connectorId + "-app-logs";
+                            exportConnectorLogs(bootstrapServers, kafkaApiKey, kafkaApiSecret, connectorName, connectorLogsTopicName);
+                        } else {
+                            log.warn("Connector ID not available; skipping connector logs export for {}", connectorName);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to export connector logs for {}: {}", connectorName, e.getMessage());
+                    }
+
                     if (testScenario.isDeleteConnector() && connectorId != null) {
                         log.info("Deleting the connector {}", connectorName);
                         confluentConnectorClient.deleteConnector(testScenario.getConnectorName());
@@ -179,6 +199,95 @@ public class LoadTestRunner {
                 }
             }
         }
+    }
+
+    private void exportConnectorLogs(String bootstrapServers,
+                                     String kafkaApiKey,
+                                     String kafkaApiSecret,
+                                     String connectorName,
+                                     String logsTopicName) {
+        if (StringUtils.isAnyBlank(bootstrapServers, kafkaApiKey, kafkaApiSecret, logsTopicName)) {
+            log.warn("Missing Kafka details; cannot export logs for topic {}", logsTopicName);
+            return;
+        }
+
+        log.info("Exporting connector logs from topic {} using bootstrap {}", logsTopicName, bootstrapServers);
+
+        java.util.Properties props = new java.util.Properties();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "connector-logs-exporter-" + java.util.UUID.randomUUID());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        // Confluent Cloud security
+        props.put("security.protocol", "SASL_SSL");
+        props.put("sasl.mechanism", "PLAIN");
+        props.put("sasl.jaas.config",
+                "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+                        "username=\"" + kafkaApiKey + "\" " +
+                        "password=\"" + kafkaApiSecret + "\";");
+
+        Path outDir = Paths.get("build", "load-test-logs", connectorName);
+        Path outFile = outDir.resolve("app-logs.jsonl");
+        try {
+            Files.createDirectories(outDir);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to create output directory for connector logs: " + outDir, e);
+        }
+
+        int total = 0;
+        try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(props);
+             java.io.BufferedWriter writer = Files.newBufferedWriter(outFile)) {
+            consumer.subscribe(java.util.Collections.singletonList(logsTopicName));
+
+            long idleStart = System.currentTimeMillis();
+            long maxIdleMillis = Duration.ofSeconds(10).toMillis();
+            long hardDeadline = System.currentTimeMillis() + Duration.ofSeconds(60).toMillis();
+
+            while (System.currentTimeMillis() < hardDeadline) {
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofSeconds(2));
+                if (records.isEmpty()) {
+                    if (System.currentTimeMillis() - idleStart >= maxIdleMillis) {
+                        break; // we've been idle enough; assume we've drained
+                    }
+                    continue;
+                }
+                idleStart = System.currentTimeMillis(); // reset idle timer
+
+                for (ConsumerRecord<byte[], byte[]> rec : records) {
+                    String key = rec.key() == null ? null : new String(rec.key(), java.nio.charset.StandardCharsets.UTF_8);
+                    String value = rec.value() == null ? null : new String(rec.value(), java.nio.charset.StandardCharsets.UTF_8);
+                    // Write as JSON lines for easy parsing
+                    String line = new StringBuilder()
+                            .append("{")
+                            .append("\"ts\":").append(rec.timestamp()).append(",")
+                            .append("\"partition\":").append(rec.partition()).append(",")
+                            .append("\"offset\":").append(rec.offset()).append(",")
+                            .append("\"key\":").append(key == null ? "null" : objectToJsonString(key)).append(",")
+                            .append("\"value\":").append(value == null ? "null" : objectToJsonString(value))
+                            .append("}")
+                            .toString();
+                    writer.write(line);
+                    writer.newLine();
+                    total++;
+                }
+                writer.flush();
+            }
+            log.info("Exported {} log records for connector {} to {}", total, connectorName, outFile.toAbsolutePath());
+        } catch (Exception e) {
+            log.warn("Failed while exporting logs from topic {}: {}", logsTopicName, e.getMessage());
+        }
+    }
+
+    private static String objectToJsonString(String s) {
+        // Minimal JSON string escape for newlines and quotes
+        String escaped = s
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+        return "\"" + escaped + "\"";
     }
 
     /**
