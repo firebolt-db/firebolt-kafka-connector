@@ -13,7 +13,7 @@ plugins {
 ext {
     lombokVersion = '1.18.42'
     jacksonVersion = '2.19.2'
-    junitJupiterVersion = '5.13.4'
+    junitJupiterVersion = '6.0.2'
     log4jVersion = '2.25.3'
     okhttpVersion = '5.3.2'
     kafkaVersion = '3.9.1'
