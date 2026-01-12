@@ -1,0 +1,109 @@
+name: Scenario Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      firebolt_jdbc_url:
+        description: 'Firebolt JDBC URL (e.g., jdbc:firebolt:db?account=acc&engine=eng&env=staging)'
+        required: true
+        default: 'jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging'
+      connector_plugin_id:
+        description: 'Confluent Firebolt Connector Plugin ID (leave empty to use repository default)'
+        required: false
+      confluent_environment_id:
+        description: 'Confluent Environment ID (leave empty to use repository default)'
+        required: false
+      confluent_cluster_id:
+        description: 'Confluent Cluster ID (leave empty to use repository default)'
+        required: false
+      scenario_name:
+        description: 'Scenario folder name under src/integrationTest/resources/load/scenarios/'
+        required: false
+        default: 'scenario1'
+      message_count:
+        description: 'Number of messages to produce and consume (default: 1,000,000)'
+        required: false
+        default: '1000000'
+      ingestion_type:
+        description: 'Ingestion type to use (sql or binary)'
+        required: false
+        default: 'sql'
+        type: choice
+        options:
+          - 'sql'
+          - 'binary'
+      message_type:
+        description: 'Message type to publish (default: json)'
+        required: false
+        default: 'json'
+      min_fetch_megabytes:
+        description: 'Minimum fetch size in MB (maps to consumer.override.fetch.min.bytes)'
+        required: false
+        default: '20'
+      max_wait_time_ms:
+        description: 'Max wait time in ms (maps to consumer.override.fetch.max.wait.ms)'
+        required: false
+        default: '2000'
+      max_records_poll:
+        description: 'Max records per poll (maps to consumer.override.max.poll.records)'
+        required: false
+        default: '10000'
+
+jobs:
+  scenario-load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: false
+
+      - name: Run Scenario Load Test
+        run: |
+          ./gradlew runScenarioLoadTest \
+            -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url }}" \
+            -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
+            -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
+            -Dconfluent.environment.id="${{ github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}" \
+            -Dconfluent.cluster.id="${{ github.event.inputs.confluent_cluster_id || vars.CONFLUENT_CLUSTER_ID }}" \
+            -Dconfluent.firebolt.connector.plugin.id="${{ github.event.inputs.connector_plugin_id || vars.CONFLUENT_CONNECTOR_PLUGIN_ID }}" \
+            -Dconfluent.kafka.api.key="${{ secrets.CONFLUENT_KAFKA_API_KEY }}" \
+            -Dconfluent.kafka.api.secret="${{ secrets.CONFLUENT_KAFKA_API_SECRET }}" \
+            -Dconfluent.schema.registry.api.key="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_KEY }}" \
+            -Dconfluent.schema.registry.api.secret="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}" \
+            -Dconfluent.cloud.resource.api.key="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}" \
+            -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
+            -Dloadtest.scenario.name="${{ github.event.inputs.scenario_name || 'scenario1' }}" \
+            -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
+            -Dloadtest.ingestion.type="${{ github.event.inputs.ingestion_type || 'sql' }}" \
+            -Dloadtest.message.type="${{ github.event.inputs.message_type || 'json' }}" \
+            -Dloadtest.fetch.min.megabytes="${{ github.event.inputs.min_fetch_megabytes || '20' }}" \
+            -Dloadtest.fetch.max.wait.ms="${{ github.event.inputs.max_wait_time_ms || '2000' }}" \
+            -Dloadtest.max.poll.records="${{ github.event.inputs.max_records_poll || '10000' }}"
+        env:
+          GRADLE_OPTS: "-Xmx2g"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: scenario-load-test-results-${{ github.run_number }}
+          path: |
+            build/reports/
+            build/test-results/
+            build/load-test-logs/
+            *.log
+          retention-days: 30
+
+

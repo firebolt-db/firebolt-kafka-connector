@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.text.StringSubstitutor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -46,6 +47,11 @@ import static org.awaitility.Awaitility.await;
  */
 @Slf4j
 public class LoadTestRunner {
+
+    /**
+     * Will replace this parameter with the actual table name in the schema definition before creating the table
+     */
+    private static final String TABLE_NAME_PARAM = "firebolt_table_name";
 
     private TestScenario testScenario;
 
@@ -172,6 +178,7 @@ public class LoadTestRunner {
                     try {
                         if (connectorId != null) {
                             String bootstrapServers = confluentResourceClient.getBootstrapServerUrl(clusterId, environmentId);
+                            // Connector logs topic uses the connector ID
                             String connectorLogsTopicName = connectorId + "-app-logs";
                             exportConnectorLogs(bootstrapServers, kafkaApiKey, kafkaApiSecret, connectorName, connectorLogsTopicName);
                         } else {
@@ -186,7 +193,7 @@ public class LoadTestRunner {
                         confluentConnectorClient.deleteConnector(testScenario.getConnectorName());
                         log.info("Successfully deleted connector {}", testScenario.getConnectorName());
 
-                        // the connector creates a topic in the format: <connectorName>-app-logs so delete the topic as well
+                        // the connector creates a topic in the format: <connectorId>-app-logs so delete the topic as well
                         String connectorLogsTopicName = connectorId + "-app-logs";
                         log.info("Delete {} connector log topic", connectorLogsTopicName);
                         confluentKafkaClient.deleteTopic(connectorLogsTopicName);
@@ -242,7 +249,7 @@ public class LoadTestRunner {
 
             long idleStart = System.currentTimeMillis();
             long maxIdleMillis = Duration.ofSeconds(10).toMillis();
-            long hardDeadline = System.currentTimeMillis() + Duration.ofSeconds(60).toMillis();
+            long hardDeadline = System.currentTimeMillis() + Duration.ofSeconds(120).toMillis();
 
             while (System.currentTimeMillis() < hardDeadline) {
                 ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofSeconds(2));
@@ -505,7 +512,10 @@ public class LoadTestRunner {
         try {
             String tableSchema = new String(java.nio.file.Files.readAllBytes(
                     java.nio.file.Paths.get(testScenario.getTableSchemaDefinitionFilePath())));
-            client.createTable(tableName, tableSchema);
+            java.util.Map<String, String> values = java.util.Map.of(TABLE_NAME_PARAM, tableName);
+
+            String tableSchemaSql = StringSubstitutor.replace(tableSchema, values, "${", "}");
+            client.createTable(tableSchemaSql);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create Firebolt table", e);
         }

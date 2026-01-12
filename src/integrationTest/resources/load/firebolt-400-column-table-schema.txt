@@ -1,3 +1,4 @@
+CREATE TABLE IF NOT EXISTS "${firebolt_table_name}" (
 "colInteger" INTEGER NOT NULL,
 "colBigint" BIGINT,
 "colTimestamp" TIMESTAMP,
@@ -398,3 +399,4 @@
 "colText390" TEXT,
 "colText391" TEXT,
 "colText392" TEXT
+) PRIMARY INDEX "colInteger";
