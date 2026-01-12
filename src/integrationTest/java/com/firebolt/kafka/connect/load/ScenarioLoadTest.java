@@ -65,6 +65,9 @@ public class ScenarioLoadTest {
 		connectorOverrides.put("consumer.override.fetch.min.bytes", String.valueOf(minFetchBytes));
 		connectorOverrides.put("consumer.override.fetch.max.wait.ms", String.valueOf(maxWaitTimeMs));
 		connectorOverrides.put("consumer.override.max.poll.records", String.valueOf(maxPollRecords));
+		// since we only have one partition we can just set it to hte
+		connectorOverrides.put("consumer.override.max.partition.fetch.bytes", String.valueOf(minFetchBytes));
+
 		if ("binary".equalsIgnoreCase(ingestionType)) {
 			connectorOverrides.put("ingestion.type", "binary");
 		}
