@@ -151,7 +151,19 @@ public class FireboltClient implements AutoCloseable {
             log.info("✅ Created table: {}", tableName);
         }
     }
-    
+
+    /**
+     * Creates a table with the specified full schema that includes the table name.
+     *
+     * @param createSchemaSql the SQL schema definition (columns, constraints, etc.)
+     * @throws SQLException if table creation fails
+     */
+    public void createTable(String createSchemaSql) throws SQLException {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.executeUpdate(createSchemaSql);
+        }
+    }
+
     /**
      * Drops a table if it exists.
      * 

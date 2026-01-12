@@ -43,6 +43,43 @@ repositories {
     }
 }
 
+// Task to run the ScenarioLoadTest with system properties
+tasks.register('runScenarioLoadTest', JavaExec) {
+    group = "Load Testing"
+    description = "Runs the ScenarioLoadTest with configurable system properties"
+    
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    mainClass = 'com.firebolt.kafka.connect.load.ScenarioLoadTest'
+    
+    // Pass all system properties to the JVM
+    systemProperties System.properties
+    
+    // Set JVM arguments for better performance and logging
+    jvmArgs = [
+        '-Xmx4g',
+        '-Xms1g',
+        '-XX:+UseG1GC',
+        '-XX:MaxGCPauseMillis=200'
+    ]
+    
+    doFirst {
+        println "🚀 Starting ScenarioLoadTest with the following configuration:"
+        println "   Scenario Name: ${System.getProperty('loadtest.scenario.name', '[using default]')}"
+        println "   Message Count: ${System.getProperty('loadtest.message.count', '[using default]')}"
+        println "   Ingestion: ${System.getProperty('loadtest.ingestion.type', '[using default]')}"
+        println "   Message Type: ${System.getProperty('loadtest.message.type', '[using default]')}"
+        println "   Min Fetch (MB): ${System.getProperty('loadtest.fetch.min.megabytes', '[using default]')}"
+        println "   Max Wait Time (ms): ${System.getProperty('loadtest.fetch.max.wait.ms', '[using default]')}"
+        println "   Max Records Poll: ${System.getProperty('loadtest.max.poll.records', '[using default]')}"
+        println "   JSON Schema Path: ${System.getProperty('loadtest.json.schema.path', '[none]')}"
+        println "   Firebolt JDBC URL: ${System.getProperty('firebolt.jdbc.url', '[using default]')}"
+        println "   Firebolt Client ID: ${System.getProperty('firebolt.client.id', '[using default]')}"
+        println "   Confluent Environment: ${System.getProperty('confluent.environment.id', '[using default]')}"
+        println "   Confluent Cluster: ${System.getProperty('confluent.cluster.id', '[using default]')}"
+        println "   Connector Plugin Id: ${System.getProperty('confluent.firebolt.connector.plugin.id', '[using default]')}"
+    }
+}
+
 dependencies {
     // Kafka Connect API - provided at runtime, needed for compilation
     compileOnly "org.apache.kafka:connect-api:${kafkaVersion}"
@@ -357,6 +394,9 @@ dependencies {
     // Lombok for integration testing
     integrationTestCompileOnly "org.projectlombok:lombok:${lombokVersion}"
     integrationTestAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+    
+    // CSV parsing for integration tests (multi-line CSV support)
+    integrationTestImplementation "org.apache.commons:commons-csv:1.11.0"
     
     // JUnit Jupiter for integration testing
     integrationTestImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
