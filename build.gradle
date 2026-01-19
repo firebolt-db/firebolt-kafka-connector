@@ -396,7 +396,7 @@ dependencies {
     integrationTestAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
     
     // CSV parsing for integration tests (multi-line CSV support)
-    integrationTestImplementation "org.apache.commons:commons-csv:1.11.0"
+    integrationTestImplementation "org.apache.commons:commons-csv:1.14.1"
     
     // JUnit Jupiter for integration testing
     integrationTestImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
