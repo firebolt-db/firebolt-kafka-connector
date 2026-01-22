@@ -81,7 +81,7 @@ public class LoadTestRunner {
         String fireboltPluginId = testScenario.getConfluentCloudSettings().getFireboltConnectorPluginId();
 
         String topicName = testScenario.getTopicName();
-        String tableName = topicName;
+        String tableName = testScenario.getTableName();
 
         String fireboltClientId = testScenario.getFireboltSettings().getClientId();
         String fireboltClientSecret = testScenario.getFireboltSettings().getClientSecret();
@@ -110,6 +110,13 @@ public class LoadTestRunner {
 
                     // TODO make sure the engine is running
                     createFireboltTable(fireboltClient, tableName);
+
+                    if (StringUtils.isNotBlank(testScenario.getDestinationTableSchemaDefinitionFilePath())) {
+                        log.info("Creating the destination table: {}", testScenario.getDestinationTableName());
+                        String tableSchema = new String(java.nio.file.Files.readAllBytes(
+                                java.nio.file.Paths.get(testScenario.getDestinationTableSchemaDefinitionFilePath())));
+                        fireboltClient.createTable(tableSchema);
+                    }
 
                     // create a new connector from the plugin
                     Map<String, String> connectorConfig = createDefaultConnectorConfiguration(schemaRegistryUrl, hasSchema);
@@ -202,6 +209,11 @@ public class LoadTestRunner {
                     if (testScenario.isDeleteTable()) {
                         log.info("Dropping the table {}", tableName);
                         fireboltClient.dropTable(tableName);
+
+                        if (StringUtils.isNotBlank(testScenario.getDestinationTableName())) {
+                            log.info("Dropping the table {}", testScenario.getDestinationTableName());
+                            fireboltClient.dropTable(testScenario.getDestinationTableName());
+                        }
                     }
                 }
             }
@@ -306,7 +318,7 @@ public class LoadTestRunner {
         String schemaApiKey = testScenario.getConfluentCloudSettings().getSchemaRegistryApiKey();
         String schemaApiSecret = testScenario.getConfluentCloudSettings().getSchemaRegistryApiSecret();
         String topicName = testScenario.getTopicName();
-        String tableName = topicName;
+        String tableName = testScenario.getTableName();
         String jdbcUrl = testScenario.getFireboltSettings().getJdbcUrl();
         String fireboltClientId = testScenario.getFireboltSettings().getClientId();
         String fireboltClientSecret = testScenario.getFireboltSettings().getClientSecret();

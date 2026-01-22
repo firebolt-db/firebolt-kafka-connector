@@ -1,7 +1,10 @@
 package com.firebolt.kafka.connect.load;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.firebolt.kafka.connect.PostProcessingConfig;
 import com.firebolt.kafka.connect.clients.ConfluentResourceClient;
+import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
 import com.firebolt.kafka.connect.load.messagegenerator.LoopingCsvFileMessageGenerator;
 import com.firebolt.kafka.connect.load.messagegenerator.MessageGenerator;
 import com.firebolt.kafka.connect.load.publisher.JsonSchemaRegistryKafkaMessagePublisher;
@@ -12,16 +15,24 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.testcontainers.shaded.org.apache.commons.lang3.RandomStringUtils;
+
+import static java.nio.file.Paths.*;
+import static org.junit.jupiter.api.Assertions.fail;
 
 @Slf4j
 public class ScenarioLoadTest {
 
 	// Static outbound endpoints (staging)
 	private static final Set<String> STAGING_APIS = Set.of("id.staging.firebolt.io", "api.staging.firebolt.io");
+	private static final long ONE_MEGA_BYTE = 1024 * 1024;
+
+	private static final ObjectMapper objectMapper = new ObjectMapper();
 
 	public static void main(String[] args) throws Exception {
 		ConfluentCloudSettings confluentCloudSettings = confluentCloudSettings();
@@ -41,6 +52,10 @@ public class ScenarioLoadTest {
 		String scenarioJsonPath = scenarioBaseDir + "/scenario.json";
 		String tableSchemaPath = scenarioBaseDir + "/table-schema.txt";
 		String csvMessagesPath = scenarioBaseDir + "/kafka-messages.csv";
+
+		// in case the of the post-processing script, this is the destination table and the post-processing script
+		String destinationTableSchemaPath = scenarioBaseDir + "/destination-table-schema.txt";
+		String postProcessingScriptPath = scenarioBaseDir + "/post_processing_script.txt";
 
 		ScenarioConfig scenarioConfig = readScenarioConfig(scenarioJsonPath);
 		boolean hasSchema = scenarioConfig.isHasSchema();
@@ -63,6 +78,7 @@ public class ScenarioLoadTest {
 		Map<String, String> connectorOverrides = new HashMap<>();
 		long minFetchBytes = (long) minFetchMegabytes * 1024 * 1024;
 		connectorOverrides.put("consumer.override.fetch.min.bytes", String.valueOf(minFetchBytes));
+		connectorOverrides.put("consumer.override.fetch.max.bytes", String.valueOf(minFetchBytes + ONE_MEGA_BYTE));
 		connectorOverrides.put("consumer.override.fetch.max.wait.ms", String.valueOf(maxWaitTimeMs));
 		connectorOverrides.put("consumer.override.max.poll.records", String.valueOf(maxPollRecords));
 		// since we only have one partition we can just set it to hte
@@ -72,16 +88,25 @@ public class ScenarioLoadTest {
 			connectorOverrides.put("ingestion.type", "binary");
 		}
 
-		String name = "ecosystem-load-test-scenario-" + scenarioName;
+		boolean hasPostProcessingScript = scenarioConfig.isHasPostProcessingScript();
+		if (hasPostProcessingScript) {
+			String postProcessingScript = new String(java.nio.file.Files.readAllBytes(get(postProcessingScriptPath)));
+
+			connectorOverrides.put(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+					preparePostProcessingScript(scenarioConfig.getTableName(), postProcessingScript));
+		}
+
+		String name = "ecosystem-load-test-scenario-" + scenarioName + "-" + RandomStringUtils.randomNumeric(2);
 
 		// No-op verifier for generic CSV scenarios (row-count validation is handled by LoadTestRunner)
 		FireboltTableRecordVerifier noopVerifier = (client, tableName) -> true;
 
-		TestScenario testScenario = TestScenario.builder()
+		TestScenario.TestScenarioBuilder testScenarioBuilder = TestScenario.builder()
 				.averageMessageSizeInBytes(0) // unknown; informational only
 				.nrOfKafkaMessageToProduce(messageCount)
 				.connectorName(name)
 				.topicName(name)
+				.tableName(scenarioConfig.getTableName())
 				.fireboltIngestionWaitDuration(Duration.ofMinutes(60))
 				.tableSchemaDefinitionFilePath(requireFile(tableSchemaPath, "table schema"))
 				.jsonSchemaRegistryDefinitionFilePath(jsonSchemaRegistryDefinitionFilePath)
@@ -92,8 +117,14 @@ public class ScenarioLoadTest {
 				.deleteConnector(true)
 				.deleteTable(true)
 				.loadTestKafkaMessagePublisher(messagePublisher)
-				.fireboltTableRecordVerifier(noopVerifier)
-				.build();
+				.fireboltTableRecordVerifier(noopVerifier);
+
+		if (hasPostProcessingScript) {
+			testScenarioBuilder.destinationTableSchemaDefinitionFilePath(requireFile(destinationTableSchemaPath, "destination table schema"));
+			testScenarioBuilder.destinationTableName(scenarioConfig.getFinalDestinationTableName());
+		}
+
+		TestScenario testScenario = testScenarioBuilder.build();
 
 		log.info("Running scenario '{}' with config:", scenarioName);
 		log.info("  hasSchema          : {}", hasSchema);
@@ -110,6 +141,19 @@ public class ScenarioLoadTest {
 		LoadTestRunner runner = new LoadTestRunner(testScenario);
 		LoadTestRunResult result = runner.run();
 		log.info("Scenario '{}' results: {}", scenarioName, result);
+	}
+
+	private static String preparePostProcessingScript(String tableName, String scriptPath) {
+		PostProcessingConfig postProcessingConfig = new PostProcessingConfig(
+				List.of(
+						new PostProcessingConfig.Mapping(tableName, scriptPath, null)
+				));
+		try {
+			return objectMapper.writeValueAsString(postProcessingConfig);
+		} catch (JsonProcessingException e) {
+			fail("Failed to serialize the post processing config");
+			return null;
+		}
 	}
 
 	private static KafkaMessagePublisher<?> createMessagePublisherFromCsv(
@@ -193,7 +237,10 @@ public class ScenarioLoadTest {
 	@Getter
 	private static class ScenarioConfig {
 		private String description;
+		private String tableName;
+		private String finalDestinationTableName;
 		private boolean hasSchema;
+		private boolean hasPostProcessingScript;
 	}
 }
 

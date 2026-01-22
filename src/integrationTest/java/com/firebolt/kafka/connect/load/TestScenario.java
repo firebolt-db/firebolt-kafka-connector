@@ -23,6 +23,10 @@ public class TestScenario {
 
     private String tableSchemaDefinitionFilePath;
 
+    // this will be populated only for the case of post-processing script
+    private String destinationTableSchemaDefinitionFilePath;
+    private String destinationTableName;
+
     /**
      * These are the static hostnames that will be used from the Kafka Connect cluster. Things like the id (id.staging.firebolt.io) or api (api.staging.firebolt.io) endpoints for firebolt
      */
@@ -42,6 +46,11 @@ public class TestScenario {
      * The name of the topic
      */
     private String topicName;
+
+    /**
+     * the name of the table
+     */
+    private String tableName;
 
     private FireboltSettings fireboltSettings;
 
