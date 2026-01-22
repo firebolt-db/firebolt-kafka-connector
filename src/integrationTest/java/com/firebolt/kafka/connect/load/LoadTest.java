@@ -117,6 +117,7 @@ public class LoadTest {
                     .nrOfKafkaMessageToProduce(messageCount)
                     .connectorName("load-test-connector-" + messageSize)
                     .topicName("load-test-connector-" + messageSize)
+                    .tableName("load-test-connector-" + messageSize)
                     .fireboltIngestionWaitDuration(Duration.ofMinutes(60))
                     .tableSchemaDefinitionFilePath(tableDefinitionFilePath)
                     .jsonSchemaRegistryDefinitionFilePath(jsonSchemaDefinitionFilePathPath)
