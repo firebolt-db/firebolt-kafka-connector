@@ -20,6 +20,10 @@ on:
         description: 'Scenario folder name under src/integrationTest/resources/load/scenarios/'
         required: false
         default: 'scenario1'
+        type: choice
+        options:
+          - 'scenario1'
+          - 'scenario2'
       message_count:
         description: 'Number of messages to produce and consume (default: 1,000,000)'
         required: false

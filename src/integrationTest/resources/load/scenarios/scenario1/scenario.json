@@ -1,5 +1,5 @@
 {
-  "description" : "A table with 470 columns no schema with json payload messages. The sample contains 10k records",
+  "description" : "A table with 470 columns no schema with json payload messages. The sample contains 10k records. A post-processing script will be executed at the end of each batch",
   "tableName" : "ecosystem-load-test-scenario1-staging",
   "finalDestinationTableName" : "ecosystem-load-test-scenario1-final-destination",
   "hasSchema" : false,

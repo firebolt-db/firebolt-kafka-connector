@@ -1,0 +1,6 @@
+{
+  "description" : "A table with 470 columns no schema with json payload messages. The sample contains 10k records",
+  "tableName" : "ecosystem-load-test-scenario2",
+  "hasSchema" : false,
+  "hasPostProcessingScript" : false
+}
