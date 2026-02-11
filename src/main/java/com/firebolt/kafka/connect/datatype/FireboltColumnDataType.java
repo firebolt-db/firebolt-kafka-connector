@@ -23,7 +23,8 @@ public enum FireboltColumnDataType {
     BYTEA(value -> Set.of("bytea").contains(value.toLowerCase())),
     BOOLEAN(value -> Set.of("boolean", "bool").contains(value.toLowerCase())),
     STRUCT(value -> Set.of("struct").contains(value.toLowerCase())),
-    GEOGRAPHY(value -> Set.of("geography").contains(value.toLowerCase()));
+    GEOGRAPHY(value -> Set.of("geography").contains(value.toLowerCase())),
+    JSON(value -> Set.of("json").contains(value.toLowerCase()));
 
     private Predicate<String> equalityPredicate;
 

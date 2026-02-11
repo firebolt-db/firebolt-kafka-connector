@@ -52,7 +52,7 @@ services:
 
   # Firebolt Core Database
   firebolt-core:
-    image: ghcr.io/firebolt-db/firebolt-core:preview-rc
+    image: ghcr.io/firebolt-db/firebolt-core:4.31.0-pre.0.20260209154307.95496d05910b
     hostname: firebolt-core
     container_name: firebolt-core-391
     command: --node 0

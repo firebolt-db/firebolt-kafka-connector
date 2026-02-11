@@ -548,7 +548,7 @@ public abstract class BaseIntegrationTest {
         Stream.Builder<Arguments> builder = Stream.builder();
         builder.add(Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"));
         builder.add(Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values"));
-        
+
         if (runsOnCloud()) {
             builder.add(Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"));
             builder.add(Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values"));
