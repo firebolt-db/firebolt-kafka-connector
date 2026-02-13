@@ -1,0 +1,53 @@
+name: Continuous Scenario Load Test
+
+on:
+  schedule:
+    # Run every 4 hours
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'If true, only check the flag without dispatching the load test'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  dispatch-load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - name: Check if continuous load test is enabled
+        id: gate
+        run: |
+          ENABLED="${{ vars.CONTINUOUS_LOAD_TEST_ENABLED }}"
+          echo "CONTINUOUS_LOAD_TEST_ENABLED=$ENABLED"
+          if [ "$ENABLED" != "true" ]; then
+            echo "Continuous load test is disabled. Set the repository variable CONTINUOUS_LOAD_TEST_ENABLED to 'true' to enable."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Continuous load test is enabled. Proceeding."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Dispatch scenario load test
+        if: steps.gate.outputs.skip != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Dispatching scenario load test to continuously ingest 7 million messages..."
+          gh workflow run scenario-load-test.yml \
+            --repo "${{ github.repository }}" \
+            -f firebolt_jdbc_url="jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging" \
+            -f scenario_name="scenario2" \
+            -f message_count="7000000" \
+            -f ingestion_type="binary" \
+            -f message_type="json" \
+            -f min_fetch_megabytes="20" \
+            -f max_wait_time_ms="2000" \
+            -f max_records_poll="10000" \
+            -f continuous_publishing="true" \
+            -f message_batch_size="1000" \
+            -f firebolt_ingestion_wait_time_in_minutes="230"
+          echo "Scenario load test dispatched successfully."
