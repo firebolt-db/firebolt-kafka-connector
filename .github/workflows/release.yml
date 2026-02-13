@@ -19,69 +19,69 @@ env:
   RELEASE_TAG: ${{ github.event.inputs.tag_name}}
 
 jobs:
-  validation:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ensure workflow runs from main branch
-        run: |
-          echo "github.ref=$GITHUB_REF"
-          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo "Releases must be triggered from the main branch. Current ref: $GITHUB_REF"
-            exit 1
-          fi
+#  validation:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Ensure workflow runs from main branch
+#        run: |
+#          echo "github.ref=$GITHUB_REF"
+#          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+#            echo "Releases must be triggered from the main branch. Current ref: $GITHUB_REF"
+#            exit 1
+#          fi
+#
+#  pre-release-testing:
+#     needs: validation
+#     uses: ./.github/workflows/pre-release-test.yml
+#     secrets: inherit
 
-  pre-release-testing:
-     needs: validation
-     uses: ./.github/workflows/pre-release-test.yml
-     secrets: inherit
+#  bump-version:
+#    needs: pre-release-testing
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          fetch-depth: 0
+#          token: ${{ secrets.RELEASE_PAT }}
+#
+#      - name: Bump version in gradle.properties
+#        run: |
+#          newVersion=$(echo $RELEASE_TAG | sed 's/^v//')
+#          sed -i.bak "s/^version=.*/version=$newVersion/" gradle.properties
+#          rm gradle.properties.bak
+#
+#      - name: Setup git config
+#        run: |
+#          git config user.name "GitHub Actions Bot"
+#          git config user.email "<>"
+#
+#      - name: Commit version bump
+#        run: |
+#          git add gradle.properties
+#          git commit -m "chore: Bump version to $RELEASE_TAG"
+#
+#      - name: Create tag version
+#        run: |
+#          git tag ${RELEASE_TAG}
+#
+#      - name: Push changes
+#        run: |
+#          git push origin main
+#          # push tag
+#          git push origin ${RELEASE_TAG}
 
-  bump-version:
-    needs: pre-release-testing
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.RELEASE_PAT }}
-
-      - name: Bump version in gradle.properties
-        run: |
-          newVersion=$(echo $RELEASE_TAG | sed 's/^v//')
-          sed -i.bak "s/^version=.*/version=$newVersion/" gradle.properties
-          rm gradle.properties.bak
-
-      - name: Setup git config
-        run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "<>"
-
-      - name: Commit version bump
-        run: |
-          git add gradle.properties
-          git commit -m "chore: Bump version to $RELEASE_TAG"
-
-      - name: Create tag version
-        run: |
-          git tag ${RELEASE_TAG}
-
-      - name: Push changes
-        run: |
-          git push origin main
-          # push tag
-          git push origin ${RELEASE_TAG}
-
-  build:
-    needs: bump-version
-    uses: ./.github/workflows/build.yml
-    with:
-      # build from the exact tag that was created and pushed above
-      branch: refs/tags/${{ github.event.inputs.tag_name }}
-      buildArtifacts: true
+#  build:
+#    needs: bump-version
+#    uses: ./.github/workflows/build.yml
+#    with:
+#      # build from the exact tag that was created and pushed above
+#      branch: refs/tags/${{ github.event.inputs.tag_name }}
+#      buildArtifacts: true
 
   publish:
     runs-on: ubuntu-latest
-    needs: build
+#    needs: build
     outputs:
       release_version: ${{ steps.release_version.outputs.value }}
     steps:
@@ -90,62 +90,62 @@ jobs:
         with:
           ref: refs/tags/${{ github.event.inputs.tag_name }}
 
-      - name: Download uber-jar
-        uses: actions/download-artifact@v7.0.0
-        with:
-          name: ${{ needs.build.outputs.uber-jar }}
-          path: uber-jar
-      - name: Download sources-jar
-        uses: actions/download-artifact@v7.0.0
-        with:
-          name: ${{ needs.build.outputs.sources-jar }}
-          path: sources-jar
+#      - name: Download uber-jar
+#        uses: actions/download-artifact@v7.0.0
+#        with:
+#          name: ${{ needs.build.outputs.uber-jar }}
+#          path: uber-jar
+#      - name: Download sources-jar
+#        uses: actions/download-artifact@v7.0.0
+#        with:
+#          name: ${{ needs.build.outputs.sources-jar }}
+#          path: sources-jar
+#
+#      - name: List downloaded artifacts
+#        run: |
+#          echo "Workspace contents:"
+#          ls -la
+#          echo "uber-jar contents:"
+#          ls -la uber-jar || true
+#          echo "sources-jar contents:"
+#          ls -la sources-jar || true
+#
+#      # e6ac9c2ff1018fca4464bf2480155faeb66f9bdb == v1.6.1
+#      - uses: xresloader/upload-to-github-release@e6ac9c2ff1018fca4464bf2480155faeb66f9bdb
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          file: "uber-jar/**/*.jar;sources-jar/**/*.jar"
+#          tags: true
+#          draft: false
+#          tag_name: ${{ env.RELEASE_TAG }}
 
-      - name: List downloaded artifacts
-        run: |
-          echo "Workspace contents:"
-          ls -la
-          echo "uber-jar contents:"
-          ls -la uber-jar || true
-          echo "sources-jar contents:"
-          ls -la sources-jar || true
-
-      # e6ac9c2ff1018fca4464bf2480155faeb66f9bdb == v1.6.1
-      - uses: xresloader/upload-to-github-release@e6ac9c2ff1018fca4464bf2480155faeb66f9bdb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          file: "uber-jar/**/*.jar;sources-jar/**/*.jar"
-          tags: true
-          draft: false
-          tag_name: ${{ env.RELEASE_TAG }}
-
-      - name: Generate and update GitHub release notes
-        uses: actions/github-script@v8
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const tag = `${{ env.RELEASE_TAG }}`;
-            const { owner, repo } = context.repo;
-            // Fetch existing release by tag (created earlier by upload step)
-            const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
-            // Generate notes based on PRs/commits between last release and this tag
-            const notes = await github.rest.repos.generateReleaseNotes({ owner, repo, tag_name: tag });
-            // Sanitize internal JIRA links: [FIR-1234](...) -> `FIR-1234`, and wrap bare FIR-1234 in backticks
-            let body = notes.data.body || '';
-            body = body.replace(/\[(FIR-\d+)\]\([^)]*\)/g, '`$1`');
-            body = body.replace(/(?<!`)\bFIR-\d+\b(?!`)/g, (m) => `\`${m}\``);
-            // Update the release body with sanitized notes
-            await github.rest.repos.updateRelease({ owner, repo, release_id: release.data.id, body });
-
-      - name: Derive release version
-        id: release_version
-        run: |
-          ver=$(echo "${RELEASE_TAG}" | sed 's/^v//')
-          echo "value=$ver" >> $GITHUB_OUTPUT
+#      - name: Generate and update GitHub release notes
+#        uses: actions/github-script@v8
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          script: |
+#            const tag = `${{ env.RELEASE_TAG }}`;
+#            const { owner, repo } = context.repo;
+#            // Fetch existing release by tag (created earlier by upload step)
+#            const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+#            // Generate notes based on PRs/commits between last release and this tag
+#            const notes = await github.rest.repos.generateReleaseNotes({ owner, repo, tag_name: tag });
+#            // Sanitize internal JIRA links: [FIR-1234](...) -> `FIR-1234`, and wrap bare FIR-1234 in backticks
+#            let body = notes.data.body || '';
+#            body = body.replace(/\[(FIR-\d+)\]\([^)]*\)/g, '`$1`');
+#            body = body.replace(/(?<!`)\bFIR-\d+\b(?!`)/g, (m) => `\`${m}\``);
+#            // Update the release body with sanitized notes
+#            await github.rest.repos.updateRelease({ owner, repo, release_id: release.data.id, body });
+#
+#      - name: Derive release version
+#        id: release_version
+#        run: |
+#          ver=$(echo "${RELEASE_TAG}" | sed 's/^v//')
+#          echo "value=$ver" >> $GITHUB_OUTPUT
 
   notify:
-    needs: publish
+#    needs: publish
     runs-on: ubuntu-latest
     strategy:
       matrix:
