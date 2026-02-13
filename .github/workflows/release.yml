@@ -8,7 +8,7 @@ on:
         type: string
         required: true
       release_summary:
-        description: 'Summary of the release (optional, included in Slack notification)'
+        description: 'Release summary — semicolon-separated items become bullet points (e.g. "Feature A; Fix B; Update C")'
         type: string
         required: false
         
@@ -165,10 +165,17 @@ jobs:
           MAIN_MSG=":tada: Firebolt Sink Connector \`${RELEASE_VERSION}\` has been released — <${RELEASE_URL}|Release notes>"
 
           if [ -n "$RELEASE_SUMMARY" ]; then
+            # Convert semicolon-separated items into a bulleted list for Slack
+            SUMMARY_TEXT=$(echo "$RELEASE_SUMMARY" \
+              | tr ';' '\n' \
+              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+              | sed '/^$/d' \
+              | sed 's/^/• /')
+            FORMATTED_SUMMARY=$(printf '*This release contains the following:*\n%s' "$SUMMARY_TEXT")
             BLOCKS=$(jq -nc \
               --arg main "$MAIN_MSG" \
-              --arg summary "$RELEASE_SUMMARY" \
-              '[{"type":"section","text":{"type":"mrkdwn","text":$main}},{"type":"section","text":{"type":"mrkdwn","text":("*Summary:* " + $summary)}}]')
+              --arg summary "$FORMATTED_SUMMARY" \
+              '[{"type":"section","text":{"type":"mrkdwn","text":$main}},{"type":"section","text":{"type":"mrkdwn","text":$summary}}]')
           else
             BLOCKS=$(jq -nc \
               --arg main "$MAIN_MSG" \
