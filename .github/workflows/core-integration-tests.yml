@@ -21,6 +21,7 @@ on:
      
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
+  FIREBOLT_CORE_IMAGE: ${{ vars.FIREBOLT_CORE_IMAGE }}
 
 jobs:
   integration-tests:
@@ -68,7 +69,7 @@ jobs:
 
     - name: Setup firebolt core permissions
       run: |
-        WHO="$(docker run --rm --entrypoint whoami ghcr.io/firebolt-db/firebolt-core:preview-rc)"
+        WHO="$(docker run --rm --entrypoint whoami ${{ vars.FIREBOLT_CORE_IMAGE }})"
         # Ensure the host directory that is mounted to /firebolt-core/data exists
         if [ "$WHO" = "firebolt-core" ]; then
           mkdir -p "$COMPOSE_FILE_DIR/firebolt-core"
