@@ -43,9 +43,12 @@ public class ScenarioLoadTest {
 		int messageCount = Integer.parseInt(System.getProperty("loadtest.message.count", "1000000"));
 		String ingestionType = System.getProperty("loadtest.ingestion.type", "sql");
 		String messageType = System.getProperty("loadtest.message.type", "json");
+		boolean continuousPublishing = Boolean.parseBoolean(System.getProperty("loadtest.continuous.publishing", "false"));
+		int messageBatchSize = Integer.parseInt(System.getProperty("loadtest.message.batch.size", "0"));
 		int minFetchMegabytes = Integer.parseInt(System.getProperty("loadtest.fetch.min.megabytes", "20"));
 		int maxWaitTimeMs = Integer.parseInt(System.getProperty("loadtest.fetch.max.wait.ms", "2000"));
 		int maxPollRecords = Integer.parseInt(System.getProperty("loadtest.max.poll.records", "10000"));
+		int fireboltIngestionWaitMinutes = Integer.parseInt(System.getProperty("loadtest.firebolt.ingestion.wait.minutes", "60"));
 
 		// Scenario resources
 		String scenarioBaseDir = "src/integrationTest/resources/load/scenarios/" + scenarioName;
@@ -71,7 +74,9 @@ public class ScenarioLoadTest {
 				csvMessagesPath,
 				hasSchema,
 				messageType,
-				confluentCloudSettings
+				confluentCloudSettings,
+				continuousPublishing,
+				messageBatchSize
 		);
 
 		// Connector overrides
@@ -107,7 +112,7 @@ public class ScenarioLoadTest {
 				.connectorName(name)
 				.topicName(name)
 				.tableName(scenarioConfig.getTableName())
-				.fireboltIngestionWaitDuration(Duration.ofMinutes(60))
+				.fireboltIngestionWaitDuration(Duration.ofMinutes(fireboltIngestionWaitMinutes))
 				.tableSchemaDefinitionFilePath(requireFile(tableSchemaPath, "table schema"))
 				.jsonSchemaRegistryDefinitionFilePath(jsonSchemaRegistryDefinitionFilePath)
 				.staticOutboundHostnames(STAGING_APIS)
@@ -131,6 +136,9 @@ public class ScenarioLoadTest {
 		log.info("  messageCount       : {}", messageCount);
 		log.info("  ingestionType      : {}", ingestionType);
 		log.info("  messageType        : {}", messageType);
+		log.info("  continuousPublishing : {}", continuousPublishing);
+		log.info("  messageBatchSize   : {}", messageBatchSize);
+		log.info("  fireboltIngestionWaitMinutes : {}", fireboltIngestionWaitMinutes);
 		log.info("  minFetchMegabytes  : {}", minFetchMegabytes);
 		log.info("  maxWaitTimeMs      : {}", maxWaitTimeMs);
 		log.info("  maxPollRecords     : {}", maxPollRecords);
@@ -160,7 +168,9 @@ public class ScenarioLoadTest {
 			String csvMessagesPath,
 			boolean hasSchema,
 			String messageType,
-			ConfluentCloudSettings confluentCloudSettings
+			ConfluentCloudSettings confluentCloudSettings,
+			boolean continuousPublishing,
+			int messageBatchSize
 	) throws IOException {
 		if (!"json".equalsIgnoreCase(messageType)) {
 			throw new IllegalArgumentException("Currently we only support json message type");
@@ -184,13 +194,17 @@ public class ScenarioLoadTest {
 						schemaRegistryUrl,
 						confluentCloudSettings.getSchemaRegistryApiKey(),
 						confluentCloudSettings.getSchemaRegistryApiSecret(),
-						messageGenerator);
+						messageGenerator,
+						continuousPublishing,
+						messageBatchSize);
 			} else {
 				return new JsonSchemalessKafkaMessagePublisher(
 						bootstrapServers,
 						confluentCloudSettings.getKafkaApiKey(),
 						confluentCloudSettings.getKafkaApiSecret(),
-						messageGenerator);
+						messageGenerator,
+						continuousPublishing,
+						messageBatchSize);
 			}
 		}
 	}

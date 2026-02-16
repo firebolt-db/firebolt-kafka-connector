@@ -52,11 +52,24 @@ on:
         description: 'Max records per poll (maps to consumer.override.max.poll.records)'
         required: false
         default: '10000'
+      continuous_publishing:
+        description: 'Publish messages continuously (first batch sync, then batches at 1s interval)'
+        required: false
+        default: false
+        type: boolean
+      message_batch_size:
+        description: 'Messages per batch when continuous publishing is enabled'
+        required: false
+        default: '1000'
+      firebolt_ingestion_wait_time_in_minutes:
+        description: 'Max time to wait for Firebolt ingestion (minutes)'
+        required: false
+        default: '60'
 
 jobs:
   scenario-load-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 600
 
     steps:
       - name: Checkout code
@@ -94,7 +107,10 @@ jobs:
             -Dloadtest.message.type="${{ github.event.inputs.message_type || 'json' }}" \
             -Dloadtest.fetch.min.megabytes="${{ github.event.inputs.min_fetch_megabytes || '20' }}" \
             -Dloadtest.fetch.max.wait.ms="${{ github.event.inputs.max_wait_time_ms || '2000' }}" \
-            -Dloadtest.max.poll.records="${{ github.event.inputs.max_records_poll || '10000' }}"
+            -Dloadtest.max.poll.records="${{ github.event.inputs.max_records_poll || '10000' }}" \
+            -Dloadtest.continuous.publishing="${{ github.event.inputs.continuous_publishing || 'false' }}" \
+            -Dloadtest.message.batch.size="${{ github.event.inputs.message_batch_size || '1000' }}" \
+            -Dloadtest.firebolt.ingestion.wait.minutes="${{ github.event.inputs.firebolt_ingestion_wait_time_in_minutes || '60' }}"
         env:
           GRADLE_OPTS: "-Xmx2g"
 
@@ -109,5 +125,3 @@ jobs:
             build/load-test-logs/
             *.log
           retention-days: 30
-
-
