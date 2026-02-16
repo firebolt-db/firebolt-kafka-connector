@@ -23,6 +23,15 @@ public class JsonSchemaRegistryKafkaMessagePublisher<T> extends KafkaMessagePubl
         this.messageGenerator = messageGenerator;
     }
 
+    public JsonSchemaRegistryKafkaMessagePublisher(String bootstrapServers, String kafkaApiKey, String kafkaApiSecret,
+                                                   String schemaRegistryUrl, String schemaApiKey, String schemaApiSecret,
+                                                   MessageGenerator<T> messageGenerator,
+                                                   boolean continuousPublishing, int batchSize) {
+        super(bootstrapServers, kafkaApiKey, kafkaApiSecret, continuousPublishing, batchSize);
+        this.kafkaProducer = initializeJsonProducer(INCLUDE_NULLS, bootstrapServers, kafkaApiKey, kafkaApiSecret, schemaRegistryUrl, schemaApiKey, schemaApiSecret);
+        this.messageGenerator = messageGenerator;
+    }
+
     private <T> Producer<String, T> initializeJsonProducer(
             boolean includeNulls,
             String bootstrapServers,

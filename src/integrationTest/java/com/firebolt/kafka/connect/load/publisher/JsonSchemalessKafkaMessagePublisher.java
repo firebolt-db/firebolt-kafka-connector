@@ -46,6 +46,31 @@ public class JsonSchemalessKafkaMessagePublisher extends KafkaMessagePublisher<S
         this.messageGenerator = messageGenerator;
     }
 
+    public JsonSchemalessKafkaMessagePublisher(
+            String bootstrapServers,
+            String kafkaApiKey,
+            String kafkaApiSecret,
+            MessageGenerator<?> messageGenerator,
+            boolean continuousPublishing,
+            int batchSize) {
+        super(bootstrapServers, kafkaApiKey, kafkaApiSecret, continuousPublishing, batchSize);
+        this.kafkaProducer = initializeSchemalessJsonProducer(bootstrapServers, kafkaApiKey, kafkaApiSecret, INCLUDE_NULLS_DEFAULT);
+        this.messageGenerator = messageGenerator;
+    }
+
+    public JsonSchemalessKafkaMessagePublisher(
+            String bootstrapServers,
+            String kafkaApiKey,
+            String kafkaApiSecret,
+            boolean includeNulls,
+            MessageGenerator<?> messageGenerator,
+            boolean continuousPublishing,
+            int batchSize) {
+        super(bootstrapServers, kafkaApiKey, kafkaApiSecret, continuousPublishing, batchSize);
+        this.kafkaProducer = initializeSchemalessJsonProducer(bootstrapServers, kafkaApiKey, kafkaApiSecret, includeNulls);
+        this.messageGenerator = messageGenerator;
+    }
+
     private Producer<String, String> initializeSchemalessJsonProducer(String bootstrapServers, String kafkaApiKey, String kafkaApiSecret, boolean includeNulls) {
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
