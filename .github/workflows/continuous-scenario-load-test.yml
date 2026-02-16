@@ -36,12 +36,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Dispatching scenario load test to continuously ingest 7 million messages..."
+          echo "Dispatching scenario load test to continuously ingest ${{ vars.CONTINUOUS_LOAD_TEST_MESSAGE_COUNT }} messages..."
           gh workflow run scenario-load-test.yml \
             --repo "${{ github.repository }}" \
             -f firebolt_jdbc_url="jdbc:firebolt:ecosystem-kafka-load-test?account=automation&engine=ecosystem_kafka_load_test&env=staging" \
-            -f scenario_name="scenario2" \
-            -f message_count="7000000" \
+            -f scenario_name="${{ vars.CONTINUOUS_LOAD_TEST_SCENARIO }}" \
+            -f message_count="${{ vars.CONTINUOUS_LOAD_TEST_MESSAGE_COUNT }}" \
             -f ingestion_type="binary" \
             -f message_type="json" \
             -f min_fetch_megabytes="20" \
