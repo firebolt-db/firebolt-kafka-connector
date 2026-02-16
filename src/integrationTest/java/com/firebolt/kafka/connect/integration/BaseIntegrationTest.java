@@ -545,33 +545,17 @@ public abstract class BaseIntegrationTest {
      * @return
      */
     protected static Stream<Arguments> ingestionTypesWithOrWithoutNulls() {
-        Stream.Builder<Arguments> builder = Stream.builder();
-        builder.add(Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"));
-        builder.add(Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values"));
-
-        if (runsOnCloud()) {
-            builder.add(Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"));
-            builder.add(Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values"));
-        }
-
-        return builder.build();
+        return Stream.of(
+                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
+                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values"),
+                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"),
+                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values"));
     }
 
     protected static Stream<Arguments> ingestionTypes() {
-        Stream.Builder<Arguments> builder = Stream.builder();
-        builder.add(Arguments.of(Map.of("ingestion.type", "sql"), "sql ingestion with null values"));
-
-        if (runsOnCloud()) {
-            builder.add(Arguments.of(Map.of("ingestion.type", "binary"), "binary ingestion with null values"));
-        }
-
-        return builder.build();
-    }
-
-    private static boolean runsOnCloud() {
-        String clientId = System.getProperty("clientId");
-        String clientSecret = System.getProperty("clientSecret");
-        return StringUtils.isNoneBlank(clientId, clientSecret);
+        return Stream.of(
+                Arguments.of(Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
+                Arguments.of(Map.of("ingestion.type", "binary"), "binary ingestion with null values"));
     }
 
 }
