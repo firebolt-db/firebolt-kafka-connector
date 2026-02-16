@@ -14,7 +14,7 @@ ext {
     lombokVersion = '1.18.42'
     jacksonVersion = '2.21.0'
     jacksonAnnotationsVersion = '2.21' // got out of sync from jacksonVersion
-    junitJupiterVersion = '5.13.4'
+    junitJupiterVersion = '6.0.3'
     log4jVersion = '2.25.3'
     okhttpVersion = '5.3.2'
     kafkaVersion = '3.9.1'
