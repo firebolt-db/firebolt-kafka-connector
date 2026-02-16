@@ -78,8 +78,6 @@ services:
       - ./config.json:/firebolt-core/config.json:ro
       # Create an anonymous volume for Firebolt's internal database files. Not using a volume would have a performance impact.
       - ./firebolt-core:/firebolt-core/data
-    tmpfs:
-      - /tmp:size=2G
 
   kafka-connect:
     image: confluentinc/cp-kafka-connect:8.0.0

@@ -28,6 +28,13 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Free disk space
+      run: |
+        df -h
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android
+        sudo docker image prune --all --force
+        df -h
+
     - name: Checkout code
       uses: actions/checkout@v6
       
@@ -89,13 +96,6 @@ jobs:
         echo "Checking if Kafka Connect is ready..."
         timeout 60 bash -c 'until curl -f http://localhost:8083/connectors; do sleep 2; done'
         echo "Kafka Connect is ready!"
-
-    - name: Free disk space
-      run: |
-        df -h
-        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android
-        sudo docker image prune --all --force
-        df -h
 
     - name: Run integration tests (excluding NOT_IMPLEMENTED)
       run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud --no-daemon
