@@ -14,6 +14,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTextBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaByteaBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaBooleanBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessJsonBinaryColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 
 public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnDataTypeConverterFactory {
@@ -29,6 +30,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
     private SchemaTextBinaryColumnDataTypeConverter textDataTypeConverter;
     private SchemaByteaBinaryColumnDataTypeConverter byteaDataTypeConverter;
     private SchemaBooleanBinaryColumnDataTypeConverter booleanDataTypeConverter;
+    private SchemalessJsonBinaryColumnDataTypeConverter jsonDataTypeConverter;
     private SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemaBinaryColumnDataTypeConverterFactory() {
@@ -43,6 +45,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
              new SchemaTextBinaryColumnDataTypeConverter(),
              new SchemaByteaBinaryColumnDataTypeConverter(),
              new SchemaBooleanBinaryColumnDataTypeConverter(),
+             new SchemalessJsonBinaryColumnDataTypeConverter(),
              new SchemaArrayBinaryColumnDataTypeConverter());
     }
 
@@ -58,6 +61,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                                                SchemaTextBinaryColumnDataTypeConverter textDataTypeConverter,
                                                SchemaByteaBinaryColumnDataTypeConverter byteaDataTypeConverter,
                                                SchemaBooleanBinaryColumnDataTypeConverter booleanDataTypeConverter,
+                                               SchemalessJsonBinaryColumnDataTypeConverter jsonDataTypeConverter,
                                                SchemaArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
@@ -70,6 +74,7 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
         this.textDataTypeConverter = textDataTypeConverter;
         this.byteaDataTypeConverter = byteaDataTypeConverter;
         this.booleanDataTypeConverter = booleanDataTypeConverter;
+        this.jsonDataTypeConverter = jsonDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         this.arrayColumnDataTypeConverter.addConverter(FireboltColumnDataType.INTEGER, integerDataTypeConverter);
@@ -114,6 +119,8 @@ public class SchemaBinaryColumnDataTypeConverterFactory implements BinaryColumnD
                 return timestamptzDataTypeConverter;
             case ARRAY:
                 return arrayColumnDataTypeConverter;
+            case JSON:
+                return jsonDataTypeConverter;
             case STRUCT:
                 break;
             case GEOGRAPHY:

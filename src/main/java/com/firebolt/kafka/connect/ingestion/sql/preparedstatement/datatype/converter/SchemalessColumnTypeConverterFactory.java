@@ -2,16 +2,17 @@ package com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.conv
 
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
+import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessArrayDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessBigIntDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessBooleanDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessDoubleDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessTextDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessArrayDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessByteaDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessDateDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessDecimalDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessDoubleDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessIntegerDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessJsonDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessRealDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessTextDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessTimestampDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessTimestamptzDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
@@ -33,6 +34,7 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
     private SchemalessTextDataTypeConverter textDataTypeConverter;
     private SchemalessByteaDataTypeConverter byteaDataTypeConverter;
     private SchemalessBooleanDataTypeConverter booleanDataTypeConverter;
+    private SchemalessJsonDataTypeConverter jsonDataTypeConverter;
 
     public SchemalessColumnTypeConverterFactory() {
         this(
@@ -47,7 +49,8 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                 new SchemalessDoubleDataTypeConverter(),
                 new SchemalessTextDataTypeConverter(),
                 new SchemalessByteaDataTypeConverter(),
-                new SchemalessBooleanDataTypeConverter()
+                new SchemalessBooleanDataTypeConverter(),
+                new SchemalessJsonDataTypeConverter()
         );
     }
 
@@ -63,7 +66,8 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                                          SchemalessDoubleDataTypeConverter doubleDataTypeConverter,
                                          SchemalessTextDataTypeConverter textDataTypeConverter,
                                          SchemalessByteaDataTypeConverter byteaDataTypeConverter,
-                                         SchemalessBooleanDataTypeConverter booleanDataTypeConverter) {
+                                         SchemalessBooleanDataTypeConverter booleanDataTypeConverter,
+                                         SchemalessJsonDataTypeConverter jsonDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.arrayDataTypeConverter = arrayDataTypeConverter;
         this.timestampDataTypeConverter = timestampDataTypeConverter;
@@ -76,6 +80,7 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
         this.textDataTypeConverter = textDataTypeConverter;
         this.byteaDataTypeConverter = byteaDataTypeConverter;
         this.booleanDataTypeConverter = booleanDataTypeConverter;
+        this.jsonDataTypeConverter = jsonDataTypeConverter;
     }
 
     @Override
@@ -107,6 +112,8 @@ class SchemalessColumnTypeConverterFactory implements ColumnDataTypeConverterFac
                 return byteaDataTypeConverter;
             case BOOLEAN:
                 return booleanDataTypeConverter;
+            case JSON:
+                return jsonDataTypeConverter;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());

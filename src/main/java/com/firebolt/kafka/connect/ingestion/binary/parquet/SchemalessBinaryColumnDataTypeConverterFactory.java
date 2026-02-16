@@ -4,16 +4,17 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.FireboltColumnDataType;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessArrayBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBigIntBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDecimalBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDoubleBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDateBinaryColumnDataTypeConverter;
-import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTextBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessBooleanBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessByteaBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDateBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDecimalBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDoubleBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessJsonBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTextBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzBinaryColumnDataTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 
 public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryColumnDataTypeConverterFactory {
@@ -29,6 +30,7 @@ public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryCol
     private SchemalessTextBinaryColumnDataTypeConverter textDataTypeConverter;
     private SchemalessBooleanBinaryColumnDataTypeConverter booleanDataTypeConverter;
     private SchemalessByteaBinaryColumnDataTypeConverter byteaDataTypeConverter;
+    private SchemalessJsonBinaryColumnDataTypeConverter jsonDataTypeConverter;
     private SchemalessArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter;
 
     public SchemalessBinaryColumnDataTypeConverterFactory() {
@@ -44,6 +46,7 @@ public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryCol
                 new SchemalessTextBinaryColumnDataTypeConverter(),
                 new SchemalessBooleanBinaryColumnDataTypeConverter(),
                 new SchemalessByteaBinaryColumnDataTypeConverter(),
+                new SchemalessJsonBinaryColumnDataTypeConverter(),
                 new SchemalessArrayBinaryColumnDataTypeConverter()
         );
     }
@@ -60,6 +63,7 @@ public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryCol
                                                    SchemalessTextBinaryColumnDataTypeConverter textDataTypeConverter,
                                                    SchemalessBooleanBinaryColumnDataTypeConverter booleanDataTypeConverter,
                                                    SchemalessByteaBinaryColumnDataTypeConverter byteaDataTypeConverter,
+                                                   SchemalessJsonBinaryColumnDataTypeConverter jsonDataTypeConverter,
                                                    SchemalessArrayBinaryColumnDataTypeConverter arrayColumnDataTypeConverter) {
         this.integerDataTypeConverter = integerDataTypeConverter;
         this.bigIntDataTypeConverter = bigIntDataTypeConverter;
@@ -72,6 +76,7 @@ public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryCol
         this.textDataTypeConverter = textDataTypeConverter;
         this.booleanDataTypeConverter = booleanDataTypeConverter;
         this.byteaDataTypeConverter = byteaDataTypeConverter;
+        this.jsonDataTypeConverter = jsonDataTypeConverter;
         this.arrayColumnDataTypeConverter = arrayColumnDataTypeConverter;
 
         // need to populate the array column data type with the values that it can convert
@@ -116,6 +121,8 @@ public class SchemalessBinaryColumnDataTypeConverterFactory implements BinaryCol
                 return booleanDataTypeConverter;
             case BYTEA:
                 return byteaDataTypeConverter;
+            case JSON:
+                return jsonDataTypeConverter;
             case ARRAY:
                 return arrayColumnDataTypeConverter;
             case STRUCT:

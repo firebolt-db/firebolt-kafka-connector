@@ -7,6 +7,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaRealBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestampBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schema.SchemaTimestamptzBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessJsonBinaryColumnDataTypeConverter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -88,5 +89,17 @@ public class SchemaBinaryColumnDataTypeConverterFactoryTest {
         TableSchema.Column col = new TableSchema.Column("amount", dataType, java.sql.Types.NUMERIC, false, 38, 9);
         BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
         assertInstanceOf(SchemaDecimalBinaryColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "json",
+            "JSON",
+            "Json"
+    })
+    void returnsJsonConverterForJsonAliases(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("data", dataType, java.sql.Types.OTHER, false);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessJsonBinaryColumnDataTypeConverter.class, converter);
     }
 }

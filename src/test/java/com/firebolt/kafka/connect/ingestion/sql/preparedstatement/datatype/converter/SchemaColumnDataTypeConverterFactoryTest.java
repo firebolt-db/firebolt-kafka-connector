@@ -4,6 +4,7 @@ import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schema.SchemaArrayDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessBigIntDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessBooleanDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schemaless.SchemalessJsonDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schema.SchemaByteaDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schema.SchemaDateDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.sql.preparedstatement.datatype.converter.schema.SchemaDecimalDataTypeConverter;
@@ -63,6 +64,9 @@ public class SchemaColumnDataTypeConverterFactoryTest {
     @Mock
     private SchemalessBooleanDataTypeConverter mockBooleanDataTypeConverter;
 
+    @Mock
+    private SchemalessJsonDataTypeConverter mockJsonDataTypeConverter;
+
     private ColumnDataTypeConverterFactory factory;
 
     @BeforeEach
@@ -70,7 +74,8 @@ public class SchemaColumnDataTypeConverterFactoryTest {
         MockitoAnnotations.openMocks(this);
         factory = new SchemaColumnTypeConverterFactory(mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter,
                 mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter, mockBigIntDataTypeConverter, mockRealDataTypeConverter,
-                mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter);
+                mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter,
+                mockJsonDataTypeConverter);
     }
 
     @ParameterizedTest
@@ -332,11 +337,27 @@ public class SchemaColumnDataTypeConverterFactoryTest {
         assertThrows(RuntimeException.class, () -> factory.getConverter(column));
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "json",
+        "JSON",
+        "Json",
+        "JsOn"
+    })
+    void testGetConverterForJsonTypes(String dataType) {
+        TableSchema.Column column = new TableSchema.Column("test_column", dataType, 1111, true);
+
+        ColumnDataTypeConverter result = factory.getConverter(column);
+
+        assertSame(mockJsonDataTypeConverter, result);
+    }
+
     @Test
     void testConstructorWithMocks() {
         ColumnDataTypeConverterFactory testFactory = new SchemaColumnTypeConverterFactory(
             mockIntegerDataTypeConverter, mockArrayDataTypeConverter, mockTimestampDataTypeConverter, mockTimestamptzDataTypeConverter, mockDecimalDataTypeConverter,
-                mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter);
+                mockBigIntDataTypeConverter, mockRealDataTypeConverter, mockDoubleDataTypeConverter, mockTextDataTypeConverter, mockDateDataTypeConverter, mockByteaDataTypeConverter, mockBooleanDataTypeConverter,
+                mockJsonDataTypeConverter);
         
         assertNotNull(testFactory);
         
@@ -350,6 +371,7 @@ public class SchemaColumnDataTypeConverterFactoryTest {
         TableSchema.Column textColumn = new TableSchema.Column("text_col", "text", 12, true);
         TableSchema.Column byteaColumn = new TableSchema.Column("bytea_col", "bytea", -2, true);
         TableSchema.Column booleanColumn = new TableSchema.Column("boolean_col", "boolean", 16, true);
+        TableSchema.Column jsonColumn = new TableSchema.Column("json_col", "json", 1111, true);
         
         assertSame(mockIntegerDataTypeConverter, testFactory.getConverter(intColumn));
         assertSame(mockArrayDataTypeConverter, testFactory.getConverter(arrayColumn));
@@ -361,5 +383,6 @@ public class SchemaColumnDataTypeConverterFactoryTest {
         assertSame(mockTextDataTypeConverter, testFactory.getConverter(textColumn));
         assertSame(mockByteaDataTypeConverter, testFactory.getConverter(byteaColumn));
         assertSame(mockBooleanDataTypeConverter, testFactory.getConverter(booleanColumn));
+        assertSame(mockJsonDataTypeConverter, testFactory.getConverter(jsonColumn));
     }
 } 

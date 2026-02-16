@@ -5,6 +5,7 @@ import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.sc
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDecimalBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessDoubleBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessIntegerBinaryBinaryColumnDataTypeConverter;
+import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessJsonBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessRealBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestampBinaryColumnDataTypeConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.datatype.converter.schemless.SchemalessTimestamptzBinaryColumnDataTypeConverter;
@@ -132,6 +133,16 @@ class SchemalessBinaryBinaryColumnDataTypeConverterFactoryTest {
         TableSchema.Column col = new TableSchema.Column("amounts", dataType, java.sql.Types.ARRAY, false);
         BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
         assertInstanceOf(SchemalessArrayBinaryColumnDataTypeConverter.class, converter);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "json"
+    })
+    void returnsJsonConverterForJson(String dataType) {
+        TableSchema.Column col = new TableSchema.Column("metadata", dataType, java.sql.Types.OTHER, false);
+        BinaryColumnDataTypeConverter<?, ?> converter = factory.getConverter(col);
+        assertInstanceOf(SchemalessJsonBinaryColumnDataTypeConverter.class, converter);
     }
 
     @ParameterizedTest
