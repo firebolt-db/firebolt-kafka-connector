@@ -35,8 +35,7 @@
   "support": {
     "logo": "assets/firebolt_logo.png",
     "provider_name": "Firebolt",
-    "summary": "We provide full support for this connector. For issues, questions, or feature requests, please visit our GitHub repository or contact our support team.",
-    "email": "support@firebolt.io"
+    "summary": "We provide full support for this connector. For issues, questions, or feature requests, please visit our GitHub repository or contact our support team."
   },
   "tags": [
     "firebolt",
