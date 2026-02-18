@@ -1,7 +1,7 @@
 package com.firebolt.kafka.connect.clients;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -71,43 +71,6 @@ public class ConfluentConnectorClient implements AutoCloseable {
     }
 
     /**
-     * Lists connectors for an explicit environment and Connect cluster ID (lcc-...).
-     */
-    public List<String> listConnectors(String envId, String connectClusterId) throws IOException {
-        HttpUrl url = HttpUrl.parse(apiBaseUrl)
-            .newBuilder()
-            .addPathSegments("connect/v1/environments")
-            .addPathSegment(envId)
-            .addPathSegment("clusters")
-            .addPathSegment(connectClusterId)
-            .addPathSegment("connectors")
-            .build();
-        Request request = new Request.Builder().url(url).get().addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("list connectors", response.code(), body);
-            }
-            List<String> names = new ArrayList<>();
-            try {
-                names = objectMapper.readValue(body, objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
-            } catch (Exception e) {
-                Map<String, Object> map = objectMapper.readValue(body, objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
-                names.addAll(map.keySet());
-            }
-            return names;
-        }
-    }
-
-    /**
-     * Lists connectors with detailed information including IDs (similar to 'confluent connect list -o json').
-     * This returns the full connector objects with metadata including the connector ID.
-     */
-    public List<Map<String, Object>> listConnectorsDetailed() throws IOException {
-        return listConnectorsDetailed(this.environmentId, this.connectClusterId);
-    }
-
-    /**
      * Lists connectors with detailed information including IDs for explicit env and Connect cluster IDs.
      * This returns the full connector objects with metadata including the connector ID.
      * Uses the Confluent Cloud accounts API: /api/accounts/{envId}/clusters/{clusterId}/connectors
@@ -161,56 +124,6 @@ public class ConfluentConnectorClient implements AutoCloseable {
         }
     }
 
-    public Map<String, Object> getConnectorConfig(String connectorName) throws IOException {
-        HttpUrl url = baseUrl().addPathSegment("connectors").addPathSegment(connectorName).build();
-        Request request = new Request.Builder().url(url).get().addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("get connector config", response.code(), body);
-            }
-            return objectMapper.readValue(body, objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
-        }
-    }
-
-    public void updateConnectorConfig(String connectorName, Map<String, String> newConfig) throws IOException {
-        String json = objectMapper.writeValueAsString(newConfig);
-        RequestBody requestBody = RequestBody.create(json, MediaType.parse("application/json"));
-        HttpUrl url = baseUrl().addPathSegment("connectors").addPathSegment(connectorName).addPathSegment("config").build();
-        Request request = new Request.Builder().url(url).put(requestBody).addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("update connector config", response.code(), body);
-            }
-        }
-    }
-
-    /**
-     * Updates a connector's configuration for explicit env and Connect cluster IDs.
-     */
-    public void updateConnectorConfig(String envId, String connectClusterId, String connectorName, Map<String, String> newConfig) throws IOException {
-        String json = objectMapper.writeValueAsString(newConfig);
-        RequestBody requestBody = RequestBody.create(json, MediaType.parse("application/json"));
-        HttpUrl url = HttpUrl.parse(apiBaseUrl)
-            .newBuilder()
-            .addPathSegments("connect/v1/environments")
-            .addPathSegment(envId)
-            .addPathSegment("clusters")
-            .addPathSegment(connectClusterId)
-            .addPathSegment("connectors")
-            .addPathSegment(connectorName)
-            .addPathSegment("config")
-            .build();
-        Request request = new Request.Builder().url(url).put(requestBody).addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("update connector config", response.code(), body);
-            }
-        }
-    }
-
     public void pauseConnector(String connectorName) throws IOException {
         HttpUrl url = baseUrl().addPathSegment("connectors").addPathSegment(connectorName).addPathSegment("pause").build();
         Request request = new Request.Builder().url(url).put(RequestBody.create(new byte[0], null)).addHeader("Authorization", basicAuthHeader).build();
@@ -232,53 +145,6 @@ public class ConfluentConnectorClient implements AutoCloseable {
             }
         }
     }
-
-    /**
-     * Pauses a connector for explicit env and Connect cluster IDs.
-     */
-    public void pauseConnector(String envId, String connectClusterId, String connectorName) throws IOException {
-        HttpUrl url = HttpUrl.parse(apiBaseUrl)
-            .newBuilder()
-            .addPathSegments("connect/v1/environments")
-            .addPathSegment(envId)
-            .addPathSegment("clusters")
-            .addPathSegment(connectClusterId)
-            .addPathSegment("connectors")
-            .addPathSegment(connectorName)
-            .addPathSegment("pause")
-            .build();
-        Request request = new Request.Builder().url(url).put(RequestBody.create(new byte[0], null)).addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("pause connector", response.code(), body);
-            }
-        }
-    }
-
-    /**
-     * Resumes a connector for explicit env and Connect cluster IDs.
-     */
-    public void resumeConnector(String envId, String connectClusterId, String connectorName) throws IOException {
-        HttpUrl url = HttpUrl.parse(apiBaseUrl)
-            .newBuilder()
-            .addPathSegments("connect/v1/environments")
-            .addPathSegment(envId)
-            .addPathSegment("clusters")
-            .addPathSegment(connectClusterId)
-            .addPathSegment("connectors")
-            .addPathSegment(connectorName)
-            .addPathSegment("resume")
-            .build();
-        Request request = new Request.Builder().url(url).put(RequestBody.create(new byte[0], null)).addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("resume connector", response.code(), body);
-            }
-        }
-    }
-
     /**
      * Deletes a connector using the instance's environment and connect cluster IDs.
      */
@@ -308,9 +174,6 @@ public class ConfluentConnectorClient implements AutoCloseable {
         }
     }
 
-    // Backwards-compat helper if needed internally; prefer listSinkConnectorPlugins
-    private static String safeString(Object o) { return o == null ? null : o.toString(); }
-
     /**
      * Best-effort check if a custom plugin id (e.g., ccp-...) exists on the Connect cluster.
      * This scans the connector-plugins payload for a matching id in common fields.
@@ -329,38 +192,6 @@ public class ConfluentConnectorClient implements AutoCloseable {
             if (ccp != null && pluginId.equals(ccp.toString())) return true;
         }
         return false;
-    }
-
-    /**
-     * Lists custom connector plugins registered in the organization for a given environment (ccp-...).
-     * Endpoint: GET /org/v2/custom-connector-plugins?environment=<env-id>
-     * NOTE: Some orgs may not expose this endpoint; see listCustomConnectorPluginsConnectApi for an alternative.
-     */
-    public List<Map<String, Object>> listCustomConnectorPlugins(String envId) throws IOException {
-        HttpUrl url = HttpUrl.parse(apiBaseUrl)
-            .newBuilder()
-            .addPathSegments("org/v2/custom-connector-plugins")
-            .addQueryParameter("environment", envId)
-            .build();
-
-        Request request = new Request.Builder().url(url).get().addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("list custom connector plugins", response.code(), body);
-            }
-            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(body);
-            com.fasterxml.jackson.databind.JsonNode data = root.get("data");
-            List<Map<String, Object>> result = new ArrayList<>();
-            if (data != null && data.isArray()) {
-                for (com.fasterxml.jackson.databind.JsonNode item : data) {
-                    // Return each item as a Map<String,Object>
-                    Map<String, Object> entry = objectMapper.convertValue(item, objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
-                    result.add(entry);
-                }
-            }
-            return result;
-        }
     }
 
     /**
@@ -580,30 +411,6 @@ public class ConfluentConnectorClient implements AutoCloseable {
                 return state != null ? state.toString() : null;
             }
             return null;
-        }
-    }
-
-    /**
-     * Returns the full status payload for a connector for explicit env and cluster IDs.
-     */
-    public Map<String, Object> getConnectorStatus(String envId, String clusterId, String connectorName) throws IOException {
-        HttpUrl url = HttpUrl.parse(apiBaseUrl)
-            .newBuilder()
-            .addPathSegments("connect/v1/environments")
-            .addPathSegment(envId)
-            .addPathSegment("clusters")
-            .addPathSegment(clusterId)
-            .addPathSegment("connectors")
-            .addPathSegment(connectorName)
-            .addPathSegment("status")
-            .build();
-        Request request = new Request.Builder().url(url).get().addHeader("Authorization", basicAuthHeader).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                handleError("get connector status", response.code(), body);
-            }
-            return objectMapper.readValue(body, objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
         }
     }
 
