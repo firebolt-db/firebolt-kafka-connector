@@ -635,7 +635,7 @@ public class LoadTestRunner {
                 host = host.substring(schemeIdx + 3);
             }
             // Cut path/query if present
-            int slashIdx = host.indexOf('/') ;
+            int slashIdx = host.indexOf('/');
             if (slashIdx >= 0) {
                 host = host.substring(0, slashIdx);
             }
@@ -649,24 +649,7 @@ public class LoadTestRunner {
                 continue;
             }
 
-            // Add hostname
             results.add(host + ":443:TCP");
-
-            // Resolve to IPs and add each IP
-            try {
-                java.net.InetAddress[] addresses = java.net.InetAddress.getAllByName(host);
-                for (java.net.InetAddress addr : addresses) {
-                    // Keep only IPv4 addresses
-                    if (addr instanceof java.net.Inet4Address) {
-                        String ip = addr.getHostAddress();
-                        if (ip != null && !ip.isEmpty()) {
-                            results.add(ip + ":443:TCP");
-                        }
-                    }
-                }
-            } catch (java.net.UnknownHostException e) {
-                log.warn("Failed to resolve host '{}': {}", host, e.getMessage());
-            }
         }
 
         return new java.util.ArrayList<>(results);
