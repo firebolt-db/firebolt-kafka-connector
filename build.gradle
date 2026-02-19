@@ -433,7 +433,19 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
+    // Confluent Avro serializer and converter for Avro integration tests
+    integrationTestImplementation("io.confluent:kafka-avro-serializer:${confluentVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
     integrationTestImplementation("io.confluent:kafka-connect-json-schema-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    integrationTestImplementation("io.confluent:kafka-connect-avro-converter:${confluentVersion}") {
         exclude group: 'org.apache.kafka', module: 'kafka-clients'
         exclude group: 'org.apache.kafka', module: 'connect-api'
         exclude group: 'org.apache.kafka', module: 'connect-transforms'
