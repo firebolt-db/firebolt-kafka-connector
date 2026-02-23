@@ -22,7 +22,7 @@ ext {
     slf4jVersion = '2.0.17'
     fireboltJdbcVersion = '3.10.0'
     guavaVersion = '33.5.0-jre'
-    confluentVersion = '7.9.1'
+    confluentVersion = '8.1.1'
     avroVersion = '1.12.1'
     mockitoVersion = '5.21.0'
     awaitilityVersion = '4.3.0'
