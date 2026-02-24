@@ -5,14 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firebolt.kafka.connect.SchemalessKafkaMessageColumnValue;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.datatype.converter.exception.ColumnConversionFailedException;
+import com.firebolt.kafka.connect.convert.StructToMapConverter;
 import com.firebolt.kafka.connect.ingestion.binary.parquet.AbstractBinaryColumnTypeConverter;
 import java.util.Collection;
 import java.util.Map;
+import org.apache.kafka.connect.data.Struct;
 
 /**
  * Converts values to JSON strings for binary parquet ingestion into Firebolt JSON columns.
- * 
+ *
  * Handles all valid JSON value types:
+ * - Kafka Connect Struct (from Avro/JSON Schema records) - converted to Map and serialized
  * - Maps and Collections are serialized to JSON
  * - Strings are used as-is (assumed to be valid JSON literals or JSON strings)
  * - Numbers and Booleans are converted to their JSON representation
@@ -28,6 +31,10 @@ public abstract class AbstractJsonBinaryColumnDataTypeConverter<T extends Schema
 
         if (value == null) {
             return null;
+        }
+
+        if (value instanceof Struct) {
+            value = StructToMapConverter.convert((Struct) value);
         }
 
         if (value instanceof Map || value instanceof Collection) {
