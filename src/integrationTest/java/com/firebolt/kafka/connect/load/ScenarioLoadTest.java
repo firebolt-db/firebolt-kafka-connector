@@ -42,7 +42,7 @@ public class ScenarioLoadTest {
 		String scenarioName = System.getProperty("loadtest.scenario.name", "scenario1");
 		int messageCount = Integer.parseInt(System.getProperty("loadtest.message.count", "1000000"));
 		String ingestionType = System.getProperty("loadtest.ingestion.type", "sql");
-		String messageType = System.getProperty("loadtest.message.type", "json");
+		MessageType messageType = MessageType.fromString(System.getProperty("loadtest.message.type", "json"));
 		boolean continuousPublishing = Boolean.parseBoolean(System.getProperty("loadtest.continuous.publishing", "false"));
 		int messageBatchSize = Integer.parseInt(System.getProperty("loadtest.message.batch.size", "0"));
 		int minFetchMegabytes = Integer.parseInt(System.getProperty("loadtest.fetch.min.megabytes", "20"));
@@ -63,10 +63,9 @@ public class ScenarioLoadTest {
 		ScenarioConfig scenarioConfig = readScenarioConfig(scenarioJsonPath);
 		boolean hasSchema = scenarioConfig.isHasSchema();
 
-		String jsonSchemaRegistryDefinitionFilePath = null;
+		String schemaDefinitionPath = null;
 		if (hasSchema) {
-			String candidateSchemaPath = scenarioBaseDir + "/schema-registry.txt";
-			jsonSchemaRegistryDefinitionFilePath = requireFile(candidateSchemaPath, "json schema registry");
+			schemaDefinitionPath = requireFile(scenarioBaseDir + "/schema-registry.txt", "schema registry");
 		}
 
 		// Build publisher using CSV-backed message generator
@@ -114,7 +113,8 @@ public class ScenarioLoadTest {
 				.tableName(scenarioConfig.getTableName())
 				.fireboltIngestionWaitDuration(Duration.ofMinutes(fireboltIngestionWaitMinutes))
 				.tableSchemaDefinitionFilePath(requireFile(tableSchemaPath, "table schema"))
-				.jsonSchemaRegistryDefinitionFilePath(jsonSchemaRegistryDefinitionFilePath)
+				.schemaDefinitionPath(schemaDefinitionPath)
+				.messageType(messageType)
 				.staticOutboundHostnames(STAGING_APIS)
 				.confluentCloudSettings(confluentCloudSettings)
 				.fireboltSettings(fireboltSettings)
@@ -135,7 +135,7 @@ public class ScenarioLoadTest {
 		log.info("  hasSchema          : {}", hasSchema);
 		log.info("  messageCount       : {}", messageCount);
 		log.info("  ingestionType      : {}", ingestionType);
-		log.info("  messageType        : {}", messageType);
+		log.info("  messageType        : {}", messageType.getValue());
 		log.info("  continuousPublishing : {}", continuousPublishing);
 		log.info("  messageBatchSize   : {}", messageBatchSize);
 		log.info("  fireboltIngestionWaitMinutes : {}", fireboltIngestionWaitMinutes);
@@ -144,7 +144,7 @@ public class ScenarioLoadTest {
 		log.info("  maxPollRecords     : {}", maxPollRecords);
 		log.info("  tableSchemaPath    : {}", tableSchemaPath);
 		log.info("  csvMessagesPath    : {}", csvMessagesPath);
-		log.info("  schemaRegistryPath : {}", jsonSchemaRegistryDefinitionFilePath);
+		log.info("  schemaRegistryPath : {}", schemaDefinitionPath);
 
 		LoadTestRunner runner = new LoadTestRunner(testScenario);
 		LoadTestRunResult result = runner.run();
@@ -167,12 +167,12 @@ public class ScenarioLoadTest {
 	private static KafkaMessagePublisher<?> createMessagePublisherFromCsv(
 			String csvMessagesPath,
 			boolean hasSchema,
-			String messageType,
+			MessageType messageType,
 			ConfluentCloudSettings confluentCloudSettings,
 			boolean continuousPublishing,
 			int messageBatchSize
 	) throws IOException {
-		if (!"json".equalsIgnoreCase(messageType)) {
+		if (messageType != MessageType.JSON) {
 			throw new IllegalArgumentException("Currently we only support json message type");
 		}
 

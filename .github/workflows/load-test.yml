@@ -44,9 +44,13 @@ on:
           - 'sql'
           - 'binary'
       message_type:
-        description: 'Message type to publish (default: json)'
+        description: 'Message format to publish (json or avro)'
         required: false
         default: 'json'
+        type: choice
+        options:
+          - 'json'
+          - 'avro'
       has_schema:
         description: 'Whether messages have schema (default: true)'
         required: false
@@ -108,6 +112,14 @@ on:
         required: false
         type: string
         default: '10000'
+      message_type:
+        required: false
+        type: string
+        default: 'json'
+      has_schema:
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   load-test:
@@ -148,8 +160,8 @@ jobs:
             -Dloadtest.message.count="${{ inputs.message_count || github.event.inputs.message_count || '1000000' }}" \
             -Dloadtest.table.schema="${{ inputs.table_schema || github.event.inputs.table_schema || '8-column' }}" \
             -Dloadtest.ingestion.type="${{ inputs.ingestion_type || github.event.inputs.ingestion_type || 'sql' }}" \
-            -Dloadtest.message.type="${{ github.event.inputs.message_type || 'json' }}" \
-            -Dloadtest.has.schema="${{ github.event.inputs.has_schema || 'true' }}" \
+            -Dloadtest.message.type="${{ inputs.message_type || github.event.inputs.message_type || 'json' }}" \
+            -Dloadtest.has.schema="${{ inputs.has_schema || github.event.inputs.has_schema || 'true' }}" \
             -Dloadtest.fetch.min.megabytes="${{ inputs.min_fetch_megabytes || github.event.inputs.min_fetch_megabytes || '20' }}" \
             -Dloadtest.fetch.max.wait.ms="${{ inputs.max_wait_time_ms || github.event.inputs.max_wait_time_ms || '2000' }}" \
             -Dloadtest.max.poll.records="${{ inputs.max_records_poll || github.event.inputs.max_records_poll || '10000' }}"
@@ -164,12 +176,14 @@ jobs:
           echo "SCHEMA_PLURAL=${SCHEMA_PLURAL}" >> $GITHUB_ENV
           ING="${{ inputs.ingestion_type || github.event.inputs.ingestion_type || 'sql' }}"
           echo "INGESTION_TYPE=${ING}" >> $GITHUB_ENV
-          
+          MSG="${{ inputs.message_type || github.event.inputs.message_type || 'json' }}"
+          echo "MESSAGE_TYPE=${MSG}" >> $GITHUB_ENV
+
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: load-test-results-${{ env.SCHEMA_PLURAL }}-${{ env.INGESTION_TYPE }}-${{ github.run_number }}
+          name: load-test-results-${{ env.SCHEMA_PLURAL }}-${{ env.INGESTION_TYPE }}-${{ env.MESSAGE_TYPE }}-${{ github.run_number }}
           path: |
             build/reports/
             build/test-results/
