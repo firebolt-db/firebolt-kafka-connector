@@ -10,12 +10,17 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Map;
+import com.firebolt.kafka.connect.convert.StructToMapConverter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.connect.data.Struct;
 
 /**
- * Converts schemaless Kafka message values to JSON strings for SQL ingestion into Firebolt JSON columns.
- * 
+ * Converts Kafka message values to JSON strings for SQL ingestion into Firebolt JSON columns.
+ * Used for BOTH schema-based (Avro, JSON Schema) and schemaless records - see SchemaColumnTypeConverterFactory
+ * and SchemalessColumnTypeConverterFactory which both use this converter for JSON columns.
+ *
  * Handles all valid JSON value types:
+ * - Kafka Connect Struct (from Avro/JSON Schema nested records) - converted to Map and serialized
  * - Maps and Collections are serialized to JSON
  * - Strings are used as-is (assumed to be valid JSON literals or JSON strings)
  * - Numbers and Booleans are converted to their JSON representation
@@ -33,6 +38,10 @@ public class SchemalessJsonDataTypeConverter extends AbstractColumnTypeConverter
         if (value == null) {
             statement.setString(paramIndex, null);
             return;
+        }
+
+        if (value instanceof Struct) {
+            value = StructToMapConverter.convert((Struct) value);
         }
 
         if (value instanceof Map || value instanceof Collection) {
