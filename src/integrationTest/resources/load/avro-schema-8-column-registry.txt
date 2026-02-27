@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "LoadTestRecord",
+  "namespace": "com.firebolt.kafka.connect.load",
+  "fields": [
+    {"name": "colInteger", "type": "int"},
+    {"name": "colBigint", "type": ["null", "long"], "default": null},
+    {"name": "colNumeric", "type": ["null", {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 9}], "default": null},
+    {"name": "colReal", "type": ["null", "float"], "default": null},
+    {"name": "colDoublePrecision", "type": ["null", "double"], "default": null},
+    {"name": "colBoolean", "type": ["null", "boolean"], "default": null},
+    {"name": "colText", "type": ["null", "string"], "default": null},
+    {"name": "colTimestamp", "type": ["null", "string"], "default": null}
+  ]
+}

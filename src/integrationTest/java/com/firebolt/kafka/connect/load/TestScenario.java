@@ -19,7 +19,12 @@ public class TestScenario {
 
     private int averageMessageSizeInBytes;
 
-    private String jsonSchemaRegistryDefinitionFilePath;
+    /**
+     * Path to the schema registry definition file (JSON or Avro, determined by messageType).
+     */
+    private String schemaDefinitionPath;
+
+    private MessageType messageType;
 
     private String tableSchemaDefinitionFilePath;
 

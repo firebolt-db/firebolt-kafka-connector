@@ -76,7 +76,8 @@ public class LoadTestRunner {
         String schemaApiKey = testScenario.getConfluentCloudSettings().getSchemaRegistryApiKey();
         String schemaApiSecret = testScenario.getConfluentCloudSettings().getSchemaRegistryApiSecret();
 
-        boolean hasSchema = StringUtils.isNotBlank(testScenario.getJsonSchemaRegistryDefinitionFilePath());
+        MessageType messageType = testScenario.getMessageType() != null ? testScenario.getMessageType() : MessageType.JSON;
+        boolean hasSchema = StringUtils.isNotBlank(testScenario.getSchemaDefinitionPath());
 
         String fireboltPluginId = testScenario.getConfluentCloudSettings().getFireboltConnectorPluginId();
 
@@ -119,7 +120,7 @@ public class LoadTestRunner {
                     }
 
                     // create a new connector from the plugin
-                    Map<String, String> connectorConfig = createDefaultConnectorConfiguration(schemaRegistryUrl, hasSchema);
+                    Map<String, String> connectorConfig = createDefaultConnectorConfiguration(schemaRegistryUrl, hasSchema, messageType);
 
                     // override any specific attributes of the connector definition
                     if (testScenario.getConnectorConfiguration() != null && !testScenario.getConnectorConfiguration().isEmpty()) {
@@ -151,7 +152,11 @@ public class LoadTestRunner {
                     pauseConnector(confluentConnectorClient, connectorName);
 
                     if (hasSchema) {
-                        registerJsonSchema(schemaRegistryClient, subjectName, testScenario.getJsonSchemaRegistryDefinitionFilePath());
+                        if (messageType == MessageType.AVRO) {
+                            registerAvroSchema(schemaRegistryClient, subjectName, testScenario.getSchemaDefinitionPath());
+                        } else {
+                            registerJsonSchema(schemaRegistryClient, subjectName, testScenario.getSchemaDefinitionPath());
+                        }
                     }
 
                     // start publishing messages
@@ -312,9 +317,11 @@ public class LoadTestRunner {
     /**
      * This would be the basic default configuration.
      * @param schemaRegistryUrl
+     * @param hasSchema
+     * @param messageType json or avro
      * @return
      */
-    private Map<String, String> createDefaultConnectorConfiguration(String schemaRegistryUrl, boolean hasSchema) {
+    private Map<String, String> createDefaultConnectorConfiguration(String schemaRegistryUrl, boolean hasSchema, MessageType messageType) {
         String schemaApiKey = testScenario.getConfluentCloudSettings().getSchemaRegistryApiKey();
         String schemaApiSecret = testScenario.getConfluentCloudSettings().getSchemaRegistryApiSecret();
         String topicName = testScenario.getTopicName();
@@ -332,19 +339,29 @@ public class LoadTestRunner {
         connectorConfig.put("topics", topicName);
         connectorConfig.put("topic.to.table.mapping", topicName + ":" + tableName);
         connectorConfig.put("jdbc.connection.url", jdbcUrl);
-        connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
         connectorConfig.put("key.converter", "org.apache.kafka.connect.storage.StringConverter");
 
-        String valueConverter = hasSchema ? "io.confluent.connect.json.JsonSchemaConverter" : "org.apache.kafka.connect.json.JsonConverter";
-        connectorConfig.put("value.converter", valueConverter);
-
-        if (hasSchema) {
+        if (messageType == MessageType.AVRO && hasSchema) {
+            connectorConfig.put("value.converter", "io.confluent.connect.avro.AvroConverter");
             connectorConfig.put("value.converter.schema.registry.url", schemaRegistryUrl);
             connectorConfig.put("value.converter.basic.auth.credentials.source", "USER_INFO");
-            connectorConfig.put("value.converter.schema.registry.basic.auth.user.info", schemaApiKey+":"+schemaApiSecret);
+            connectorConfig.put("value.converter.schema.registry.basic.auth.user.info", schemaApiKey + ":" + schemaApiSecret);
+            connectorConfig.put("value.converter.auto.register.schemas", "false");
+            connectorConfig.put("value.converter.use.latest.version", "true");
+            connectorConfig.put("value.converter.latest.compatibility.strict", "false");
+            connectorConfig.put("schemas.enable", "true");
         } else {
-            connectorConfig.put("value.converter.schemas.enable", "false");
-            connectorConfig.put("schemas.enable", "false");
+            String valueConverter = hasSchema ? "io.confluent.connect.json.JsonSchemaConverter" : "org.apache.kafka.connect.json.JsonConverter";
+            connectorConfig.put("value.converter", valueConverter);
+            connectorConfig.put("value.converter.json.write.dates.iso8601", "true");
+            if (hasSchema) {
+                connectorConfig.put("value.converter.schema.registry.url", schemaRegistryUrl);
+                connectorConfig.put("value.converter.basic.auth.credentials.source", "USER_INFO");
+                connectorConfig.put("value.converter.schema.registry.basic.auth.user.info", schemaApiKey + ":" + schemaApiSecret);
+            } else {
+                connectorConfig.put("value.converter.schemas.enable", "false");
+                connectorConfig.put("schemas.enable", "false");
+            }
         }
 
         connectorConfig.put("kafka.api.key", kafkaApiKey);
@@ -482,12 +499,31 @@ public class LoadTestRunner {
         log.info("Reading the schema from path {}", schemaPathName);
         String jsonSchema = new String(Files.readAllBytes(Paths.get(schemaPathName)));
 
-        log.info("Registering the schema: {} with length {}", subject, jsonSchema.length());
+        log.info("Registering the JSON schema: {} with length {}", subject, jsonSchema.length());
         try {
             int id = schemaRegistryClient.registerSchema(subject, jsonSchema, "JSON");
             log.info("Registered schema id {} for subject {}", id, subject);
         } catch (Exception e) {
             log.error("Failed to register the schema: ", e);
+            throw e;
+        }
+    }
+
+    private static void registerAvroSchema(ConfluentSchemaRegistryClient schemaRegistryClient, String subject, String schemaPathName) throws IOException {
+        String[] subjects = schemaRegistryClient.listSubjects();
+
+        log.info("Found {} subjects.", subjects.length);
+        Arrays.stream(subjects).forEach(subjectName -> log.info("Subject: {}", subjectName));
+
+        log.info("Reading the Avro schema from path {}", schemaPathName);
+        String avroSchema = new String(Files.readAllBytes(Paths.get(schemaPathName)));
+
+        log.info("Registering the Avro schema: {} with length {}", subject, avroSchema.length());
+        try {
+            int id = schemaRegistryClient.registerSchema(subject, avroSchema, "AVRO");
+            log.info("Registered Avro schema id {} for subject {}", id, subject);
+        } catch (Exception e) {
+            log.error("Failed to register the Avro schema: ", e);
             throw e;
         }
     }
