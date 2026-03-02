@@ -44,7 +44,7 @@ jobs:
           echo "Built archive: ${ZIP_PATH}"
 
       - name: Upload archive as workflow artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: custom-connector-archive
           path: ${{ env.ZIP_PATH }}
