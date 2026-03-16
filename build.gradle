@@ -12,7 +12,7 @@ plugins {
 // and it will be applied to all dependencies that use that library
 ext {
     lombokVersion = '1.18.42'
-    jacksonVersion = '2.21.0'
+    jacksonVersion = '2.21.1'
     jacksonAnnotationsVersion = '2.21' // got out of sync from jacksonVersion
     junitJupiterVersion = '5.13.4'
     log4jVersion = '2.25.3'
@@ -378,6 +378,12 @@ configurations {
     integrationTestImplementation.extendsFrom testImplementation
     integrationTestCompileOnly.extendsFrom testCompileOnly
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+
+    configureEach {
+        resolutionStrategy {
+            force 'io.airlift:aircompressor:2.0.3' // CVE-2025-67721
+        }
+    }
 }
 
 // Configure IntelliJ IDEA to recognize integration test source set
