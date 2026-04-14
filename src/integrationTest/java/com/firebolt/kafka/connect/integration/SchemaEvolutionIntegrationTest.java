@@ -242,6 +242,7 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
         waitForDataInFirebolt(tableName, 1);
 
         // DBA drops the column directly in Firebolt — connector has NOT refreshed yet
+        fireboltDefaultDbClient.executeUpdate("SET enable_alter_table_drop_column=true");
         fireboltDefaultDbClient.executeUpdate(
                 "ALTER TABLE \"" + tableName + "\" DROP COLUMN \"extra\"");
 
@@ -268,6 +269,81 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
             assertEquals(true, rs.next());
             assertEquals(3, rs.getInt("id"));
             assertEquals("carol", rs.getString("name"));
+        }
+    }
+
+    /**
+     * A nullable column is renamed in Firebolt after the connector has started.
+     *
+     * <p>From the connector's perspective a RENAME is a DROP + ADD in one step: the old name
+     * disappears from the schema and a new name appears.  Two behaviours are verified:
+     * <ol>
+     *   <li><b>Self-heal</b> — a record sent <em>immediately after the rename</em> (before the
+     *       refresh interval) triggers a failed insert on the stale schema.  The connector detects
+     *       this, forces an immediate schema refresh, and retries within the same {@code put()} call.
+     *       The Kafka field that used the old column name is silently dropped (no matching column
+     *       in the refreshed schema); a {@code WARN} is logged.  No task restart is required.</li>
+     *   <li><b>New column pickup</b> — once the renamed column name is in the cache, records that
+     *       include the new field name populate it correctly.</li>
+     * </ol>
+     */
+    @Test
+    void renamedColumnIsHandledOnRefresh() throws Exception {
+        Supplier<String> schemaWithExtra = () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"name\" TEXT NULL, " +
+                "\"extra\" TEXT NULL" +
+                ")";
+        setupSchemalessTestResources(topicName, tableName, schemaWithExtra,
+                schemaEvolutionConnectorOverrides());
+
+        producer = initializeSchemalessJsonProducer();
+
+        // Row 1: sent before the rename — "extra" should be stored under its original name
+        publishMessages(List.of(row(1, "alice", "extra", "value-1")));
+        waitForDataInFirebolt(tableName, 1);
+
+        // DBA renames the column in Firebolt; connector has NOT refreshed yet
+        fireboltDefaultDbClient.executeUpdate("SET enable_alter_table_rename_column=true");
+        fireboltDefaultDbClient.executeUpdate(
+                "ALTER TABLE \"" + tableName + "\" RENAME COLUMN \"extra\" TO \"extra_v2\"");
+
+        // Row 2: sent immediately after rename, before refresh interval.
+        // The connector's first INSERT attempt will reference the old column name and fail.
+        // The connector must self-heal: refresh schema and retry.  On retry the "extra" field
+        // has no matching column ("extra_v2" exists but "extra" doesn't), so it is silently
+        // dropped and "extra_v2" gets NULL.
+        publishMessages(List.of(row(2, "bob", "extra", "should-be-dropped")));
+        waitForDataInFirebolt(tableName, 2);
+
+        // Wait for the periodic refresh interval so the connector picks up "extra_v2"
+        Thread.sleep(SLEEP_AFTER_ALTER_MS);
+
+        // Row 3: uses the new column name — should be stored correctly
+        publishMessages(List.of(row(3, "carol", "extra_v2", "new-value")));
+        waitForDataInFirebolt(tableName, 3);
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"name\", \"extra_v2\" FROM \"" + tableName + "\" ORDER BY \"id\"")) {
+
+            // Row 1: inserted before rename; data is accessible under the new column name
+            assertEquals(true, rs.next(), "Expected row 1");
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("alice", rs.getString("name"));
+            assertEquals("value-1", rs.getString("extra_v2"));
+
+            // Row 2: the old "extra" field was silently dropped after self-heal refresh
+            assertEquals(true, rs.next(), "Expected row 2");
+            assertEquals(2, rs.getInt("id"));
+            assertEquals("bob", rs.getString("name"));
+            assertNull(rs.getString("extra_v2"),
+                    "extra_v2 should be NULL — Kafka field 'extra' had no matching column after rename");
+
+            // Row 3: used the new column name; data stored correctly
+            assertEquals(true, rs.next(), "Expected row 3");
+            assertEquals(3, rs.getInt("id"));
+            assertEquals("carol", rs.getString("name"));
+            assertEquals("new-value", rs.getString("extra_v2"));
         }
     }
 
