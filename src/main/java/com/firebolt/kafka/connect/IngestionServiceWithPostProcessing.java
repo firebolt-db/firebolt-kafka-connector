@@ -14,8 +14,14 @@ import org.apache.commons.text.StringSubstitutor;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
- *  Use the decorator pattern to wrap the ingestion service with a post-processing script.
- *  First the decorated service will run its logic, then we will run the post-processing script in the same transaction
+ * Decorator that runs a user-defined post-processing SQL script in the same transaction as the data insert.
+ *
+ * When manageTransaction is true (the default, used for at-least-once mode), this class owns the
+ * transaction: BEGIN → insert data → run script → COMMIT / ROLLBACK.
+ *
+ * When manageTransaction is false (used for exactly-once mode), the transaction is owned by
+ * TableWriter so that the post-processing script and the offset metadata update are all committed
+ * atomically in a single Firebolt transaction.
  */
 @Slf4j
 public class IngestionServiceWithPostProcessing implements IngestionService {
@@ -23,17 +29,23 @@ public class IngestionServiceWithPostProcessing implements IngestionService {
     static final String BATCH_ID_COLUMN_NAME = "batch_id";
     private static final String FIREBOLT_BATCH_ID_KEY = "firebolt_param.batch_id";
 
-    private IngestionService ingestionService;
+    private final IngestionService ingestionService;
 
-    // This is the same connection that is used in the IngestionService
-    private Connection connection;
+    // This is the same connection that is used in the wrapped IngestionService
+    private final Connection connection;
 
-    private String postProcessingScript;
+    private final String postProcessingScript;
+    private final boolean manageTransaction;
 
     public IngestionServiceWithPostProcessing(IngestionService ingestionService, Connection connection, String postProcessingScript) {
+        this(ingestionService, connection, postProcessingScript, true);
+    }
+
+    public IngestionServiceWithPostProcessing(IngestionService ingestionService, Connection connection, String postProcessingScript, boolean manageTransaction) {
         this.ingestionService = ingestionService;
         this.connection = connection;
         this.postProcessingScript = postProcessingScript;
+        this.manageTransaction = manageTransaction;
     }
 
     @Override
@@ -41,42 +53,39 @@ public class IngestionServiceWithPostProcessing implements IngestionService {
         String batchId = UUID.randomUUID().toString();
         log.info("Using batch id: {}", batchId);
 
-        // amend all the firebolt records with a batch id
         List<AbstractFireboltRecord> batchIdFireboltRecords = fireboltRecords.stream()
                 .map(fireboltRecord -> new BatchIdFireboltRecord(fireboltRecord, batchId))
                 .collect(Collectors.toList());
-        connection.setAutoCommit(false);
 
-        try {
-            ingestionService.addRecords(batchIdFireboltRecords);
-
-            try (Statement statement = connection.createStatement()) {
-                log.info("Executing the post processing script");
-                String processedScript = processScript(postProcessingScript, batchId);
-                statement.execute(processedScript);
-            }
-
-        } catch (SQLException ex) {
-            log.error("There was an error so rolling back the transaction: ", ex.getMessage());
-            connection.rollback();
-            throw ex;
-        } finally {
+        if (manageTransaction) {
+            connection.setAutoCommit(false);
             try {
+                executeIngestionAndPostProcessing(batchIdFireboltRecords, batchId);
                 connection.commit();
-            } catch (SQLException e) {
-                log.error("Failed to commit the transaction. Will rollback");
+            } catch (SQLException ex) {
+                log.error("Error during ingestion with post-processing, rolling back: {}", ex.getMessage());
                 connection.rollback();
-
-                // rethrow the original exception
-                throw e;
+                throw ex;
+            } finally {
+                connection.setAutoCommit(true);
             }
+        } else {
+            // Transaction is managed externally (by TableWriter in exactly-once mode)
+            executeIngestionAndPostProcessing(batchIdFireboltRecords, batchId);
         }
+    }
 
+    private void executeIngestionAndPostProcessing(List<AbstractFireboltRecord> records, String batchId) throws SQLException {
+        ingestionService.addRecords(records);
+        try (Statement statement = connection.createStatement()) {
+            log.info("Executing the post processing script");
+            statement.execute(processScript(postProcessingScript, batchId));
+        }
     }
 
     @Override
     public void close() {
-        if (ingestionService!= null) {
+        if (ingestionService != null) {
             try {
                 ingestionService.close();
             } catch (Exception e) {
@@ -103,8 +112,6 @@ public class IngestionServiceWithPostProcessing implements IngestionService {
         java.util.Map<String, String> values = java.util.Map.of(FIREBOLT_BATCH_ID_KEY, batchId);
         return StringSubstitutor.replace(script, values, "${", "}");
     }
-
-    
 
     private class BatchIdFireboltRecord implements AbstractFireboltRecord {
 

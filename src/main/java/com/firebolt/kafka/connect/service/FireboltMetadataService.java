@@ -100,7 +100,12 @@ public class FireboltMetadataService {
         }
     }
 
-    public void updateOffsets(String topicName, Map<Integer, Long> offsets) {
+    /**
+     * Updates the committed offsets for the given topic-partitions using the provided connection.
+     * The caller is responsible for committing or rolling back the transaction, which allows this
+     * update to be included atomically in the same Firebolt transaction as the data insert.
+     */
+    public void updateOffsets(Connection connection, String topicName, Map<Integer, Long> offsets) throws SQLException {
         if (StringUtils.isBlank(topicName) || MapUtils.isEmpty(offsets)) {
             log.error("Invalid topic: {}, or offsets {}", topicName, offsets);
             throw new IllegalArgumentException("Topic name or offsets cannot be empty");
@@ -109,21 +114,13 @@ public class FireboltMetadataService {
         String updateSql = String.format("UPDATE \"%s\" SET partition_offset = ? WHERE topic = \"%s\" AND topic_partition = ?",
                 METADATA_TABLE_NAME, topicName);
 
-        try (Connection connection = fireboltDbService.createConnection(jdbcConfig);
-             PreparedStatement updatePs = connection.prepareStatement(updateSql)) {
-
-            for (Map.Entry<Integer, Long> partitionOffset: offsets.entrySet()) {
+        try (PreparedStatement updatePs = connection.prepareStatement(updateSql)) {
+            for (Map.Entry<Integer, Long> partitionOffset : offsets.entrySet()) {
                 updatePs.setLong(1, partitionOffset.getValue());
                 updatePs.setInt(2, partitionOffset.getKey());
-
                 updatePs.addBatch();
             }
             updatePs.executeBatch();
-
-        } catch (SQLException e) {
-            //not authorized exceptions come back as 400 s from firebolt so we can't really differentiate here
-            log.error("Failed to update offsets in metadata table: {}", METADATA_TABLE_NAME, e);
-            throw new RuntimeException("Failed to update offsets in metadata table: " + METADATA_TABLE_NAME, e);
         }
     }
 

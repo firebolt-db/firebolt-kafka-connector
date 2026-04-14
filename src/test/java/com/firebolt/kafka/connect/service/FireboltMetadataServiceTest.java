@@ -162,7 +162,7 @@ class FireboltMetadataServiceTest {
         when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
 
-        metadataService.updateOffsets("t1", updates);
+        metadataService.updateOffsets(mockConnection, "t1", updates);
 
         verify(mockConnection).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(0);
@@ -212,7 +212,7 @@ class FireboltMetadataServiceTest {
         PreparedStatement updatePs = mock(PreparedStatement.class);
         when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
-        metadataService.updateOffsets("topicB", Map.of(1, 7L));
+        metadataService.updateOffsets(mockConnection, "topicB", Map.of(1, 7L));
 
         verify(mockConnection, times(3)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(2);
