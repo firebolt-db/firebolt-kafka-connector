@@ -143,7 +143,11 @@ public class SinkConfig {
         } else {
             return IngestionType.fromValue(value);
         }
+    }
 
-
+    public boolean isAutoEvolveEnabled() {
+        String val = config.get(ConnectorConfigDefinition.AUTO_EVOLVE_CONFIG);
+        if (val == null) return ConnectorConfigDefinition.AUTO_EVOLVE_DEFAULT;
+        return Boolean.parseBoolean(val);
     }
 }

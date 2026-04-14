@@ -21,6 +21,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
@@ -48,6 +50,7 @@ public class FireboltSinkTask extends SinkTask {
     private FireboltDbService fireboltDbService;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
+    private boolean autoEvolveEnabled;
 
     @Override
     public String version() {
@@ -79,6 +82,7 @@ public class FireboltSinkTask extends SinkTask {
             this.assignedTopicPartitions = new HashMap<>();
 
             this.errorToleranceAll = this.sinkConfig.isErrorToleranceAll();
+            this.autoEvolveEnabled = this.sinkConfig.isAutoEvolveEnabled();
             createAndSetErrorReporter();
 
             // Initialize services
@@ -148,6 +152,8 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
+            maybeEvolveTableSchemas(records);
+
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
@@ -251,6 +257,118 @@ public class FireboltSinkTask extends SinkTask {
         if (!tablesNotFoundInFirebolt.isEmpty()) {
             log.error("The following tables were not found in firebolt: {}", tablesNotFoundInFirebolt);
             throw new RuntimeException("The following tables were not found in Firebolt:" + tablesNotFoundInFirebolt.stream().collect(Collectors.joining(",")));
+        }
+    }
+
+    /**
+     * Issues ALTER TABLE ADD COLUMN for any field present in a record's Kafka Connect schema
+     * but absent from the cached Firebolt TableSchema. Runs only when {@code auto.evolve=true}
+     * and only for schema-bearing records ({@code valueSchema() != null}).
+     *
+     * One ADD COLUMN statement is issued per missing column (using IF NOT EXISTS for idempotency).
+     * After any DDL the schema cache for that table is refreshed so the current batch can
+     * already write to the new columns.
+     *
+     * Failures are logged as warnings and do not interrupt record processing.
+     */
+    private void maybeEvolveTableSchemas(Collection<SinkRecord> records) {
+        if (!autoEvolveEnabled) {
+            return;
+        }
+
+        // Collect the first schema seen per topic — all records from the same topic should
+        // carry the same schema version within a single put() batch.
+        Map<String, Schema> topicSchemas = new HashMap<>();
+        for (SinkRecord record : records) {
+            if (record.valueSchema() != null && !topicSchemas.containsKey(record.topic())) {
+                topicSchemas.put(record.topic(), record.valueSchema());
+            }
+        }
+        if (topicSchemas.isEmpty()) {
+            log.debug("auto.evolve: no schema-bearing records in batch — skipping");
+            return;
+        }
+
+        for (Map.Entry<String, Schema> entry : topicSchemas.entrySet()) {
+            String tableName = topicToTableMapping.getOrDefault(entry.getKey(), entry.getKey());
+            TableSchema tableSchema = tableSchemas.get(tableName);
+            if (tableSchema != null) {
+                evolveTableIfNeeded(tableName, entry.getValue(), tableSchema);
+            }
+        }
+    }
+
+    private void evolveTableIfNeeded(String tableName, Schema recordSchema, TableSchema tableSchema) {
+        Set<String> existingColumns = tableSchema.getColumns().stream()
+                .map(col -> col.getName().toLowerCase())
+                .collect(Collectors.toSet());
+
+        JdbcConfig jdbcConfig = sinkConfig.getJdbcConfig();
+        boolean evolved = false;
+
+        for (Field field : recordSchema.fields()) {
+            if (existingColumns.contains(field.name().toLowerCase())) {
+                continue;
+            }
+            String fireboltType = connectTypeToFireboltType(field.schema());
+            if (fireboltType == null) {
+                log.warn("auto.evolve: cannot map Kafka Connect type {} for field '{}' on table '{}' — skipping",
+                        field.schema().type(), field.name(), tableName);
+                continue;
+            }
+            String ddl = "ALTER TABLE \"" + tableName + "\" ADD COLUMN IF NOT EXISTS \""
+                    + field.name() + "\" " + fireboltType + " NULL";
+            log.info("auto.evolve: {}", ddl);
+            try {
+                fireboltDbService.executeUpdate(jdbcConfig, ddl);
+                evolved = true;
+            } catch (Exception e) {
+                log.warn("auto.evolve: DDL failed for column '{}' on table '{}': {}",
+                        field.name(), tableName, e.getMessage());
+            }
+        }
+
+        if (evolved) {
+            // Refresh the cache so the current batch can already populate the new columns.
+            try {
+                Map<String, TableSchema> fresh = fireboltDbService.discoverTableSchemas(jdbcConfig, Set.of(tableName));
+                TableSchema freshSchema = fresh.get(tableName);
+                if (freshSchema != null) {
+                    tableSchema.replaceColumns(freshSchema.getColumns());
+                }
+            } catch (Exception e) {
+                log.warn("auto.evolve: schema refresh after DDL failed for table '{}': {}", tableName, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Maps a Kafka Connect field schema to the Firebolt SQL type used in ADD COLUMN DDL.
+     * Logical types (Decimal, Date, Timestamp) take precedence over the base type.
+     * Returns {@code null} for types that cannot be mapped (STRUCT, ARRAY, MAP) — callers
+     * should skip those fields and log a warning.
+     */
+    private static String connectTypeToFireboltType(Schema schema) {
+        String logicalName = schema.name();
+        if (org.apache.kafka.connect.data.Decimal.LOGICAL_NAME.equals(logicalName)) {
+            int scale = Integer.parseInt(schema.parameters().get(org.apache.kafka.connect.data.Decimal.SCALE_FIELD));
+            return "NUMERIC(38, " + scale + ")";
+        }
+        if (org.apache.kafka.connect.data.Date.LOGICAL_NAME.equals(logicalName)) {
+            return "DATE";
+        }
+        if (org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME.equals(logicalName)) {
+            return "TIMESTAMP";
+        }
+        switch (schema.type()) {
+            case INT8: case INT16: case INT32: return "INTEGER";
+            case INT64:  return "BIGINT";
+            case FLOAT32: return "REAL";
+            case FLOAT64: return "DOUBLE PRECISION";
+            case BOOLEAN: return "BOOLEAN";
+            case STRING:  return "TEXT";
+            case BYTES:   return "BYTEA";
+            default: return null; // STRUCT, ARRAY, MAP — not supported for DDL evolution
         }
     }
 

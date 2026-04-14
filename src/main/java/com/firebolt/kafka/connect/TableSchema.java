@@ -30,6 +30,15 @@ public class TableSchema {
     }
 
     /**
+     * Replaces all columns in-place. Used after a DDL ALTER TABLE ADD COLUMN so that the cached
+     * schema reflects the new columns without creating a new TableSchema object.
+     */
+    public void replaceColumns(List<Column> newColumns) {
+        this.columns.clear();
+        this.columns.addAll(newColumns);
+    }
+
+    /**
      * Represents a column in the table schema.
      */
     @Data
