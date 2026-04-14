@@ -30,6 +30,17 @@ public class TableSchema {
     }
 
     /**
+     * Replaces all columns in-place with the provided list. Used by schema evolution to update
+     * the cached schema so that existing InsertPreparedStatement references see the change
+     * immediately on the next batch (they hold a reference to this object and call
+     * getColumns() fresh on each addRecords() call).
+     */
+    public void replaceColumns(List<Column> newColumns) {
+        this.columns.clear();
+        this.columns.addAll(newColumns);
+    }
+
+    /**
      * Represents a column in the table schema.
      */
     @Data

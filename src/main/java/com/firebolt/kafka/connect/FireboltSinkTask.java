@@ -49,6 +49,11 @@ public class FireboltSinkTask extends SinkTask {
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
 
+    // Schema refresh
+    private boolean schemaRefreshEnabled;
+    private long schemaRefreshIntervalMs;
+    private long lastSchemaRefreshMs = 0L;
+
     @Override
     public String version() {
         try {
@@ -80,6 +85,10 @@ public class FireboltSinkTask extends SinkTask {
 
             this.errorToleranceAll = this.sinkConfig.isErrorToleranceAll();
             createAndSetErrorReporter();
+
+            // Schema refresh
+            this.schemaRefreshEnabled = this.sinkConfig.isSchemaRefreshEnabled();
+            this.schemaRefreshIntervalMs = this.sinkConfig.getSchemaRefreshIntervalMs();
 
             // Initialize services
             this.fireboltDbService = new FireboltDbService();
@@ -148,6 +157,10 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
+            if (schemaRefreshEnabled) {
+                maybeRefreshTableSchemas();
+            }
+
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
@@ -251,6 +264,46 @@ public class FireboltSinkTask extends SinkTask {
         if (!tablesNotFoundInFirebolt.isEmpty()) {
             log.error("The following tables were not found in firebolt: {}", tablesNotFoundInFirebolt);
             throw new RuntimeException("The following tables were not found in Firebolt:" + tablesNotFoundInFirebolt.stream().collect(Collectors.joining(",")));
+        }
+    }
+
+    /**
+     * Periodically re-queries Firebolt's information_schema to pick up columns that were added
+     * to the table after the connector started. Updates the cached TableSchema objects in-place
+     * so that existing InsertPreparedStatement instances see the change on the next batch.
+     *
+     * Runs at most once per schemaRefreshIntervalMs. Failures are logged as warnings
+     * and do not interrupt record processing — the stale schema is kept until the next attempt.
+     */
+    private void maybeRefreshTableSchemas() {
+        long now = System.currentTimeMillis();
+        if (now - lastSchemaRefreshMs < schemaRefreshIntervalMs) {
+            return;
+        }
+
+        log.info("Schema evolution: refreshing schemas for tables {}", tableSchemas.keySet());
+        try {
+            JdbcConfig jdbcConfig = sinkConfig.getJdbcConfig();
+            Map<String, TableSchema> fresh = fireboltDbService.discoverTableSchemas(jdbcConfig, tableSchemas.keySet());
+
+            for (Map.Entry<String, TableSchema> entry : tableSchemas.entrySet()) {
+                TableSchema freshSchema = fresh.get(entry.getKey());
+                if (freshSchema == null) {
+                    log.warn("Schema evolution: table '{}' was not found during refresh — keeping cached schema", entry.getKey());
+                    continue;
+                }
+                List<TableSchema.Column> current = entry.getValue().getColumns();
+                List<TableSchema.Column> updated = freshSchema.getColumns();
+                if (!updated.equals(current)) {
+                    log.info("Schema evolution: table '{}' schema changed ({} -> {} columns), updating cache",
+                            entry.getKey(), current.size(), updated.size());
+                    entry.getValue().replaceColumns(updated);
+                }
+            }
+
+            lastSchemaRefreshMs = now;
+        } catch (Exception e) {
+            log.warn("Schema evolution: schema refresh failed, will retry after interval: {}", e.getMessage());
         }
     }
 

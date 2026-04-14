@@ -46,7 +46,7 @@ public class InsertPreparedStatement implements IngestionService {
     }
 
     public void addRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
-        // since no schema evolution is supported, keep track of all the column names that are present in the records and filter out the ones that are not part of the table schema column names
+        // keep track of all the column names that are present in the records and filter out the ones that are not part of the table schema column names
         Set<String> columnNamesFromRecords = computeColumnNamesFromRecords(fireboltRecords);
 
         // detect all the columns will null values across all records
