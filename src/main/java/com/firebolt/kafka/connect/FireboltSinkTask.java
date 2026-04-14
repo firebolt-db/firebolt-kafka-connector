@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import com.firebolt.kafka.connect.schema.ConnectToFireboltTypeMapper;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -51,6 +52,8 @@ public class FireboltSinkTask extends SinkTask {
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
     private boolean autoEvolveEnabled;
+
+    private static final int DDL_MAX_RETRIES = 3;
 
     @Override
     public String version() {
@@ -152,7 +155,7 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
-            maybeEvolveTableSchemas(records);
+            applySchemaEvolution(records);
 
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
@@ -261,23 +264,18 @@ public class FireboltSinkTask extends SinkTask {
     }
 
     /**
-     * Issues ALTER TABLE ADD COLUMN for any field present in a record's Kafka Connect schema
-     * but absent from the cached Firebolt TableSchema. Runs only when {@code auto.evolve=true}
-     * and only for schema-bearing records ({@code valueSchema() != null}).
-     *
-     * One ADD COLUMN statement is issued per missing column (using IF NOT EXISTS for idempotency).
-     * After any DDL the schema cache for that table is refreshed so the current batch can
-     * already write to the new columns.
-     *
-     * Failures are logged as warnings and do not interrupt record processing.
+     * Compares each batch record's Kafka Connect schema against the cached Firebolt TableSchema
+     * and issues ALTER TABLE ADD COLUMN IF NOT EXISTS for any field that is absent.
+     * Runs only when {@code auto.evolve=true} and only for schema-bearing records.
+     * After DDL the schema cache is refreshed so the current batch already populates the new columns.
      */
-    private void maybeEvolveTableSchemas(Collection<SinkRecord> records) {
+    private void applySchemaEvolution(Collection<SinkRecord> records) {
         if (!autoEvolveEnabled) {
             return;
         }
 
-        // Collect the first schema seen per topic — all records from the same topic should
-        // carry the same schema version within a single put() batch.
+        // Collect the first schema-bearing record per topic. Within a single put() call all
+        // records from the same topic/partition should carry the same schema version.
         Map<String, Schema> topicSchemas = new HashMap<>();
         for (SinkRecord record : records) {
             if (record.valueSchema() != null && !topicSchemas.containsKey(record.topic())) {
@@ -285,20 +283,19 @@ public class FireboltSinkTask extends SinkTask {
             }
         }
         if (topicSchemas.isEmpty()) {
-            log.debug("auto.evolve: no schema-bearing records in batch — skipping");
-            return;
+            return; // schemaless batch — nothing to evolve
         }
 
         for (Map.Entry<String, Schema> entry : topicSchemas.entrySet()) {
             String tableName = topicToTableMapping.getOrDefault(entry.getKey(), entry.getKey());
             TableSchema tableSchema = tableSchemas.get(tableName);
             if (tableSchema != null) {
-                evolveTableIfNeeded(tableName, entry.getValue(), tableSchema);
+                addMissingColumns(tableName, entry.getValue(), tableSchema);
             }
         }
     }
 
-    private void evolveTableIfNeeded(String tableName, Schema recordSchema, TableSchema tableSchema) {
+    private void addMissingColumns(String tableName, Schema recordSchema, TableSchema tableSchema) {
         Set<String> existingColumns = tableSchema.getColumns().stream()
                 .map(col -> col.getName().toLowerCase())
                 .collect(Collectors.toSet());
@@ -310,7 +307,7 @@ public class FireboltSinkTask extends SinkTask {
             if (existingColumns.contains(field.name().toLowerCase())) {
                 continue;
             }
-            String fireboltType = connectTypeToFireboltType(field.schema());
+            String fireboltType = ConnectToFireboltTypeMapper.toFireboltType(field.schema());
             if (fireboltType == null) {
                 log.warn("auto.evolve: cannot map Kafka Connect type {} for field '{}' on table '{}' — skipping",
                         field.schema().type(), field.name(), tableName);
@@ -320,16 +317,15 @@ public class FireboltSinkTask extends SinkTask {
                     + field.name() + "\" " + fireboltType + " NULL";
             log.info("auto.evolve: {}", ddl);
             try {
-                fireboltDbService.executeUpdate(jdbcConfig, ddl);
+                executeWithRetry(jdbcConfig, ddl);
                 evolved = true;
             } catch (Exception e) {
-                log.warn("auto.evolve: DDL failed for column '{}' on table '{}': {}",
-                        field.name(), tableName, e.getMessage());
+                log.warn("auto.evolve: DDL failed after {} attempts for column '{}' on table '{}': {}",
+                        DDL_MAX_RETRIES, field.name(), tableName, e.getMessage());
             }
         }
 
         if (evolved) {
-            // Refresh the cache so the current batch can already populate the new columns.
             try {
                 Map<String, TableSchema> fresh = fireboltDbService.discoverTableSchemas(jdbcConfig, Set.of(tableName));
                 TableSchema freshSchema = fresh.get(tableName);
@@ -343,33 +339,31 @@ public class FireboltSinkTask extends SinkTask {
     }
 
     /**
-     * Maps a Kafka Connect field schema to the Firebolt SQL type used in ADD COLUMN DDL.
-     * Logical types (Decimal, Date, Timestamp) take precedence over the base type.
-     * Returns {@code null} for types that cannot be mapped (STRUCT, ARRAY, MAP) — callers
-     * should skip those fields and log a warning.
+     * Executes a DDL statement with up to {@value #DDL_MAX_RETRIES} attempts and linear back-off.
+     * This makes concurrent tasks that race to ADD the same column (which the second one may see
+     * as a transient error) resilient without failing the batch.
      */
-    private static String connectTypeToFireboltType(Schema schema) {
-        String logicalName = schema.name();
-        if (org.apache.kafka.connect.data.Decimal.LOGICAL_NAME.equals(logicalName)) {
-            int scale = Integer.parseInt(schema.parameters().get(org.apache.kafka.connect.data.Decimal.SCALE_FIELD));
-            return "NUMERIC(38, " + scale + ")";
+    private void executeWithRetry(JdbcConfig jdbcConfig, String ddl) throws Exception {
+        Exception lastException = null;
+        for (int attempt = 1; attempt <= DDL_MAX_RETRIES; attempt++) {
+            try {
+                fireboltDbService.executeUpdate(jdbcConfig, ddl);
+                return;
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt < DDL_MAX_RETRIES) {
+                    log.warn("auto.evolve: DDL attempt {}/{} failed, retrying in {}ms: {}",
+                            attempt, DDL_MAX_RETRIES, attempt * 1000L, e.getMessage());
+                    try {
+                        Thread.sleep(attempt * 1000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("auto.evolve: DDL interrupted", ie);
+                    }
+                }
+            }
         }
-        if (org.apache.kafka.connect.data.Date.LOGICAL_NAME.equals(logicalName)) {
-            return "DATE";
-        }
-        if (org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME.equals(logicalName)) {
-            return "TIMESTAMP";
-        }
-        switch (schema.type()) {
-            case INT8: case INT16: case INT32: return "INTEGER";
-            case INT64:  return "BIGINT";
-            case FLOAT32: return "REAL";
-            case FLOAT64: return "DOUBLE PRECISION";
-            case BOOLEAN: return "BOOLEAN";
-            case STRING:  return "TEXT";
-            case BYTES:   return "BYTEA";
-            default: return null; // STRUCT, ARRAY, MAP — not supported for DDL evolution
-        }
+        throw lastException;
     }
 
     private void handleError(Exception batchException, Collection<SinkRecord> records) {
