@@ -148,11 +148,7 @@ public class SinkConfig {
         if (val == null) {
             return ConnectorConfigDefinition.SCHEMA_REFRESH_INTERVAL_MS_DEFAULT;
         }
-        try {
-            return Long.parseLong(val);
-        } catch (NumberFormatException e) {
-            return ConnectorConfigDefinition.SCHEMA_REFRESH_INTERVAL_MS_DEFAULT;
-        }
+        return Long.parseLong(val);
     }
 
     public IngestionType getIngestionType() {

@@ -157,9 +157,7 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
-            if (schemaRefreshEnabled) {
-                maybeRefreshTableSchemas();
-            }
+            maybeRefreshTableSchemas();
 
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
@@ -276,6 +274,9 @@ public class FireboltSinkTask extends SinkTask {
      * and do not interrupt record processing — the stale schema is kept until the next attempt.
      */
     private void maybeRefreshTableSchemas() {
+        if (!schemaRefreshEnabled) {
+            return;
+        }
         long now = System.currentTimeMillis();
         if (now - lastSchemaRefreshMs < schemaRefreshIntervalMs) {
             return;

@@ -78,9 +78,9 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
 
         // Send records before the schema change — these should land without "extra"
         publishMessages(List.of(
-                row(1, "alice", null),
-                row(2, "bob", null),
-                row(3, "carol", null)
+                row(1, "alice"),
+                row(2, "bob"),
+                row(3, "carol")
         ));
         waitForDataInFirebolt(tableName, 3);
 
@@ -93,9 +93,9 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
 
         // Now send records that include the new field
         publishMessages(List.of(
-                row(4, "dave",  "value-4"),
-                row(5, "eve",   "value-5"),
-                row(6, "frank", "value-6")
+                row(4, "dave",  "extra", "value-4"),
+                row(5, "eve",   "extra", "value-5"),
+                row(6, "frank", "extra", "value-6")
         ));
         waitForDataInFirebolt(tableName, 6);
 
@@ -133,8 +133,8 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
 
         // Records intentionally do not include "extra"
         publishMessages(List.of(
-                row(1, "alice", null),
-                row(2, "bob",   null)
+                row(1, "alice"),
+                row(2, "bob")
         ));
         waitForDataInFirebolt(tableName, 2);
 
@@ -166,8 +166,8 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
         // Record 1 has the field — should use the record value
         // Record 2 does not have the field — should get the Firebolt DEFAULT
         publishMessages(List.of(
-                row(1, "alice", "custom_val"),
-                row(2, "bob",   null)             // null → omitted from JSON → column gets DEFAULT
+                row(1, "alice", "extra", "custom_val"),
+                row(2, "bob")                     // no "extra" key → column gets DEFAULT
         ));
         waitForDataInFirebolt(tableName, 2);
 
@@ -199,8 +199,8 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
         Thread.sleep(SLEEP_AFTER_ALTER_MS);
 
         publishMessages(List.of(
-                row(1, "alice", "value-1"),
-                row(2, "bob",   "value-2")
+                row(1, "alice", "extra", "value-1"),
+                row(2, "bob",   "extra", "value-2")
         ));
         waitForDataInFirebolt(tableName, 2);
 
@@ -233,9 +233,9 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
         Thread.sleep(SLEEP_AFTER_ALTER_MS);
 
         // Send records with both new fields
-        publishRichMessages(List.of(
-                richRow(1, "alice", "val-a", 10),
-                richRow(2, "bob",   "val-b", 20)
+        publishMessages(List.of(
+                row(1, "alice", "extra1", "val-a", "extra2", 10),
+                row(2, "bob",   "extra1", "val-b", "extra2", 20)
         ));
         waitForDataInFirebolt(tableName, 2);
 
@@ -264,13 +264,27 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
         );
     }
 
-    /** Produces a plain JSON object with id, name, and optionally extra. */
-    private String row(int id, String name, String extra) throws Exception {
+    /**
+     * Produces a JSON object with id, name, and any additional columns supplied as
+     * alternating key/value varargs (e.g. {@code row(1, "alice", "extra", "val", "extra2", 42)}).
+     * Null values are omitted from the JSON so the corresponding Firebolt column receives its
+     * DEFAULT (or NULL for nullable columns).
+     */
+    private String row(int id, String name, Object... keyValuePairs) {
         StringBuilder sb = new StringBuilder("{");
         sb.append("\"id\":").append(id).append(",");
         sb.append("\"name\":").append(name == null ? "null" : "\"" + name + "\"");
-        if (extra != null) {
-            sb.append(",\"extra\":\"").append(extra).append("\"");
+        for (int i = 0; i < keyValuePairs.length; i += 2) {
+            String key = (String) keyValuePairs[i];
+            Object val = keyValuePairs[i + 1];
+            if (val != null) {
+                sb.append(",\"").append(key).append("\":");
+                if (val instanceof String) {
+                    sb.append("\"").append(val).append("\"");
+                } else {
+                    sb.append(val);
+                }
+            }
         }
         sb.append("}");
         return sb.toString();
@@ -294,20 +308,6 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
         } else {
             assertEquals(expectedExtra, rs.getString("extra"), "extra mismatch");
         }
-    }
-
-    /** Produces a JSON object with id, name, extra1 (text), and extra2 (int). */
-    private String richRow(int id, String name, String extra1, int extra2) {
-        return String.format("{\"id\":%d,\"name\":\"%s\",\"extra1\":\"%s\",\"extra2\":%d}",
-                id, name, extra1, extra2);
-    }
-
-    private void publishRichMessages(List<String> jsonPayloads) throws Exception {
-        for (String payload : jsonPayloads) {
-            ProducerRecord<String, String> record = new ProducerRecord<>(topicName, payload);
-            producer.send(record).get();
-        }
-        producer.flush();
     }
 
     private void assertNextRichRow(ResultSet rs, int expectedId, String expectedName,
