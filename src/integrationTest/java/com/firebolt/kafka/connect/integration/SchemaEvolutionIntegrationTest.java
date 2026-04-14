@@ -213,6 +213,65 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
     }
 
     /**
+     * A nullable column is dropped from Firebolt after the connector has started.
+     * <p>
+     * Scenario A — records arrive <em>after</em> the refresh interval: the connector picks up
+     * the schema change on its periodic refresh and subsequent records land cleanly with the
+     * dropped field silently ignored.
+     * <p>
+     * Scenario B — records arrive <em>before</em> the refresh interval fires: the connector
+     * detects the insert failure caused by the stale schema, immediately forces a schema refresh,
+     * and retries the batch successfully within the same {@code put()} call.  No records are lost
+     * and no task restart is required.
+     */
+    @Test
+    void droppedColumnIsRemovedFromCacheAndIgnoredOnInsert() throws Exception {
+        // Start with a table that has an "extra" column
+        Supplier<String> schemaWithExtra = () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"name\" TEXT NULL, " +
+                "\"extra\" TEXT NULL" +
+                ")";
+        setupSchemalessTestResources(topicName, tableName, schemaWithExtra,
+                schemaEvolutionConnectorOverrides());
+
+        producer = initializeSchemalessJsonProducer();
+
+        // Send a row while "extra" still exists — it should be stored
+        publishMessages(List.of(row(1, "alice", "extra", "value-1")));
+        waitForDataInFirebolt(tableName, 1);
+
+        // DBA drops the column directly in Firebolt — connector has NOT refreshed yet
+        fireboltDefaultDbClient.executeUpdate(
+                "ALTER TABLE \"" + tableName + "\" DROP COLUMN \"extra\"");
+
+        // Send records immediately (before the refresh interval elapses).
+        // The connector's first insert attempt will fail because the cached schema still
+        // references "extra".  The connector must self-heal: force a schema refresh and
+        // retry, completing without a task failure.
+        publishMessages(List.of(
+                row(2, "bob",   "extra", "value-2"),
+                row(3, "carol", "extra", "value-3")
+        ));
+        waitForDataInFirebolt(tableName, 3);
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"name\" FROM \"" + tableName + "\" ORDER BY \"id\"")) {
+            assertEquals(true, rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("alice", rs.getString("name"));
+
+            assertEquals(true, rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertEquals("bob", rs.getString("name"));
+
+            assertEquals(true, rs.next());
+            assertEquals(3, rs.getInt("id"));
+            assertEquals("carol", rs.getString("name"));
+        }
+    }
+
+    /**
      * Two nullable columns are added to Firebolt simultaneously.
      * The connector's schema refresh must pick up both new columns in one pass
      * and start populating them correctly from subsequent Kafka records.

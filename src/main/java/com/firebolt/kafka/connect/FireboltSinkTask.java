@@ -162,9 +162,28 @@ public class FireboltSinkTask extends SinkTask {
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
-        } catch (Exception batchException) {
-            log.error("Error processing records", batchException);
-            handleError(batchException, records);
+        } catch (Exception firstException) {
+            if (schemaRefreshEnabled) {
+                // A Firebolt schema change (e.g. DROP COLUMN, RENAME COLUMN) may have caused
+                // the failure while the connector still held a stale cached schema.
+                // Force an immediate schema refresh and retry the batch once before treating
+                // this as a permanent error.
+                log.warn("Batch failed — forcing immediate schema refresh and retrying once. Cause: {}",
+                        firstException.getMessage());
+                lastSchemaRefreshMs = 0L;
+                try {
+                    maybeRefreshTableSchemas();
+                    fireboltSinkService.processRecord(records, tableSchemas);
+                    log.info("Batch succeeded after schema refresh.");
+                    return;
+                } catch (Exception retryException) {
+                    log.error("Batch still failed after schema refresh", retryException);
+                    handleError(retryException, records);
+                    return;
+                }
+            }
+            log.error("Error processing records", firstException);
+            handleError(firstException, records);
         }
     }
 
@@ -266,12 +285,26 @@ public class FireboltSinkTask extends SinkTask {
     }
 
     /**
-     * Periodically re-queries Firebolt's information_schema to pick up columns that were added
-     * to the table after the connector started. Updates the cached TableSchema objects in-place
-     * so that existing InsertPreparedStatement instances see the change on the next batch.
+     * Periodically re-queries Firebolt's {@code information_schema} to detect schema changes in
+     * the target tables and update the connector's cached schemas accordingly.
      *
-     * Runs at most once per schemaRefreshIntervalMs. Failures are logged as warnings
-     * and do not interrupt record processing — the stale schema is kept until the next attempt.
+     * <p>Handles all schema-change scenarios that can occur in Firebolt independently of the
+     * connector:
+     * <ul>
+     *   <li><b>ADD COLUMN</b> — new column is added to the cache; subsequent Kafka records
+     *       that include a matching field will populate it.</li>
+     *   <li><b>DROP COLUMN / RENAME COLUMN</b> — the column disappears from the cache.
+     *       Kafka record fields whose names no longer match any column in the table are
+     *       silently ignored on insert. A {@code WARN} is logged listing the removed columns
+     *       so operators can detect data loss early and update their producers if needed.</li>
+     *   <li><b>Table not found</b> — the table may have been dropped. The stale cache is
+     *       retained; a {@code WARN} is logged. Subsequent insert attempts will fail at the
+     *       database level until the table is recreated.</li>
+     * </ul>
+     *
+     * <p>Runs at most once per {@code schema.refresh.interval.ms}. Failures are logged as
+     * warnings and do not interrupt record processing — the stale schema is kept until the
+     * next attempt.
      */
     private void maybeRefreshTableSchemas() {
         if (!schemaRefreshEnabled) {
@@ -282,29 +315,57 @@ public class FireboltSinkTask extends SinkTask {
             return;
         }
 
-        log.info("Schema evolution: refreshing schemas for tables {}", tableSchemas.keySet());
+        log.info("Schema refresh: querying Firebolt for current schema of tables {}", tableSchemas.keySet());
         try {
             JdbcConfig jdbcConfig = sinkConfig.getJdbcConfig();
             Map<String, TableSchema> fresh = fireboltDbService.discoverTableSchemas(jdbcConfig, tableSchemas.keySet());
 
             for (Map.Entry<String, TableSchema> entry : tableSchemas.entrySet()) {
-                TableSchema freshSchema = fresh.get(entry.getKey());
+                String tableName = entry.getKey();
+                TableSchema freshSchema = fresh.get(tableName);
                 if (freshSchema == null) {
-                    log.warn("Schema evolution: table '{}' was not found during refresh — keeping cached schema", entry.getKey());
+                    log.warn("Schema refresh: table '{}' was not found in Firebolt — " +
+                             "it may have been dropped. Keeping cached schema; inserts will fail " +
+                             "until the table is recreated.", tableName);
                     continue;
                 }
+
                 List<TableSchema.Column> current = entry.getValue().getColumns();
                 List<TableSchema.Column> updated = freshSchema.getColumns();
                 if (!updated.equals(current)) {
-                    log.info("Schema evolution: table '{}' schema changed ({} -> {} columns), updating cache",
-                            entry.getKey(), current.size(), updated.size());
+                    Set<String> currentNames = current.stream()
+                            .map(TableSchema.Column::getName)
+                            .collect(Collectors.toSet());
+                    Set<String> updatedNames = updated.stream()
+                            .map(TableSchema.Column::getName)
+                            .collect(Collectors.toSet());
+
+                    Set<String> addedColumns = new HashSet<>(updatedNames);
+                    addedColumns.removeAll(currentNames);
+                    Set<String> removedColumns = new HashSet<>(currentNames);
+                    removedColumns.removeAll(updatedNames);
+
+                    if (!addedColumns.isEmpty()) {
+                        log.info("Schema refresh: table '{}' has {} new column(s): {}. " +
+                                 "Kafka records with matching fields will populate these columns.",
+                                 tableName, addedColumns.size(), addedColumns);
+                    }
+                    if (!removedColumns.isEmpty()) {
+                        log.warn("Schema refresh: table '{}' is missing {} column(s) that were previously present: {}. " +
+                                 "This may indicate a DROP COLUMN or RENAME COLUMN in Firebolt. " +
+                                 "Kafka record fields for these columns will be silently ignored on insert.",
+                                 tableName, removedColumns.size(), removedColumns);
+                    }
+
+                    log.info("Schema refresh: updating cached schema for table '{}' ({} -> {} columns)",
+                             tableName, current.size(), updated.size());
                     entry.getValue().replaceColumns(updated);
                 }
             }
 
             lastSchemaRefreshMs = now;
         } catch (Exception e) {
-            log.warn("Schema evolution: schema refresh failed, will retry after interval: {}", e.getMessage());
+            log.warn("Schema refresh: failed — will retry after interval. Cause: {}", e.getMessage());
         }
     }
 
