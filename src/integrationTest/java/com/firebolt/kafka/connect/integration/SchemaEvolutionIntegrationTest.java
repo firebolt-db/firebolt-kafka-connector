@@ -423,6 +423,98 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
     }
 
     /**
+     * ADD, DROP, and RENAME happen concurrently (between two consecutive Kafka batches).
+     *
+     * <p>Starting schema: {@code id, name, extra, to_drop}.
+     * <br>Changes applied while the connector holds the stale cache:
+     * <ul>
+     *   <li>DROP COLUMN {@code to_drop}</li>
+     *   <li>RENAME COLUMN {@code extra} → {@code extra_v2}</li>
+     *   <li>ADD COLUMN {@code new_col TEXT NULL}</li>
+     * </ul>
+     * Resulting schema: {@code id, name, extra_v2, new_col}.
+     *
+     * <p>Row 2 is sent immediately after all three DDL statements, before the refresh
+     * interval fires.  The connector self-heals in a single {@code put()} call:
+     * <ul>
+     *   <li>First INSERT fails — stale schema references {@code extra} and {@code to_drop}.</li>
+     *   <li>{@code refreshTableSchemas()} runs, picking up all three changes at once.</li>
+     *   <li>Retry succeeds.  Fields {@code extra} and {@code to_drop} have no match in the
+     *       refreshed schema and are silently dropped; {@code new_col} is populated.</li>
+     * </ul>
+     * Row 3 is sent after the self-heal and uses the updated column names directly.
+     */
+    @Test
+    void concurrentAddDropRename_selfHealAndContinue() throws Exception {
+        Supplier<String> schemaWithFourColumns = () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"name\" TEXT NULL, " +
+                "\"extra\" TEXT NULL, " +
+                "\"to_drop\" TEXT NULL" +
+                ")";
+        setupSchemalessTestResources(topicName, tableName, schemaWithFourColumns,
+                schemaEvolutionConnectorOverrides());
+
+        producer = initializeSchemalessJsonProducer();
+
+        // Row 1: baseline insert before any schema changes
+        publishMessages(List.of(row(1, "alice", "extra", "orig-extra", "to_drop", "orig-drop")));
+        waitForDataInFirebolt(tableName, 1);
+
+        // Apply all three DDL changes before the connector's next refresh
+        fireboltDefaultDbClient.executeUpdate("SET enable_alter_table_drop_column=true");
+        fireboltDefaultDbClient.executeUpdate(
+                "ALTER TABLE \"" + tableName + "\" DROP COLUMN \"to_drop\"");
+        fireboltDefaultDbClient.executeUpdate("SET enable_alter_table_rename_column=true");
+        fireboltDefaultDbClient.executeUpdate(
+                "ALTER TABLE \"" + tableName + "\" RENAME COLUMN \"extra\" TO \"extra_v2\"");
+        fireboltDefaultDbClient.executeUpdate(
+                "ALTER TABLE \"" + tableName + "\" ADD COLUMN \"new_col\" TEXT NULL");
+
+        // Row 2: sent immediately — carries old field names plus the new field.
+        // Self-heal: first INSERT fails (stale schema), connector refreshes all changes
+        // in one pass and retries.  "extra" and "to_drop" have no match → silently dropped.
+        // "new_col" matches → populated.
+        publishMessages(List.of(row(2, "bob",
+                "extra",   "should-be-dropped",
+                "to_drop", "should-be-dropped-too",
+                "new_col", "added")));
+        waitForDataInFirebolt(tableName, 2);
+
+        // Row 3: uses the post-DDL column names — all fields should land correctly
+        publishMessages(List.of(row(3, "carol",
+                "extra_v2", "renamed-val",
+                "new_col",  "new-val")));
+        waitForDataInFirebolt(tableName, 3);
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"name\", \"extra_v2\", \"new_col\" FROM \"" + tableName + "\" ORDER BY \"id\"")) {
+
+            // Row 1: inserted before the DDL; "extra" data is accessible under the renamed
+            // column name, "new_col" was not yet present so it is NULL
+            assertEquals(true, rs.next(), "Expected row 1");
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("alice", rs.getString("name"));
+            assertEquals("orig-extra", rs.getString("extra_v2"));
+            assertNull(rs.getString("new_col"), "new_col should be NULL for row 1 (column didn't exist yet)");
+
+            // Row 2: self-heal path; "extra" and "to_drop" were silently dropped, "new_col" populated
+            assertEquals(true, rs.next(), "Expected row 2");
+            assertEquals(2, rs.getInt("id"));
+            assertEquals("bob", rs.getString("name"));
+            assertNull(rs.getString("extra_v2"), "extra_v2 should be NULL — Kafka field 'extra' had no match after rename");
+            assertEquals("added", rs.getString("new_col"));
+
+            // Row 3: used post-DDL column names; all data lands correctly
+            assertEquals(true, rs.next(), "Expected row 3");
+            assertEquals(3, rs.getInt("id"));
+            assertEquals("carol", rs.getString("name"));
+            assertEquals("renamed-val", rs.getString("extra_v2"));
+            assertEquals("new-val", rs.getString("new_col"));
+        }
+    }
+
+    /**
      * Two nullable columns are added to Firebolt simultaneously.
      * The connector's schema refresh must pick up both new columns in one pass
      * and start populating them correctly from subsequent Kafka records.
