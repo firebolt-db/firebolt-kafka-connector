@@ -157,7 +157,7 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
-            maybeRefreshTableSchemas();
+            refreshTableSchemasPeriodic();
 
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
@@ -170,9 +170,8 @@ public class FireboltSinkTask extends SinkTask {
                 // this as a permanent error.
                 log.warn("Batch failed — forcing immediate schema refresh and retrying once. Cause: {}",
                         firstException.getMessage());
-                lastSchemaRefreshMs = 0L;
                 try {
-                    maybeRefreshTableSchemas();
+                    refreshTableSchemas();
                     fireboltSinkService.processRecord(records, tableSchemas);
                     log.info("Batch succeeded after schema refresh.");
                     return;
@@ -285,8 +284,7 @@ public class FireboltSinkTask extends SinkTask {
     }
 
     /**
-     * Periodically re-queries Firebolt's {@code information_schema} to detect schema changes in
-     * the target tables and update the connector's cached schemas accordingly.
+     * Re-queries Firebolt's {@code information_schema} immediately and updates the cached schemas.
      *
      * <p>Handles all schema-change scenarios that can occur in Firebolt independently of the
      * connector:
@@ -302,19 +300,14 @@ public class FireboltSinkTask extends SinkTask {
      *       database level until the table is recreated.</li>
      * </ul>
      *
-     * <p>Runs at most once per {@code schema.refresh.interval.ms}. Failures are logged as
-     * warnings and do not interrupt record processing — the stale schema is kept until the
-     * next attempt.
+     * <p>Called directly when a batch insert fails so the connector can recover from a stale
+     * schema without a task restart. Also called by {@link #refreshTableSchemasPeriodic()} on
+     * the normal polling cadence.
+     *
+     * <p>Failures are logged as warnings and do not interrupt record processing — the stale
+     * schema is kept until the next attempt.
      */
-    private void maybeRefreshTableSchemas() {
-        if (!schemaRefreshEnabled) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (now - lastSchemaRefreshMs < schemaRefreshIntervalMs) {
-            return;
-        }
-
+    private void refreshTableSchemas() {
         log.info("Schema refresh: querying Firebolt for current schema of tables {}", tableSchemas.keySet());
         try {
             JdbcConfig jdbcConfig = sinkConfig.getJdbcConfig();
@@ -363,10 +356,24 @@ public class FireboltSinkTask extends SinkTask {
                 }
             }
 
-            lastSchemaRefreshMs = now;
+            lastSchemaRefreshMs = System.currentTimeMillis();
         } catch (Exception e) {
             log.warn("Schema refresh: failed — will retry after interval. Cause: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Calls {@link #refreshTableSchemas()} at most once per {@code schema.refresh.interval.ms}.
+     * No-op if schema refresh is disabled or the interval has not yet elapsed.
+     */
+    private void refreshTableSchemasPeriodic() {
+        if (!schemaRefreshEnabled) {
+            return;
+        }
+        if (System.currentTimeMillis() - lastSchemaRefreshMs < schemaRefreshIntervalMs) {
+            return;
+        }
+        refreshTableSchemas();
     }
 
     private void handleError(Exception batchException, Collection<SinkRecord> records) {

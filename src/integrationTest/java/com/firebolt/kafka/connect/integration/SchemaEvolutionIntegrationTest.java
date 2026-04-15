@@ -316,10 +316,8 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
         publishMessages(List.of(row(2, "bob", "extra", "should-be-dropped")));
         waitForDataInFirebolt(tableName, 2);
 
-        // Wait for the periodic refresh interval so the connector picks up "extra_v2"
-        Thread.sleep(SLEEP_AFTER_ALTER_MS);
-
-        // Row 3: uses the new column name — should be stored correctly
+        // Row 3: uses the new column name — no sleep needed because the self-heal triggered
+        // by row 2 already refreshed the schema; the connector knows about "extra_v2" now.
         publishMessages(List.of(row(3, "carol", "extra_v2", "new-value")));
         waitForDataInFirebolt(tableName, 3);
 
@@ -345,6 +343,83 @@ public class SchemaEvolutionIntegrationTest extends SchemalessBaseIntegrationTes
             assertEquals("carol", rs.getString("name"));
             assertEquals("new-value", rs.getString("extra_v2"));
         }
+    }
+
+    /**
+     * The original target table is renamed and a brand-new table with the same name (but a
+     * different schema) is created in its place while the connector is running.
+     *
+     * <p>Expected behaviour:
+     * <ul>
+     *   <li>Records sent before the swap land in the original table.</li>
+     *   <li>Records sent immediately after the swap (before the refresh interval) trigger a
+     *       stale-schema insert failure.  The connector self-heals: it forces an immediate
+     *       schema refresh, discovers the new table layout, and retries the batch within the
+     *       same {@code put()} call — no task restart required.</li>
+     *   <li>Subsequent records are inserted into the new table using the new schema.  Fields
+     *       that don't match any column in the new table are silently dropped.</li>
+     *   <li>The renamed table is untouched after the swap — no connector writes reach it.</li>
+     * </ul>
+     */
+    @Test
+    void tableReplacedWithDifferentSchema_selfHealAndContinue() throws Exception {
+        Supplier<String> originalSchema = () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"name\" TEXT NULL, " +
+                "\"extra\" TEXT NULL" +
+                ")";
+        setupSchemalessTestResources(topicName, tableName, originalSchema,
+                schemaEvolutionConnectorOverrides());
+
+        producer = initializeSchemalessJsonProducer();
+
+        // Row 1: confirm the connector is alive and writing to the original table
+        publishMessages(List.of(row(1, "alice", "extra", "original-value")));
+        waitForDataInFirebolt(tableName, 1);
+
+        // DBA renames the original table and creates a replacement with a different schema.
+        // The connector has NOT refreshed its cache yet.
+        String archivedTableName = tableName + "_archived";
+        fireboltDefaultDbClient.executeUpdate(
+                "ALTER TABLE \"" + tableName + "\" RENAME TO \"" + archivedTableName + "\"");
+        fireboltDefaultDbClient.executeUpdate(
+                "CREATE TABLE \"" + tableName + "\" (\"id\" INTEGER NOT NULL, \"value\" TEXT NULL)");
+
+        // Row 2: sent immediately after the swap.  The connector's INSERT will fail because
+        // the cached schema references "name" and "extra", which don't exist in the new table.
+        // The connector must self-heal: refresh the schema and retry.  On retry, only "id"
+        // matches; "name" and "extra" are silently dropped.
+        publishMessages(List.of(row(2, "bob", "extra", "will-be-dropped")));
+        waitForDataInFirebolt(tableName, 1);  // new table has 1 row (row 2); row 1 is in the archived table
+
+        // Row 3: sent after self-heal; uses the new column name — should land correctly
+        publishMessages(List.of(row(3, null, "value", "new-value")));
+        waitForDataInFirebolt(tableName, 2);
+
+        // Verify new table: contains only rows 2 and 3 (connector writes to the new table)
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"value\" FROM \"" + tableName + "\" ORDER BY \"id\"")) {
+            assertEquals(true, rs.next(), "Expected row 2 in new table");
+            assertEquals(2, rs.getInt("id"));
+            assertNull(rs.getString("value"), "value should be NULL — Kafka fields 'name'/'extra' had no match in new schema");
+
+            assertEquals(true, rs.next(), "Expected row 3 in new table");
+            assertEquals(3, rs.getInt("id"));
+            assertEquals("new-value", rs.getString("value"));
+        }
+
+        // Verify the archived table is untouched — only row 1 from before the swap
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"name\", \"extra\" FROM \"" + archivedTableName + "\" ORDER BY \"id\"")) {
+            assertEquals(true, rs.next(), "Expected row 1 in archived table");
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("alice", rs.getString("name"));
+            assertEquals("original-value", rs.getString("extra"));
+            assertEquals(false, rs.next(), "Archived table should have exactly 1 row");
+        }
+
+        // Cleanup the archived table (not handled by the standard tearDown)
+        fireboltDefaultDbClient.dropTable(archivedTableName);
     }
 
     /**
