@@ -78,6 +78,7 @@ jobs:
       # build from the exact tag that was created and pushed above
       branch: refs/tags/${{ github.event.inputs.tag_name }}
       buildArtifacts: true
+      buildConfluentArchive: true
 
   publish:
     runs-on: ubuntu-latest
@@ -100,6 +101,11 @@ jobs:
         with:
           name: ${{ needs.build.outputs.sources-jar }}
           path: sources-jar
+      - name: Download confluent-archive
+        uses: actions/download-artifact@v7.0.0
+        with:
+          name: ${{ needs.build.outputs.confluent-archive }}
+          path: confluent-archive
 
       - name: List downloaded artifacts
         run: |
@@ -109,13 +115,15 @@ jobs:
           ls -la uber-jar || true
           echo "sources-jar contents:"
           ls -la sources-jar || true
+          echo "confluent-archive contents:"
+          ls -la confluent-archive || true
 
       # e6ac9c2ff1018fca4464bf2480155faeb66f9bdb == v1.6.1
       - uses: xresloader/upload-to-github-release@e6ac9c2ff1018fca4464bf2480155faeb66f9bdb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          file: "uber-jar/**/*.jar;sources-jar/**/*.jar"
+          file: "uber-jar/**/*.jar;sources-jar/**/*.jar;confluent-archive/**/*.zip"
           tags: true
           draft: false
           tag_name: ${{ env.RELEASE_TAG }}
