@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: false
+      buildConfluentArchive:
+        description: 'Build and upload the Confluent Hub archive ZIP'
+        required: false
+        type: boolean
+        default: false
     
     outputs:
       uber-jar:
@@ -20,6 +25,9 @@ on:
       sources-jar:
         description: 'Artifact name for sources JAR'
         value: ${{ jobs.build.outputs.sources-jar }}
+      confluent-archive:
+        description: 'Artifact name for Confluent Hub archive ZIP'
+        value: ${{ jobs.build.outputs.confluent-archive }}
   push:
 
 env:
@@ -31,6 +39,7 @@ jobs:
     outputs:
       uber-jar: ${{ steps.artifact_names.outputs.uber_name }}
       sources-jar: ${{ steps.artifact_names.outputs.sources_name }}
+      confluent-archive: ${{ steps.artifact_names.outputs.confluent_name }}
     
     strategy:
       matrix:
@@ -76,7 +85,7 @@ jobs:
       run: ./gradlew sourcesJar --no-daemon
     
     - name: Compute artifact names
-      if: ${{ inputs.buildArtifacts }}
+      if: ${{ inputs.buildArtifacts || inputs.buildConfluentArchive }}
       id: artifact_names
       run: |
         BASE=$(grep '^archivesBaseName=' gradle.properties | sed 's/archivesBaseName=//')
@@ -85,6 +94,8 @@ jobs:
         echo "sources_name=${BASE}-${VERSION}-sources.jar" >> $GITHUB_OUTPUT
         echo "uber_path=build/libs/${BASE}-${VERSION}.jar" >> $GITHUB_OUTPUT
         echo "sources_path=build/libs/${BASE}-${VERSION}-sources.jar" >> $GITHUB_OUTPUT
+        echo "confluent_name=firebolt-db-firebolt-kafka-connect-${VERSION}.zip" >> $GITHUB_OUTPUT
+        echo "confluent_path=build/confluent/firebolt-db-firebolt-kafka-connect-${VERSION}.zip" >> $GITHUB_OUTPUT
               
     - name: Upload test results
       uses: actions/upload-artifact@v6
@@ -110,6 +121,18 @@ jobs:
       with:
         name: ${{ steps.artifact_names.outputs.sources_name }}
         path: ${{ steps.artifact_names.outputs.sources_path }}
+        if-no-files-found: error
+
+    - name: Build Confluent Hub archive
+      if: ${{ inputs.buildConfluentArchive }}
+      run: ./gradlew createConfluentArchive --no-daemon
+
+    - name: Upload Confluent Hub archive
+      if: ${{ inputs.buildConfluentArchive }}
+      uses: actions/upload-artifact@v6
+      with:
+        name: ${{ steps.artifact_names.outputs.confluent_name }}
+        path: ${{ steps.artifact_names.outputs.confluent_path }}
         if-no-files-found: error
           
     - name: Upload build reports
