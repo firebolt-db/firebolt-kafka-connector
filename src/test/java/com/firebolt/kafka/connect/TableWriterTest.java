@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -109,6 +110,11 @@ public class TableWriterTest {
         assertEquals(100L, offsets.get(0));
         assertEquals(200L, offsets.get(1));
         assertEquals(300L, offsets.get(2));
+        verify(mockFireboltMetadataService).updateOffsets(eq(TOPIC_NAME), eq(Map.of(
+                PARTITION_0, 100L,
+                PARTITION_1, 200L,
+                PARTITION_2, 300L
+        )));
     }
 
     @Test
@@ -117,10 +123,10 @@ public class TableWriterTest {
         when(mockFireboltRecord1.getOffset()).thenReturn(100L);
 
         when(mockFireboltRecord2.getPartition()).thenReturn(0);
-        when(mockFireboltRecord2.getOffset()).thenReturn(101L);
+        when(mockFireboltRecord2.getOffset()).thenReturn(102L);
 
         when(mockFireboltRecord3.getPartition()).thenReturn(0);
-        when(mockFireboltRecord3.getOffset()).thenReturn(102L);
+        when(mockFireboltRecord3.getOffset()).thenReturn(101L);
 
         List<AbstractFireboltRecord> records = List.of(mockFireboltRecord1, mockFireboltRecord2, mockFireboltRecord3);
         doNothing().when(mockIngestionService).addRecords(records);
@@ -131,8 +137,27 @@ public class TableWriterTest {
         assertEquals(102L, offsets.get(0));
         assertEquals(-1L, offsets.get(1));
         assertEquals(-1L, offsets.get(2));
+        verify(mockFireboltMetadataService).updateOffsets(eq(TOPIC_NAME), eq(Map.of(PARTITION_0, 102L)));
     }
 
+    @Test
+    void shouldInsertRecordsWithoutPersistingOffsetsWhenMetadataServiceIsNotConfigured() throws SQLException {
+        TableWriter atLeastOnceTableWriter = new TableWriter(
+                mockTableSchema,
+                null,
+                TOPIC_NAME,
+                new HashMap<>(Map.of(PARTITION_0, -1L)),
+                mockIngestionService
+        );
+
+        when(mockFireboltRecord1.getPartition()).thenReturn(PARTITION_0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(100L);
+
+        List<AbstractFireboltRecord> records = List.of(mockFireboltRecord1);
+        assertDoesNotThrow(() -> atLeastOnceTableWriter.insertRecords(records));
+
+        assertEquals(100L, atLeastOnceTableWriter.getProcessedPartitionOffsets().get(PARTITION_0));
+    }
 
     @Test
     void shouldHandleEmptyRecordsList() throws Exception {
@@ -140,14 +165,26 @@ public class TableWriterTest {
         assertDoesNotThrow(() -> tableWriter.insertRecords(emptyRecords));
 
         verify(mockIngestionService, never()).addRecords(any());
+        verify(mockFireboltMetadataService, never()).updateOffsets(any(), any());
     }
 
     @Test
     void shouldThrowSQLExceptionWhenIngestionFails() throws SQLException {
         doThrow(SQLException.class).when(mockIngestionService).addRecords(anyList());
         assertThrows(SQLException.class, () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+        verify(mockFireboltMetadataService, never()).updateOffsets(any(), any());
     }
 
+    @Test
+    void shouldNotAdvanceProcessedOffsetsWhenMetadataUpdateFails() {
+        when(mockFireboltRecord1.getPartition()).thenReturn(PARTITION_0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(100L);
+        doThrow(RuntimeException.class).when(mockFireboltMetadataService).updateOffsets(eq(TOPIC_NAME), any());
+
+        assertThrows(RuntimeException.class, () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+
+        assertEquals(-1L, tableWriter.getProcessedPartitionOffsets().get(PARTITION_0));
+    }
 
     @Test
     void shouldCloseTableWriterSuccessfully() throws Exception {

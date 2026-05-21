@@ -75,6 +75,7 @@ class FireboltMetadataServiceTest {
 
     @Test
     void getLastOffsetsShouldInsertMissingAndReturnZeroOffsetsWhenNoneExist() throws Exception {
+        String topicName = "t1\" OR 1=1 --";
         // ensureAndGetOffsets: first prepareStatement is SELECT (no rows), second is INSERT
         PreparedStatement selectPs = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
@@ -84,7 +85,7 @@ class FireboltMetadataServiceTest {
         when(selectPs.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
 
-        Map<Integer, Long> result = metadataService.getLastOffsets("t1", Set.of(0, 1));
+        Map<Integer, Long> result = metadataService.getLastOffsets(topicName, Set.of(0, 1));
 
         assertEquals(2, result.size());
         assertTrue(result.values().stream().allMatch(offset -> offset == -1));
@@ -101,15 +102,17 @@ class FireboltMetadataServiceTest {
         );
         assertTrue(expectedQuery.contains(selectQuery));
 
-        verify(selectPs).setString(1, "t1");
+        verify(selectPs).setString(1, topicName);
 
         // second prepared statement is the insert
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (?, ?, ?)", insertStatement);
 
         // verify batch insert invoked for two missing rows
-        verify(insertPs).setInt(1, 0);
-        verify(insertPs).setInt(1, 1);
+        verify(insertPs, times(2)).setString(1, topicName);
+        verify(insertPs).setInt(2, 0);
+        verify(insertPs).setInt(2, 1);
+        verify(insertPs, times(2)).setLong(3, -1L);
         verify(insertPs, times(2)).addBatch();
         verify(insertPs).executeBatch();
     }
@@ -143,16 +146,19 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection, times(2)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (?, ?, ?)", insertStatement);
 
         // verify only one insert for missing partition 1
-        verify(insertPs, times(1)).setInt(1, 1);
+        verify(insertPs, times(1)).setString(1, "t1");
+        verify(insertPs, times(1)).setInt(2, 1);
+        verify(insertPs, times(1)).setLong(3, -1L);
         verify(insertPs, times(1)).addBatch();
         verify(insertPs, times(1)).executeBatch();
     }
 
     @Test
     void updateOffsetsShouldBatchUpdateOffsetsOnly() throws Exception {
+        String topicName = "t1\" OR 1=1 --";
         Map<Integer, Long> updates = Map.of(
             0, 10L,
             1, 20L
@@ -162,16 +168,17 @@ class FireboltMetadataServiceTest {
         when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
             .thenReturn(updatePs);
 
-        metadataService.updateOffsets("t1", updates);
+        metadataService.updateOffsets(topicName, updates);
 
         verify(mockConnection).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(0);
-        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"t1\" AND topic_partition = ?", updateStatement);
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = ? AND topic_partition = ?", updateStatement);
 
         verify(updatePs).setLong(1, 10L);
-        verify(updatePs).setInt(2, 0);
         verify(updatePs).setLong(1, 20L);
-        verify(updatePs).setInt(2, 1);
+        verify(updatePs, times(2)).setString(2, topicName);
+        verify(updatePs).setInt(3, 0);
+        verify(updatePs).setInt(3, 1);
 
         // verify parameters were bound and batch executed
         verify(updatePs, times(2)).addBatch();
@@ -216,10 +223,11 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection, times(3)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(2);
-        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"topicB\" AND topic_partition = ?", updateStatement);
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = ? AND topic_partition = ?", updateStatement);
 
         verify(updatePs).setLong(1, 7L);
-        verify(updatePs).setInt(2, 1);
+        verify(updatePs).setString(2, "topicB");
+        verify(updatePs).setInt(3, 1);
         verify(updatePs).addBatch();
         verify(updatePs).executeBatch();
 
@@ -242,5 +250,3 @@ class FireboltMetadataServiceTest {
         verify(insertPsLocal, times(1)).executeBatch();
     }
 }
-
-

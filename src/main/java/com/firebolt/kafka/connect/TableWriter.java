@@ -1,15 +1,11 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.firebolt.kafka.connect.service.FireboltMetadataService;
-import com.google.common.annotations.VisibleForTesting;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 
@@ -49,8 +45,9 @@ public class TableWriter {
 
         ingestionService.addRecords(fireboltRecords);
 
-        // update the processed offsets in Kafka node
-        updateProcessedOffsets(fireboltRecords);
+        Map<Integer, Long> updatedOffsets = getUpdatedOffsets(fireboltRecords);
+        persistProcessedOffsets(updatedOffsets);
+        processedPartitionOffsets.putAll(updatedOffsets);
     }
 
     public Map<Integer, Long> getProcessedPartitionOffsets() {
@@ -67,15 +64,25 @@ public class TableWriter {
         }
     }
 
-    private void updateProcessedOffsets(List<AbstractFireboltRecord> fireboltRecords) {
+    private Map<Integer, Long> getUpdatedOffsets(List<AbstractFireboltRecord> fireboltRecords) {
+        Map<Integer, Long> updatedOffsets = new HashMap<>();
         fireboltRecords.forEach(fireboltRecord -> {
             Integer partition = fireboltRecord.getPartition();
             Long offset = fireboltRecord.getOffset();
-            if (processedPartitionOffsets.get(partition) < offset) {
-                processedPartitionOffsets.put(partition, offset);
+            Long processedOffset = updatedOffsets.containsKey(partition)
+                    ? updatedOffsets.get(partition)
+                    : processedPartitionOffsets.get(partition);
+            if (processedOffset == null || processedOffset < offset) {
+                updatedOffsets.put(partition, offset);
             }
         });
+        return updatedOffsets;
+    }
 
+    private void persistProcessedOffsets(Map<Integer, Long> updatedOffsets) {
+        if (fireboltMetadataService != null && !updatedOffsets.isEmpty()) {
+            fireboltMetadataService.updateOffsets(topicName, updatedOffsets);
+        }
     }
 
 }

@@ -78,12 +78,14 @@ public class FireboltMetadataService {
                 return results;
             }
 
-            String insertSql = String.format("INSERT INTO \"%s\" (topic, topic_partition, partition_offset) VALUES (\"%s\", ?, %d)",
-                    METADATA_TABLE_NAME, topicName, DEFAULT_OFFSET);
+            String insertSql = String.format("INSERT INTO \"%s\" (topic, topic_partition, partition_offset) VALUES (?, ?, ?)",
+                    METADATA_TABLE_NAME);
             try (PreparedStatement insertPs = connection.prepareStatement(insertSql)) {
                 for (Integer partition : topicPartitions) {
                     if (!presentTopics.contains(partition)) {
-                        insertPs.setInt(1, partition);
+                        insertPs.setString(1, topicName);
+                        insertPs.setInt(2, partition);
+                        insertPs.setLong(3, DEFAULT_OFFSET);
                         insertPs.addBatch();
 
                         results.put(partition, DEFAULT_OFFSET);
@@ -106,15 +108,16 @@ public class FireboltMetadataService {
             throw new IllegalArgumentException("Topic name or offsets cannot be empty");
         }
 
-        String updateSql = String.format("UPDATE \"%s\" SET partition_offset = ? WHERE topic = \"%s\" AND topic_partition = ?",
-                METADATA_TABLE_NAME, topicName);
+        String updateSql = String.format("UPDATE \"%s\" SET partition_offset = ? WHERE topic = ? AND topic_partition = ?",
+                METADATA_TABLE_NAME);
 
         try (Connection connection = fireboltDbService.createConnection(jdbcConfig);
              PreparedStatement updatePs = connection.prepareStatement(updateSql)) {
 
             for (Map.Entry<Integer, Long> partitionOffset: offsets.entrySet()) {
                 updatePs.setLong(1, partitionOffset.getValue());
-                updatePs.setInt(2, partitionOffset.getKey());
+                updatePs.setString(2, topicName);
+                updatePs.setInt(3, partitionOffset.getKey());
 
                 updatePs.addBatch();
             }
