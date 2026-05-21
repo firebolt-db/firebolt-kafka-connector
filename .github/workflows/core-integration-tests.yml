@@ -119,26 +119,38 @@ jobs:
         SHARD_INDEX="${{ inputs.shard_index }}"
         SHARD_TOTAL="${{ inputs.shard_total }}"
 
-        # Suite-level include tag filter (empty means run all suites)
+        # Suite-level include tag filter
         if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
           SUITE_TAG_FILTER=""
         else
           SUITE_TAG_FILTER="-Djunit.jupiter.includeTags=$SUITE"
         fi
 
-        # Round-robin shard filter — works for any shard_total including 1
-        TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
-          | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
-          | sed 's|.*/||; s|\.java$||' | sort \
+        # Discover test classes — filter by suite tag BEFORE sharding so that
+        # round-robin distributes only the suite's own classes evenly
+        if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
+          TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
+            | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
+            | sed 's|.*/||; s|\.java$||' | sort)
+        else
+          TAG_CONSTANT=$(echo "$SUITE" | tr '[:lower:]' '[:upper:]')
+          TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
+            | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
+            | xargs grep -l "@Tag(TestTag.$TAG_CONSTANT)" \
+            | sed 's|.*/||; s|\.java$||' | sort)
+        fi
+
+        # Round-robin shard across the scoped class list
+        SHARDED_CLASSES=$(echo "$TEST_CLASSES" \
           | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" 'NR % total == shard % total')
 
         TEST_FILTER=""
         while IFS= read -r cls; do
           [ -z "$cls" ] && continue
           TEST_FILTER="$TEST_FILTER --tests *.$cls"
-        done <<< "$TEST_CLASSES"
+        done <<< "$SHARDED_CLASSES"
 
-        CLASS_COUNT=$(echo "$TEST_CLASSES" | grep -c . || true)
+        CLASS_COUNT=$(echo "$SHARDED_CLASSES" | grep -c . || true)
         echo "Suite '$SUITE', shard $SHARD_INDEX/$SHARD_TOTAL: $CLASS_COUNT classes"
         echo "SUITE_TAG_FILTER=$SUITE_TAG_FILTER" >> $GITHUB_ENV
         echo "TEST_FILTER=$TEST_FILTER" >> $GITHUB_ENV
