@@ -9,6 +9,8 @@ import com.firebolt.kafka.connect.load.publisher.JsonSchemalessKafkaMessagePubli
 import com.firebolt.kafka.connect.load.publisher.KafkaMessagePublisher;
 import com.firebolt.kafka.connect.load.verifier.LoadTestRecordFireboltTableVerifier;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -161,7 +163,12 @@ public class LoadTest {
                 if (!hasSchema) {
                     throw new IllegalArgumentException("Avro message type requires hasSchema=true");
                 }
-                String avroSchema = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(schemaDefinitionPath)));
+                Path basePath = Paths.get("src/integrationTest/resources").toAbsolutePath().normalize();
+                Path resolved = basePath.resolve(schemaDefinitionPath).normalize();
+                if (!resolved.startsWith(basePath)) {
+                    throw new IllegalArgumentException("Invalid schema path: " + schemaDefinitionPath);
+                }
+                String avroSchema = new String(java.nio.file.Files.readAllBytes(resolved));
                 TestRecordFactory testRecordFactory = new TestRecordFactory(messageSize);
                 MessageGenerator<LoadTestRecord> messageGenerator = new LoadTestRecordMessageGenerator(testRecordFactory, loadTestRecordFireboltTableVerifier, messageCount);
                 return new AvroSchemaRegistryKafkaMessagePublisher(

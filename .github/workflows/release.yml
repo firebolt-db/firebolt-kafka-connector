@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
@@ -87,22 +87,22 @@ jobs:
       release_version: ${{ steps.release_version.outputs.value }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: refs/tags/${{ github.event.inputs.tag_name }}
 
       - name: Download uber-jar
-        uses: actions/download-artifact@v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: ${{ needs.build.outputs.uber-jar }}
           path: uber-jar
       - name: Download sources-jar
-        uses: actions/download-artifact@v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: ${{ needs.build.outputs.sources-jar }}
           path: sources-jar
       - name: Download confluent-archive
-        uses: actions/download-artifact@v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: ${{ needs.build.outputs.confluent-archive }}
           path: confluent-archive
@@ -129,7 +129,7 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
 
       - name: Generate and update GitHub release notes
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

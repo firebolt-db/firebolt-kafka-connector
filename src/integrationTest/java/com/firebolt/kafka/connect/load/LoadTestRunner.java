@@ -114,8 +114,13 @@ public class LoadTestRunner {
 
                     if (StringUtils.isNotBlank(testScenario.getDestinationTableSchemaDefinitionFilePath())) {
                         log.info("Creating the destination table: {}", testScenario.getDestinationTableName());
-                        String tableSchema = new String(java.nio.file.Files.readAllBytes(
-                                java.nio.file.Paths.get(testScenario.getDestinationTableSchemaDefinitionFilePath())));
+                        Path basePath = Paths.get("src/integrationTest/resources").toAbsolutePath().normalize();
+                        Path resolved = basePath.resolve(testScenario.getDestinationTableSchemaDefinitionFilePath()).normalize();
+                        if (!resolved.startsWith(basePath)) {
+                            throw new IllegalArgumentException("Invalid destination schema path: "
+                                    + testScenario.getDestinationTableSchemaDefinitionFilePath());
+                        }
+                        String tableSchema = new String(Files.readAllBytes(resolved));
                         fireboltClient.createTable(tableSchema);
                     }
 
@@ -497,7 +502,12 @@ public class LoadTestRunner {
         Arrays.stream(subjects).forEach(subjectName -> log.info("Subject: {}", subjectName));
 
         log.info("Reading the schema from path {}", schemaPathName);
-        String jsonSchema = new String(Files.readAllBytes(Paths.get(schemaPathName)));
+        Path basePath = Paths.get("src/integrationTest/resources").toAbsolutePath().normalize();
+        Path resolved = basePath.resolve(schemaPathName).normalize();
+        if (!resolved.startsWith(basePath)) {
+            throw new IllegalArgumentException("Invalid schema path: " + schemaPathName);
+        }
+        String jsonSchema = new String(Files.readAllBytes(resolved));
 
         log.info("Registering the JSON schema: {} with length {}", subject, jsonSchema.length());
         try {
@@ -516,7 +526,12 @@ public class LoadTestRunner {
         Arrays.stream(subjects).forEach(subjectName -> log.info("Subject: {}", subjectName));
 
         log.info("Reading the Avro schema from path {}", schemaPathName);
-        String avroSchema = new String(Files.readAllBytes(Paths.get(schemaPathName)));
+        Path basePath = Paths.get("src/integrationTest/resources").toAbsolutePath().normalize();
+        Path resolved = basePath.resolve(schemaPathName).normalize();
+        if (!resolved.startsWith(basePath)) {
+            throw new IllegalArgumentException("Invalid schema path: " + schemaPathName);
+        }
+        String avroSchema = new String(Files.readAllBytes(resolved));
 
         log.info("Registering the Avro schema: {} with length {}", subject, avroSchema.length());
         try {
@@ -558,8 +573,12 @@ public class LoadTestRunner {
 
     private void createFireboltTable(FireboltClient client, String tableName) {
         try {
-            String tableSchema = new String(java.nio.file.Files.readAllBytes(
-                    java.nio.file.Paths.get(testScenario.getTableSchemaDefinitionFilePath())));
+            Path basePath = Paths.get("src/integrationTest/resources").toAbsolutePath().normalize();
+            Path resolved = basePath.resolve(testScenario.getTableSchemaDefinitionFilePath()).normalize();
+            if (!resolved.startsWith(basePath)) {
+                throw new IllegalArgumentException("Invalid schema path: " + testScenario.getTableSchemaDefinitionFilePath());
+            }
+            String tableSchema = new String(Files.readAllBytes(resolved));
             java.util.Map<String, String> values = java.util.Map.of(TABLE_NAME_PARAM, tableName);
 
             String tableSchemaSql = StringSubstitutor.replace(tableSchema, values, "${", "}");

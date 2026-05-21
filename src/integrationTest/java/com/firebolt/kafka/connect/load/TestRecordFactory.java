@@ -42,16 +42,12 @@ public class TestRecordFactory {
      * @return
      */
     private BigDecimal randomBigDecimal() {
-		StringBuilder digits = new StringBuilder(38);
 		java.util.concurrent.ThreadLocalRandom rnd = java.util.concurrent.ThreadLocalRandom.current();
-		// Ensure first digit is non-zero to maintain precision 38
-		digits.append((char) ('1' + rnd.nextInt(9)));
-		for (int i = 1; i < 38; i++) {
-			digits.append((char) ('0' + rnd.nextInt(10)));
-		}
-		// Insert decimal point to enforce scale 9 (38 total digits -> 29 integer, 9 fractional)
-		digits.insert(38 - 9, '.');
-		return new BigDecimal(digits.toString());
+		// Ensure the first digit is non-zero to maintain precision 38.
+		String digits = String.valueOf((char) ('1' + rnd.nextInt(9)))
+				+ RandomStringUtils.secure().nextNumeric(37);
+		String decimalValue = digits.substring(0, 29) + "." + digits.substring(29);
+		return new BigDecimal(decimalValue);
     }
 
     /**
