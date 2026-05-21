@@ -24,12 +24,12 @@ on:
           - 'stress'
           - 'customer'
       shard_index:
-        description: 'Shard index (0-based). Only used when shard_total > 1.'
+        description: 'Shard index (0-based)'
         required: false
-        default: '0'
+        default: '1'
         type: string
       shard_total:
-        description: 'Total number of shards for this suite run.'
+        description: 'Total number of shards for this suite run'
         required: false
         default: '1'
         type: string
@@ -46,16 +46,16 @@ on:
         default: 'all'
         type: string
       shard_index:
-        description: 'Shard index (0-based). Only used when shard_total > 1.'
-        required: false
-        default: 0
-        type: number
-      shard_total:
-        description: 'Total number of shards for this suite run.'
+        description: 'Shard index (0-based)'
         required: false
         default: 1
         type: number
-     
+      shard_total:
+        description: 'Total number of shards for this suite run'
+        required: false
+        default: 1
+        type: number
+
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
   FIREBOLT_CORE_IMAGE: ${{ vars.FIREBOLT_CORE_IMAGE }}
@@ -90,18 +90,14 @@ jobs:
 
     - name: Enforce suite tag coverage
       run: |
-        UNTAGGED=""
-        for f in $(find src/integrationTest -name "*Test.java" | grep -v "Base" | grep -v "load/" | grep -v "utils/" | grep -v "datatype/"); do
-          if ! grep -q '@Tag(TestTag\.\(SERIALIZATION\|CONNECTOR\|LIFECYCLE\|STRESS\|CUSTOMER\))' "$f"; then
-            UNTAGGED="$UNTAGGED\n  $(basename $f .java)"
-          fi
-        done
-
+        UNTAGGED=$(find src/integrationTest -name "*Test.java" \
+          | grep -v "Base" | grep -v "load/" | grep -v "utils/" | grep -v "datatype/" \
+          | xargs grep -EL '@Tag\(TestTag\.(SERIALIZATION|CONNECTOR|LIFECYCLE|STRESS|CUSTOMER)\)' \
+          | sed 's|.*/||; s|\.java$||')
         if [ -n "$UNTAGGED" ]; then
-          echo "ERROR: The following integration test classes are missing a suite @Tag annotation:"
-          echo -e "$UNTAGGED"
-          echo ""
-          echo "Every integration test class must have exactly one of: @Tag(TestTag.SERIALIZATION), @Tag(TestTag.CONNECTOR), @Tag(TestTag.LIFECYCLE), @Tag(TestTag.STRESS), @Tag(TestTag.CUSTOMER)"
+          echo "ERROR: Missing suite @Tag on:"
+          echo "$UNTAGGED"
+          echo "Each class must have one of: @Tag(TestTag.SERIALIZATION/CONNECTOR/LIFECYCLE/STRESS/CUSTOMER)"
           exit 1
         fi
         echo "✓ All integration test classes have suite tags"
@@ -118,49 +114,29 @@ jobs:
         SHARD_INDEX="${{ inputs.shard_index }}"
         SHARD_TOTAL="${{ inputs.shard_total }}"
 
-        # Set suite-level include tag filter (empty means run all suites)
+        # Suite-level include tag filter (empty means run all suites)
         if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
           SUITE_TAG_FILTER=""
         else
           SUITE_TAG_FILTER="-Djunit.jupiter.includeTags=$SUITE"
         fi
 
-        # Apply sharding within the suite if shard_total > 1
-        if [ "$SHARD_TOTAL" = "1" ] || [ -z "$SHARD_TOTAL" ]; then
-          echo "Running suite '$SUITE' (no sharding)"
-          echo "SUITE_TAG_FILTER=$SUITE_TAG_FILTER" >> $GITHUB_ENV
-          echo "TEST_FILTER=" >> $GITHUB_ENV
-        else
-          echo "Computing shard $SHARD_INDEX of $SHARD_TOTAL within suite '$SUITE'"
+        # Round-robin shard filter — works for any shard_total including 1
+        TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
+          | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
+          | sed 's|.*/||; s|\.java$||' | sort \
+          | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" 'NR % total == shard % total')
 
-          if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
-            # Shard across every integration test class
-            TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
-              | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
-              | sed 's|.*/||; s|\.java$||' | sort \
-              | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" '(NR-1) % total == shard')
-          else
-            # Shard within the tagged suite subset
-            SUITE_UPPER=$(echo "$SUITE" | tr '[:lower:]' '[:upper:]')
-            TEST_CLASSES=$(grep -rl "@Tag(TestTag.$SUITE_UPPER)" src/integrationTest \
-              | grep -v "Base" | grep -v "load/" | grep -v "utils/" | grep -v "datatype/" \
-              | sed 's|.*/||; s|\.java$||' | sort \
-              | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" '(NR-1) % total == shard')
-          fi
+        TEST_FILTER=""
+        while IFS= read -r cls; do
+          [ -z "$cls" ] && continue
+          TEST_FILTER="$TEST_FILTER --tests *.$cls"
+        done <<< "$TEST_CLASSES"
 
-          # Build --tests arguments (one --tests flag per class)
-          TEST_FILTER=""
-          while IFS= read -r cls; do
-            [ -z "$cls" ] && continue
-            TEST_FILTER="$TEST_FILTER --tests *.$cls"
-          done <<< "$TEST_CLASSES"
-
-          CLASS_COUNT=$(echo "$TEST_CLASSES" | grep -c . || true)
-          echo "Shard $SHARD_INDEX will run $CLASS_COUNT classes:"
-          echo "$TEST_CLASSES"
-          echo "SUITE_TAG_FILTER=$SUITE_TAG_FILTER" >> $GITHUB_ENV
-          echo "TEST_FILTER=$TEST_FILTER" >> $GITHUB_ENV
-        fi
+        CLASS_COUNT=$(echo "$TEST_CLASSES" | grep -c . || true)
+        echo "Suite '$SUITE', shard $SHARD_INDEX/$SHARD_TOTAL: $CLASS_COUNT classes"
+        echo "SUITE_TAG_FILTER=$SUITE_TAG_FILTER" >> $GITHUB_ENV
+        echo "TEST_FILTER=$TEST_FILTER" >> $GITHUB_ENV
         
     - name: Build project
       run: ./gradlew build --no-daemon
