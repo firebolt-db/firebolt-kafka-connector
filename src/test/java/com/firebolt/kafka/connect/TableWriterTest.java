@@ -146,6 +146,9 @@ public class TableWriterTest {
     void shouldThrowSQLExceptionWhenIngestionFails() throws SQLException {
         doThrow(SQLException.class).when(mockIngestionService).addRecords(anyList());
         assertThrows(SQLException.class, () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+        // Exactly-once invariant: offsets must NOT be persisted when ingestion fails —
+        // persisting them would cause records to be skipped on restart even though they were never written.
+        verify(mockFireboltMetadataService, never()).updateOffsets(any(), any());
     }
 
 
