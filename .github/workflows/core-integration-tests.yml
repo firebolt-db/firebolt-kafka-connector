@@ -11,6 +11,16 @@ on:
         options:
           - '3.9.1'
           - '4.0'
+      shard_index:
+        description: 'Shard index to run (0-5). Use -1 to run all tests.'
+        required: false
+        default: '-1'
+        type: string
+      shard_total:
+        description: 'Total number of shards'
+        required: false
+        default: '6'
+        type: string
   workflow_call:
     inputs:
       kafka_connect_version:
@@ -18,6 +28,16 @@ on:
         required: false
         default: '3.9.1'
         type: string
+      shard_index:
+        description: 'Shard index to run (0-5). Use -1 to run all tests.'
+        required: false
+        default: -1
+        type: number
+      shard_total:
+        description: 'Total number of shards'
+        required: false
+        default: 6
+        type: number
      
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
@@ -54,6 +74,36 @@ jobs:
     - name: Display Kafka Connect version
       run: |
         echo "Testing with Kafka Connect version: ${{ inputs.kafka_connect_version }}"
+
+    - name: Compute shard test filter
+      run: |
+        SHARD_INDEX="${{ inputs.shard_index }}"
+        SHARD_TOTAL="${{ inputs.shard_total }}"
+
+        if [ "$SHARD_INDEX" = "-1" ] || [ -z "$SHARD_INDEX" ]; then
+          echo "Running all tests (no shard filter)"
+          echo "TEST_FILTER=" >> $GITHUB_ENV
+        else
+          echo "Computing shard $SHARD_INDEX of $SHARD_TOTAL"
+          # Discover test classes, sort, pick every SHARD_TOTAL-th starting at SHARD_INDEX
+          # (NR-1) converts awk's 1-based line count to 0-based for modulo
+          TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
+            | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
+            | sed 's|.*/||; s|\.java$||' | sort \
+            | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" '(NR-1) % total == shard')
+
+          # Build --tests arguments (one --tests flag per class)
+          TEST_FILTER=""
+          while IFS= read -r cls; do
+            [ -z "$cls" ] && continue
+            TEST_FILTER="$TEST_FILTER --tests *.$cls"
+          done <<< "$TEST_CLASSES"
+
+          CLASS_COUNT=$(echo "$TEST_CLASSES" | grep -c . || true)
+          echo "Shard $SHARD_INDEX will run $CLASS_COUNT classes:"
+          echo "$TEST_CLASSES"
+          echo "TEST_FILTER=$TEST_FILTER" >> $GITHUB_ENV
+        fi
         
     - name: Build project
       run: ./gradlew build --no-daemon
@@ -98,7 +148,7 @@ jobs:
         echo "Kafka Connect is ready!"
 
     - name: Run integration tests (excluding NOT_IMPLEMENTED)
-      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud --no-daemon
+      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud --no-daemon ${{ env.TEST_FILTER }}
       env:
         KAFKA_BOOTSTRAP_SERVERS: localhost:9092
         SCHEMA_REGISTRY_URL: http://localhost:8081
@@ -144,7 +194,7 @@ jobs:
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: integration-test-results-${{ inputs.kafka_connect_version }}
+        name: integration-test-results-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
         path: |
           build/test-results/
           build/reports/tests/
@@ -154,12 +204,12 @@ jobs:
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: integration-test-reports-${{ inputs.kafka_connect_version }}
+        name: integration-test-reports-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
         path: build/reports/
         
     - name: Upload Docker logs
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: docker-logs-${{ inputs.kafka_connect_version }}
-        path: docker-logs/ 
+        name: docker-logs-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
+        path: docker-logs/
