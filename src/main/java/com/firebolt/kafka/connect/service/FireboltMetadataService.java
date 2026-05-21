@@ -114,10 +114,13 @@ public class FireboltMetadataService {
         try (Connection connection = fireboltDbService.createConnection(jdbcConfig);
              PreparedStatement updatePs = connection.prepareStatement(updateSql)) {
 
-            for (Map.Entry<Integer, Long> partitionOffset: offsets.entrySet()) {
-                updatePs.setLong(1, partitionOffset.getValue());
+            for (Map.Entry<Integer, Long> offsetByPartition: offsets.entrySet()) {
+                Integer partition = offsetByPartition.getKey();
+                Long offset = offsetByPartition.getValue();
+
+                updatePs.setLong(1, offset);
                 updatePs.setString(2, topicName);
-                updatePs.setInt(3, partitionOffset.getKey());
+                updatePs.setInt(3, partition);
 
                 updatePs.addBatch();
             }

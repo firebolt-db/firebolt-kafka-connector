@@ -45,9 +45,11 @@ public class TableWriter {
 
         ingestionService.addRecords(fireboltRecords);
 
-        Map<Integer, Long> updatedOffsets = getUpdatedOffsets(fireboltRecords);
-        persistProcessedOffsets(updatedOffsets);
-        processedPartitionOffsets.putAll(updatedOffsets);
+        Map<Integer, Long> offsetsToCommit = collectOffsetsToCommit(fireboltRecords);
+
+        // Keep local offsets behind durable metadata if the metadata write fails.
+        persistOffsetsIfExactlyOnceEnabled(offsetsToCommit);
+        markOffsetsAsProcessed(offsetsToCommit);
     }
 
     public Map<Integer, Long> getProcessedPartitionOffsets() {
@@ -64,25 +66,34 @@ public class TableWriter {
         }
     }
 
-    private Map<Integer, Long> getUpdatedOffsets(List<AbstractFireboltRecord> fireboltRecords) {
-        Map<Integer, Long> updatedOffsets = new HashMap<>();
-        fireboltRecords.forEach(fireboltRecord -> {
+    private Map<Integer, Long> collectOffsetsToCommit(List<AbstractFireboltRecord> fireboltRecords) {
+        Map<Integer, Long> highestOffsetsByPartition = new HashMap<>();
+
+        for (AbstractFireboltRecord fireboltRecord : fireboltRecords) {
             Integer partition = fireboltRecord.getPartition();
-            Long offset = fireboltRecord.getOffset();
-            Long processedOffset = updatedOffsets.containsKey(partition)
-                    ? updatedOffsets.get(partition)
-                    : processedPartitionOffsets.get(partition);
-            if (processedOffset == null || processedOffset < offset) {
-                updatedOffsets.put(partition, offset);
+            Long recordOffset = fireboltRecord.getOffset();
+            Long highestKnownOffset = highestOffsetsByPartition.get(partition);
+
+            if (highestKnownOffset == null) {
+                highestKnownOffset = processedPartitionOffsets.get(partition);
             }
-        });
-        return updatedOffsets;
+
+            if (highestKnownOffset == null || recordOffset > highestKnownOffset) {
+                highestOffsetsByPartition.put(partition, recordOffset);
+            }
+        }
+
+        return highestOffsetsByPartition;
     }
 
-    private void persistProcessedOffsets(Map<Integer, Long> updatedOffsets) {
-        if (fireboltMetadataService != null && !updatedOffsets.isEmpty()) {
-            fireboltMetadataService.updateOffsets(topicName, updatedOffsets);
+    private void persistOffsetsIfExactlyOnceEnabled(Map<Integer, Long> offsetsToCommit) {
+        if (fireboltMetadataService != null && !offsetsToCommit.isEmpty()) {
+            fireboltMetadataService.updateOffsets(topicName, offsetsToCommit);
         }
+    }
+
+    private void markOffsetsAsProcessed(Map<Integer, Long> offsetsToCommit) {
+        processedPartitionOffsets.putAll(offsetsToCommit);
     }
 
 }
