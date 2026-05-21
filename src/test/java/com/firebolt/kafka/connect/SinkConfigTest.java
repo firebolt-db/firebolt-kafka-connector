@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.apache.kafka.common.config.ConfigException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -176,30 +178,36 @@ public class SinkConfigTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-        "topic1",
-        "topic1:table1:extra",
-        "topic1:",
-        ":table1",
-        "topic1:table1,malformed",
-        "topic1:table1,:",
-        "topic1:table1,"
+        "topic1",           // no colon at all
+        "topic1:table1:extra", // too many colons
+        "topic1:",          // empty table name
+        ":table1"           // empty topic name
     })
-    void testGetTableNameForTopicWithMalformedMappings(String malformedMapping) {
+    void testGetTableNameForTopicWithMalformedEntriesThrowsConfigException(String malformedMapping) {
+        // A configured-but-malformed mapping string is a misconfiguration; it must fail loudly
+        // rather than silently falling back to topic-name defaults.
         configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, malformedMapping);
         SinkConfig testConfig = new SinkConfig(configMap);
 
-        String result = testConfig.getTableNameForTopic("topic1");
+        assertThrows(ConfigException.class, () -> testConfig.getTableNameForTopic("topic1"));
+    }
 
-        // Entries with a valid 2-part mapping for topic1 return the mapped table name.
-        // All other (malformed) entries fall back to the topic name itself.
-        if (malformedMapping.equals("topic1:table1,malformed")
-                || malformedMapping.equals("topic1:table1,:") 
-                || malformedMapping.equals("topic1:table1,")) {
-            assertEquals("table1", result); // valid leading entry wins
-        } else {
-            // Malformed or unmatched → topic-name fallback
-            assertEquals("topic1", result);
-        }
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "topic1:table1,malformed",  // trailing malformed entry
+        "topic1:table1,:",          // trailing empty-both entry
+        "topic1:table1,"            // trailing empty entry
+    })
+    void testGetTableNameForTopicThrowsOnMalformedTrailingEntries(String malformedMapping) {
+        // Even when the first entry matches correctly, a malformed later entry must still throw.
+        // This prevents silent misconfiguration from masking a subset of broken mappings.
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, malformedMapping);
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        // topic1 is found before the bad entry, so it returns correctly…
+        assertEquals("table1", testConfig.getTableNameForTopic("topic1"));
+        // …but any topic that would need to iterate past the bad entry throws.
+        assertThrows(ConfigException.class, () -> testConfig.getTableNameForTopic("other-topic"));
     }
 
     @Test

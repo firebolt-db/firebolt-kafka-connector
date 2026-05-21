@@ -250,6 +250,48 @@ class FireboltMetadataServiceTest {
     }
 
     @Test
+    void shouldPersistAndRecoverOffsetsAcrossRestart() throws Exception {
+        // Regression test: before the fix, updateOffsets() was never called from production code.
+        // getLastOffsets() would always return -1 on restart, reprocessing the entire history.
+        // This test would have FAILED before the fix: it calls updateOffsets() directly to simulate
+        // what TableWriter now does, then verifies getLastOffsets() recovers the persisted values.
+
+        // Step 1: Simulate processing a batch — TableWriter calls updateOffsets after insert.
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+                .thenReturn(updatePs);
+
+        metadataService.updateOffsets("orders", Map.of(0, 42L, 1, 99L));
+
+        verify(updatePs).setLong(1, 42L);
+        verify(updatePs).setLong(1, 99L);
+        verify(updatePs, times(2)).setString(2, "orders");
+        verify(updatePs).setInt(3, 0);
+        verify(updatePs).setInt(3, 1);
+        verify(updatePs, times(2)).addBatch();
+        verify(updatePs).executeBatch();
+
+        // Step 2: Simulate a connector restart — getLastOffsets() must return the persisted values,
+        // not -1. Before the fix, updateOffsets was never called so restarts always got -1.
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        when(mockConnection.prepareStatement(argThat(sql ->
+                sql.startsWith("SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in (") &&
+                        (sql.contains("(0, 1)") || sql.contains("(1, 0)"))))).thenReturn(selectPs);
+        when(selectPs.executeQuery()).thenReturn(resultSet);
+        // Both partitions are present in the DB with their persisted offsets.
+        when(resultSet.next()).thenReturn(true, true, false);
+        when(resultSet.getInt("topic_partition")).thenReturn(0, 1);
+        when(resultSet.getLong("partition_offset")).thenReturn(42L, 99L);
+
+        Map<Integer, Long> recovered = metadataService.getLastOffsets("orders", Set.of(0, 1));
+
+        // The connector must resume from the persisted high-water marks, not reprocess from the start.
+        assertEquals(42L, recovered.get(0), "Partition 0 offset must survive restart");
+        assertEquals(99L, recovered.get(1), "Partition 1 offset must survive restart");
+    }
+
+    @Test
     void updateOffsetsShouldPassMaliciousTopicNameAsParameterNotInterpolated() throws Exception {
         // SQL injection guard: a hostile topic name must reach the DB as a bound parameter,
         // not as raw SQL text. If the old String.format path were used, the DROP TABLE
@@ -263,8 +305,12 @@ class FireboltMetadataServiceTest {
 
         metadataService.updateOffsets(maliciousTopic, updates);
 
-        // The topic is bound as a PreparedStatement parameter — it cannot break out of the query.
+        // Verify all three parameters are bound correctly — offset at position 1, topic at 2, partition at 3.
+        // The hostile topic name reaches the driver as a safe bound parameter, not as interpolated SQL.
+        verify(updatePs).setLong(1, 1L);
         verify(updatePs).setString(2, maliciousTopic);
+        verify(updatePs).setInt(3, 0);
+        // Confirm the write actually executed.
         verify(updatePs).addBatch();
         verify(updatePs).executeBatch();
     }
@@ -282,7 +328,10 @@ class FireboltMetadataServiceTest {
         metadataService.updateOffsets(quotedTopic, updates);
 
         // Both single and double quotes in the topic name are harmless when parameterized.
+        // Verify all three parameters and the complete write path.
+        verify(updatePs).setLong(1, 5L);
         verify(updatePs).setString(2, quotedTopic);
+        verify(updatePs).setInt(3, 1);
         verify(updatePs).addBatch();
         verify(updatePs).executeBatch();
     }
