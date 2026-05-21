@@ -74,9 +74,8 @@ class FireboltMetadataServiceTest {
     }
 
     @Test
-    void getLastOffsetsShouldInsertMissingAndReturnZeroOffsetsWhenNoneExist() throws Exception {
+    void getLastOffsetsShouldInsertMissingAndReturnDefaultOffsetsWhenNoneExist() throws Exception {
         String topicName = "t1\" OR 1=1 --";
-        // ensureAndGetOffsets: first prepareStatement is SELECT (no rows), second is INSERT
         PreparedStatement selectPs = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
         PreparedStatement insertPs = mock(PreparedStatement.class);
@@ -189,7 +188,7 @@ class FireboltMetadataServiceTest {
 
     @Test
     void getLastOffsetsTwiceWithUpdateShouldNotDuplicateAndReturnUpdatedOffsets() throws Exception {
-        // First call: SELECT returns no rows -> INSERT missing two -> return offsets [0,0]
+        // First call: SELECT returns no rows, inserts missing rows, and returns default offsets.
         PreparedStatement selectPsFirst = mock(PreparedStatement.class);
         PreparedStatement insertPsLocal = mock(PreparedStatement.class);
         ResultSet rsFirst = mock(ResultSet.class);

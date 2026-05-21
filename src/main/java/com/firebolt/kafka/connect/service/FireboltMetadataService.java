@@ -64,17 +64,17 @@ public class FireboltMetadataService {
              PreparedStatement selectPs = connection.prepareStatement(selectQuery);) {
             selectPs.setString(1, topicName);
 
-            Set<Integer> presentTopics = new HashSet<>();
+            Set<Integer> presentPartitions = new HashSet<>();
             try (ResultSet rs = selectPs.executeQuery()) {
                 while (rs.next()) {
                     int partition = rs.getInt("topic_partition");
                     long offset = rs.getLong("partition_offset");
-                    presentTopics.add(partition);
+                    presentPartitions.add(partition);
                     results.put(partition, offset);
                 }
             }
 
-            if (presentTopics.size() == topicPartitions.size()) {
+            if (presentPartitions.size() == topicPartitions.size()) {
                 return results;
             }
 
@@ -82,7 +82,7 @@ public class FireboltMetadataService {
                     METADATA_TABLE_NAME);
             try (PreparedStatement insertPs = connection.prepareStatement(insertSql)) {
                 for (Integer partition : topicPartitions) {
-                    if (!presentTopics.contains(partition)) {
+                    if (!presentPartitions.contains(partition)) {
                         insertPs.setString(1, topicName);
                         insertPs.setInt(2, partition);
                         insertPs.setLong(3, DEFAULT_OFFSET);
@@ -114,7 +114,7 @@ public class FireboltMetadataService {
         try (Connection connection = fireboltDbService.createConnection(jdbcConfig);
              PreparedStatement updatePs = connection.prepareStatement(updateSql)) {
 
-            for (Map.Entry<Integer, Long> offsetByPartition: offsets.entrySet()) {
+            for (Map.Entry<Integer, Long> offsetByPartition : offsets.entrySet()) {
                 Integer partition = offsetByPartition.getKey();
                 Long offset = offsetByPartition.getValue();
 

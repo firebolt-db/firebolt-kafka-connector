@@ -10,8 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 
 /**
- * A class that knows how to insert into a Firebolt table . It will use prepared statements to do the inserts.
- * It also tracks what were the last offsets that were written for a particular partition
+ * A class that knows how to insert into a Firebolt table. It will use prepared statements to do the inserts.
+ * It also tracks what were the last offsets that were written for a particular partition.
  */
 @Slf4j
 public class TableWriter {
@@ -21,7 +21,7 @@ public class TableWriter {
      */
     private TableSchema tableSchema;
 
-    // when this table writer is created we should fetch the offsets from the metadata table
+    // Last accepted offsets by Kafka partition.
     private Map<Integer, Long> processedPartitionOffsets;
 
     private IngestionService ingestionService;
@@ -45,7 +45,7 @@ public class TableWriter {
 
         ingestionService.addRecords(fireboltRecords);
 
-        Map<Integer, Long> offsetsToCommit = collectOffsetsToCommit(fireboltRecords);
+        Map<Integer, Long> offsetsToCommit = computeOffsetsToCommit(fireboltRecords);
 
         // Keep local offsets behind durable metadata if the metadata write fails.
         persistOffsetsIfExactlyOnceEnabled(offsetsToCommit);
@@ -66,24 +66,21 @@ public class TableWriter {
         }
     }
 
-    private Map<Integer, Long> collectOffsetsToCommit(List<AbstractFireboltRecord> fireboltRecords) {
-        Map<Integer, Long> highestOffsetsByPartition = new HashMap<>();
+    private Map<Integer, Long> computeOffsetsToCommit(List<AbstractFireboltRecord> fireboltRecords) {
+        Map<Integer, Long> offsetsToCommit = new HashMap<>();
 
         for (AbstractFireboltRecord fireboltRecord : fireboltRecords) {
-            Integer partition = fireboltRecord.getPartition();
-            Long recordOffset = fireboltRecord.getOffset();
-            Long highestKnownOffset = highestOffsetsByPartition.get(partition);
-
-            if (highestKnownOffset == null) {
-                highestKnownOffset = processedPartitionOffsets.get(partition);
-            }
-
-            if (highestKnownOffset == null || recordOffset > highestKnownOffset) {
-                highestOffsetsByPartition.put(partition, recordOffset);
-            }
+            offsetsToCommit.merge(fireboltRecord.getPartition(), fireboltRecord.getOffset(), Math::max);
         }
 
-        return highestOffsetsByPartition;
+        offsetsToCommit.entrySet()
+                .removeIf(entry -> isAlreadyProcessed(entry.getKey(), entry.getValue()));
+        return offsetsToCommit;
+    }
+
+    private boolean isAlreadyProcessed(Integer partition, Long offset) {
+        Long processedOffset = processedPartitionOffsets.get(partition);
+        return processedOffset != null && offset <= processedOffset;
     }
 
     private void persistOffsetsIfExactlyOnceEnabled(Map<Integer, Long> offsetsToCommit) {
