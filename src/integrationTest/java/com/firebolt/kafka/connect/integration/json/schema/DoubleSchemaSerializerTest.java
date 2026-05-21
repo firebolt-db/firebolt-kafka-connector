@@ -1,4 +1,6 @@
 package com.firebolt.kafka.connect.integration.json.schema;
+
+import com.firebolt.kafka.connect.utils.TestTag;
 import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.DoubleTestRecord;
 import java.sql.Array;
@@ -16,6 +18,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -25,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class DoubleSchemaSerializerTest extends SchemaBaseIntegrationTest {
     
     private static final String TABLE_NAME = generateTableName("double_test_table");

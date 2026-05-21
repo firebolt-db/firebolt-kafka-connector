@@ -393,7 +393,7 @@ public abstract class BaseIntegrationTest {
 
         await()
             .atMost(maxWaitDuration)
-            .pollInterval(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofSeconds(1))
             .until(() -> {
                 try {
                     int count = fireboltDefaultDbClient.countRows(tableName);

@@ -11,15 +11,27 @@ on:
         options:
           - '3.9.1'
           - '4.0'
+      suite:
+        description: 'Test suite to run (serialization, connector, lifecycle, stress, customer, all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'serialization'
+          - 'connector'
+          - 'lifecycle'
+          - 'stress'
+          - 'customer'
       shard_index:
-        description: 'Shard index to run (0-5). Use -1 to run all tests.'
+        description: 'Shard index (0-based)'
         required: false
-        default: '-1'
+        default: '1'
         type: string
       shard_total:
-        description: 'Total number of shards'
+        description: 'Total number of shards for this suite run'
         required: false
-        default: '6'
+        default: '1'
         type: string
   workflow_call:
     inputs:
@@ -28,17 +40,22 @@ on:
         required: false
         default: '3.9.1'
         type: string
-      shard_index:
-        description: 'Shard index to run (0-5). Use -1 to run all tests.'
+      suite:
+        description: 'Test suite to run (serialization, connector, lifecycle, stress, customer, all)'
         required: false
-        default: -1
+        default: 'all'
+        type: string
+      shard_index:
+        description: 'Shard index (0-based)'
+        required: false
+        default: 1
         type: number
       shard_total:
-        description: 'Total number of shards'
+        description: 'Total number of shards for this suite run'
         required: false
-        default: 6
+        default: 1
         type: number
-     
+
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
   FIREBOLT_CORE_IMAGE: ${{ vars.FIREBOLT_CORE_IMAGE }}
@@ -50,10 +67,15 @@ jobs:
     steps:
     - name: Free disk space
       run: |
-        df -h
-        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android
-        sudo docker image prune --all --force
-        df -h
+        AVAIL_GB=$(df --output=avail / | tail -1 | awk '{printf "%d", $1/1024/1024}')
+        if [ "$AVAIL_GB" -lt 50 ]; then
+          echo "Available disk: ${AVAIL_GB}GB — freeing space..."
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android
+          sudo docker image prune --all --force
+          df -h
+        else
+          echo "Available disk: ${AVAIL_GB}GB — sufficient, skipping cleanup"
+        fi
 
     - name: Checkout code
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -70,40 +92,68 @@ jobs:
         
     - name: Make gradlew executable
       run: chmod +x ./gradlew
+
+    - name: Enforce suite tag coverage
+      run: |
+        UNTAGGED=$(find src/integrationTest -name "*Test.java" \
+          | grep -v "Base" | grep -v "load/" | grep -v "utils/" | grep -v "datatype/" \
+          | xargs grep -EL '@Tag\(TestTag\.(SERIALIZATION|CONNECTOR|LIFECYCLE|STRESS|CUSTOMER)\)' \
+          | sed 's|.*/||; s|\.java$||')
+        if [ -n "$UNTAGGED" ]; then
+          echo "ERROR: Missing suite @Tag on:"
+          echo "$UNTAGGED"
+          echo "Each class must have one of: @Tag(TestTag.SERIALIZATION/CONNECTOR/LIFECYCLE/STRESS/CUSTOMER)"
+          exit 1
+        fi
+        echo "✓ All integration test classes have suite tags"
         
     - name: Display Kafka Connect version
       run: |
         echo "Testing with Kafka Connect version: ${{ inputs.kafka_connect_version }}"
+        echo "Suite: ${{ inputs.suite }}"
+        echo "Shard: ${{ inputs.shard_index }} / ${{ inputs.shard_total }}"
 
-    - name: Compute shard test filter
+    - name: Compute test filter
       run: |
+        SUITE="${{ inputs.suite }}"
         SHARD_INDEX="${{ inputs.shard_index }}"
         SHARD_TOTAL="${{ inputs.shard_total }}"
 
-        if [ "$SHARD_INDEX" = "-1" ] || [ -z "$SHARD_INDEX" ]; then
-          echo "Running all tests (no shard filter)"
-          echo "TEST_FILTER=" >> $GITHUB_ENV
+        # Suite-level include tag filter
+        if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
+          SUITE_TAG_FILTER=""
         else
-          echo "Computing shard $SHARD_INDEX of $SHARD_TOTAL"
-          # Discover test classes, sort, pick every SHARD_TOTAL-th starting at SHARD_INDEX
-          # (NR-1) converts awk's 1-based line count to 0-based for modulo
+          SUITE_TAG_FILTER="-Djunit.jupiter.includeTags=$SUITE"
+        fi
+
+        # Discover test classes — filter by suite tag BEFORE sharding so that
+        # round-robin distributes only the suite's own classes evenly
+        if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
           TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
             | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
-            | sed 's|.*/||; s|\.java$||' | sort \
-            | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" '(NR-1) % total == shard')
-
-          # Build --tests arguments (one --tests flag per class)
-          TEST_FILTER=""
-          while IFS= read -r cls; do
-            [ -z "$cls" ] && continue
-            TEST_FILTER="$TEST_FILTER --tests *.$cls"
-          done <<< "$TEST_CLASSES"
-
-          CLASS_COUNT=$(echo "$TEST_CLASSES" | grep -c . || true)
-          echo "Shard $SHARD_INDEX will run $CLASS_COUNT classes:"
-          echo "$TEST_CLASSES"
-          echo "TEST_FILTER=$TEST_FILTER" >> $GITHUB_ENV
+            | sed 's|.*/||; s|\.java$||' | sort)
+        else
+          TAG_CONSTANT=$(echo "$SUITE" | tr '[:lower:]' '[:upper:]')
+          TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
+            | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
+            | xargs grep -l "@Tag(TestTag.$TAG_CONSTANT)" \
+            | sed 's|.*/||; s|\.java$||' | sort)
         fi
+
+        # Round-robin shard across the scoped class list
+        SHARDED_CLASSES=$(echo "$TEST_CLASSES" \
+          | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" 'NR % total == shard % total')
+
+        TEST_FILTER=""
+        while IFS= read -r cls; do
+          [ -z "$cls" ] && continue
+          TEST_FILTER="$TEST_FILTER --tests *.$cls"
+        done <<< "$SHARDED_CLASSES"
+
+        CLASS_COUNT=$(echo "$SHARDED_CLASSES" | grep -c . || true)
+        echo "Suite '$SUITE', shard $SHARD_INDEX/$SHARD_TOTAL: $CLASS_COUNT classes"
+        echo "SUITE_TAG_FILTER=$SUITE_TAG_FILTER" >> $GITHUB_ENV
+        echo "TEST_FILTER=$TEST_FILTER" >> $GITHUB_ENV
         
     - name: Build project
       run: ./gradlew build --no-daemon
@@ -147,8 +197,8 @@ jobs:
         timeout 60 bash -c 'until curl -f http://localhost:8083/connectors; do sleep 2; done'
         echo "Kafka Connect is ready!"
 
-    - name: Run integration tests (excluding NOT_IMPLEMENTED)
-      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud --no-daemon ${{ env.TEST_FILTER }}
+    - name: Run integration tests (excluding not_implemented and cloud)
+      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud ${{ env.SUITE_TAG_FILTER }} --no-daemon ${{ env.TEST_FILTER }}
       env:
         KAFKA_BOOTSTRAP_SERVERS: localhost:9092
         SCHEMA_REGISTRY_URL: http://localhost:8081
@@ -194,7 +244,7 @@ jobs:
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: integration-test-results-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
+        name: integration-test-results-${{ inputs.kafka_connect_version }}-${{ inputs.suite }}-shard-${{ inputs.shard_index }}
         path: |
           build/test-results/
           build/reports/tests/
@@ -204,12 +254,12 @@ jobs:
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: integration-test-reports-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
+        name: integration-test-reports-${{ inputs.kafka_connect_version }}-${{ inputs.suite }}-shard-${{ inputs.shard_index }}
         path: build/reports/
         
     - name: Upload Docker logs
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: docker-logs-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
+        name: docker-logs-${{ inputs.kafka_connect_version }}-${{ inputs.suite }}-shard-${{ inputs.shard_index }}
         path: docker-logs/

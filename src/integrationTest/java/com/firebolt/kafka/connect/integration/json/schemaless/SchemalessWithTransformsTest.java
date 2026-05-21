@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -18,11 +20,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class SchemalessWithTransformsTest extends SchemalessBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("message_transforms_table");

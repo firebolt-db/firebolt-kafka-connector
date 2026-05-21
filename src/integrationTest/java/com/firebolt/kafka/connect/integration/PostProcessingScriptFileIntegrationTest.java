@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.firebolt.kafka.connect.PostProcessingConfig;
 import com.firebolt.kafka.connect.config.ConnectorConfigDefinition;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("post_processing_file_table");

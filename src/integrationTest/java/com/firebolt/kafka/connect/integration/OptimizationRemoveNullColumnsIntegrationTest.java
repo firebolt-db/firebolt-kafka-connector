@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -23,6 +25,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import java.time.Duration;
+import org.junit.jupiter.api.Tag;
+import static org.awaitility.Awaitility.await;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("optimization_remove_null_columns_table");
@@ -91,13 +97,24 @@ public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBase
         // check that all the values are in the target table
         verifyResults(testRecords);
 
-        ResultSet resultSet = fireboltDefaultDbClient.executeQuery(
-                "SELECT query_text, start_time " +
-                        "FROM information_schema.engine_query_history " +
-                        "WHERE start_time > '" + startTime + "'" +
-                        "  AND status ='ENDED_SUCCESSFULLY' " +
-                        "  AND query_text LIKE 'INSERT INTO%'" +
-                        "  ORDER by start_time asc;");
+        String queryHistorySql = "SELECT query_text, start_time " +
+                "FROM information_schema.engine_query_history " +
+                "WHERE start_time > '" + startTime + "'" +
+                "  AND status ='ENDED_SUCCESSFULLY' " +
+                "  AND query_text LIKE 'INSERT INTO%'" +
+                "  ORDER by start_time asc";
+
+        // Query history may lag behind data flush — poll until the INSERT appears
+        await()
+            .atMost(Duration.ofSeconds(10))
+            .pollInterval(Duration.ofSeconds(1))
+            .until(() -> {
+                try (ResultSet rs = fireboltDefaultDbClient.executeQuery(queryHistorySql)) {
+                    return rs.next();
+                }
+            });
+
+        ResultSet resultSet = fireboltDefaultDbClient.executeQuery(queryHistorySql);
         assertTrue(resultSet.next());
 
         String insertQuery = resultSet.getString("query_text");

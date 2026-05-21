@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class DlqReporterIntegrationTest extends SchemaBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("dlq_it_table");

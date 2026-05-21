@@ -6,17 +6,114 @@ on:
   pull_request:
     types: [ opened, synchronize ]
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Test suite to run. Use "all" to run every suite.'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'serialization'
+          - 'connector'
+          - 'lifecycle'
+          - 'stress'
+          - 'customer'
 
 jobs:
   integration-tests:
-    name: Integration Tests (KC ${{ matrix.kafka_connect_version }}, Shard ${{ matrix.shard_index }})
+    name: Integration Tests (KC ${{ matrix.kafka_connect_version }}, ${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_total }})
     strategy:
       fail-fast: false
       matrix:
-        kafka_connect_version: ['3.9.1', '4.0']
-        shard_index: [0, 1, 2, 3, 4, 5]
+        include:
+          # KC 3.9.1 — serialization (6 shards, 1-based, ~7 classes each)
+          - kafka_connect_version: '3.9.1'
+            suite: serialization
+            shard_index: 1
+            shard_total: 6
+          - kafka_connect_version: '3.9.1'
+            suite: serialization
+            shard_index: 2
+            shard_total: 6
+          - kafka_connect_version: '3.9.1'
+            suite: serialization
+            shard_index: 3
+            shard_total: 6
+          - kafka_connect_version: '3.9.1'
+            suite: serialization
+            shard_index: 4
+            shard_total: 6
+          - kafka_connect_version: '3.9.1'
+            suite: serialization
+            shard_index: 5
+            shard_total: 6
+          - kafka_connect_version: '3.9.1'
+            suite: serialization
+            shard_index: 6
+            shard_total: 6
+          # KC 3.9.1 — single-shard suites
+          - kafka_connect_version: '3.9.1'
+            suite: connector
+            shard_index: 1
+            shard_total: 1
+          - kafka_connect_version: '3.9.1'
+            suite: lifecycle
+            shard_index: 1
+            shard_total: 1
+          - kafka_connect_version: '3.9.1'
+            suite: stress
+            shard_index: 1
+            shard_total: 1
+          - kafka_connect_version: '3.9.1'
+            suite: customer
+            shard_index: 1
+            shard_total: 1
+          # KC 4.0 — serialization (6 shards, 1-based, ~7 classes each)
+          - kafka_connect_version: '4.0'
+            suite: serialization
+            shard_index: 1
+            shard_total: 6
+          - kafka_connect_version: '4.0'
+            suite: serialization
+            shard_index: 2
+            shard_total: 6
+          - kafka_connect_version: '4.0'
+            suite: serialization
+            shard_index: 3
+            shard_total: 6
+          - kafka_connect_version: '4.0'
+            suite: serialization
+            shard_index: 4
+            shard_total: 6
+          - kafka_connect_version: '4.0'
+            suite: serialization
+            shard_index: 5
+            shard_total: 6
+          - kafka_connect_version: '4.0'
+            suite: serialization
+            shard_index: 6
+            shard_total: 6
+          # KC 4.0 — single-shard suites
+          - kafka_connect_version: '4.0'
+            suite: connector
+            shard_index: 1
+            shard_total: 1
+          - kafka_connect_version: '4.0'
+            suite: lifecycle
+            shard_index: 1
+            shard_total: 1
+          - kafka_connect_version: '4.0'
+            suite: stress
+            shard_index: 1
+            shard_total: 1
+          - kafka_connect_version: '4.0'
+            suite: customer
+            shard_index: 1
+            shard_total: 1
     uses: ./.github/workflows/core-integration-tests.yml
     with:
       kafka_connect_version: ${{ matrix.kafka_connect_version }}
+      suite: ${{ matrix.suite }}
       shard_index: ${{ matrix.shard_index }}
-      shard_total: 6
+      shard_total: ${{ matrix.shard_total }}

@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.AllDataTypesTestRecord;
 import java.math.BigDecimal;
@@ -24,6 +26,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -35,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for json schema less connector
  */
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
     // All data types test constants

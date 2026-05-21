@@ -1,6 +1,8 @@
 
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.ByteaTestRecord;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +20,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.shaded.org.bouncycastle.util.encoders.Base64;
@@ -29,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
     private static final String TABLE_NAME = generateTableName("bytea_test_table");

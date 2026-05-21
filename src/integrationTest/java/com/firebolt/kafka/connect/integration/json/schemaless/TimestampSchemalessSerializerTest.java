@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.TimestampTestRecord;
 import java.sql.Array;
@@ -25,6 +27,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -34,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
     private static final String TOPIC_NAME = generateTopicName("timestamp-test-topic");
