@@ -19,6 +19,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -82,14 +83,16 @@ public class RecordConverterFactoryTest {
 
     @Test
     void testConvertWithRecordNoConverterCanHandle() {
-        // Setup a record that no converter can handle (null schema, non-Struct value)
+        // No converter handles null-schema + non-Map value; should throw a descriptive exception.
         when(mockSinkRecord.valueSchema()).thenReturn(null);
         when(mockSinkRecord.value()).thenReturn("plain string value");
         when(mockSinkRecord.topic()).thenReturn("test-topic");
 
-        assertThrows(NullPointerException.class, () -> {
+        RecordConversionException ex = assertThrows(RecordConversionException.class, () -> {
             factory.convert(mockSinkRecord);
         });
+        assertNotNull(ex.getMessage());
+        assertTrue(ex.getMessage().contains("No converter found"));
     }
 
     @Test
@@ -198,27 +201,33 @@ public class RecordConverterFactoryTest {
     }
 
     @Test
-    void testConvertWithNonStructValue() {
-        // Test record with schema but non-Struct value - no converter can handle this
+    void testConvertWithNonStructValueThrowsRecordConversionException() {
+        // Schema-backed record with a non-Struct value: no converter matches → descriptive exception.
         when(mockSinkRecord.valueSchema()).thenReturn(mockSchema);
         when(mockSinkRecord.value()).thenReturn("not a struct");
         when(mockSinkRecord.topic()).thenReturn("test-topic");
 
-        assertThrows(NullPointerException.class, () -> {
+        RecordConversionException ex = assertThrows(RecordConversionException.class, () -> {
             factory.convert(mockSinkRecord);
         });
+        assertNotNull(ex.getMessage());
+        assertTrue(ex.getMessage().contains("No converter found"));
+        assertTrue(ex.getMessage().contains("String")); // value type in message
     }
 
     @Test
-    void testConvertWithNullValue() {
-        // Test record with schema but null value - SchemaBasedRecordConverter cannot handle this
+    void testConvertWithNullValueThrowsRecordConversionException() {
+        // Schema-backed record with null value: no converter matches → descriptive exception.
         when(mockSinkRecord.valueSchema()).thenReturn(mockSchema);
-        when(mockSinkRecord.value()).thenReturn(null); // null value but has schema
+        when(mockSinkRecord.value()).thenReturn(null);
         when(mockSinkRecord.topic()).thenReturn("test-topic");
 
-        assertThrows(NullPointerException.class, () -> {
+        RecordConversionException ex = assertThrows(RecordConversionException.class, () -> {
             factory.convert(mockSinkRecord);
         });
+        assertNotNull(ex.getMessage());
+        assertTrue(ex.getMessage().contains("No converter found"));
+        assertTrue(ex.getMessage().contains("null")); // value type in message
     }
 
     @Test
@@ -267,9 +276,4 @@ public class RecordConverterFactoryTest {
         assertEquals(offset, result.getOffset());
     }
 
-    private void assertTrue(boolean condition, String message) {
-        if (!condition) {
-            throw new AssertionError(message);
-        }
-    }
 } 

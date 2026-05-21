@@ -76,6 +76,10 @@ public class TableWriter {
             }
         });
 
+        // Persist the new high-water marks so exactly-once restarts skip already-processed records.
+        if (fireboltMetadataService != null) {
+            fireboltMetadataService.updateOffsets(topicName, processedPartitionOffsets);
+        }
     }
 
 }

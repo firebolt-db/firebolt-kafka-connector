@@ -35,20 +35,19 @@ public class SinkConfig {
 
     public String getTableNameForTopic(String topic) {
         String mapping = getTopicToTableMapping();
-        if (mapping == null || mapping.trim().isEmpty()) {
-            return null;
-        }
-
-        String[] mappings = mapping.split(",");
-        for (String map : mappings) {
-            String trimmed = map.trim();
-            String[] parts = trimmed.split(":");
-            if (parts.length == 2 && parts[0].trim().equals(topic)) {
-                return parts[1].trim();
+        if (mapping != null && !mapping.trim().isEmpty()) {
+            String[] mappings = mapping.split(",");
+            for (String map : mappings) {
+                String trimmed = map.trim();
+                String[] parts = trimmed.split(":");
+                if (parts.length == 2 && parts[0].trim().equals(topic)) {
+                    return parts[1].trim();
+                }
             }
         }
 
-        return null;
+        // Documented default: when no explicit mapping exists, use the topic name as the table name.
+        return topic;
     }
 
     public JdbcConfig getJdbcConfig() {

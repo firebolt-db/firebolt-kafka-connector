@@ -171,4 +171,36 @@ public class TableWriterTest {
         verify(mockIngestionService, times(2)).close();
     }
 
+    @Test
+    void shouldPersistOffsetsViaMetadataServiceAfterSuccessfulBatch() throws SQLException {
+        // Exactly-once: after inserting records, updateOffsets must be called so restarts
+        // don't reprocess already-committed records.
+        when(mockFireboltRecord1.getPartition()).thenReturn(0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(42L);
+        when(mockFireboltRecord2.getPartition()).thenReturn(1);
+        when(mockFireboltRecord2.getOffset()).thenReturn(99L);
+
+        List<AbstractFireboltRecord> records = List.of(mockFireboltRecord1, mockFireboltRecord2);
+        doNothing().when(mockIngestionService).addRecords(records);
+
+        tableWriter.insertRecords(records);
+
+        // Offset map must be persisted after the batch, not just updated in memory.
+        verify(mockFireboltMetadataService).updateOffsets(TOPIC_NAME, tableWriter.getProcessedPartitionOffsets());
+    }
+
+    @Test
+    void shouldNotCallUpdateOffsetsWhenMetadataServiceIsNull() throws SQLException {
+        // At-least-once mode: no metadata service → no persistence call, no NPE.
+        TableWriter writerWithoutMetadata = new TableWriter(
+                mockTableSchema, null, TOPIC_NAME,
+                new HashMap<>(Map.of(0, -1L)), mockIngestionService);
+
+        when(mockFireboltRecord1.getPartition()).thenReturn(0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(10L);
+        doNothing().when(mockIngestionService).addRecords(anyList());
+
+        assertDoesNotThrow(() -> writerWithoutMetadata.insertRecords(List.of(mockFireboltRecord1)));
+    }
+
 }

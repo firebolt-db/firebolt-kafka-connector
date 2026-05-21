@@ -124,43 +124,54 @@ public class SinkConfigTest {
         "topic3",
         "nonexistent-topic",
         "TOPIC1",
-        "topic1_different",
-        ""
+        "topic1_different"
     })
-    void testGetTableNameForTopicWithNonexistentTopic(String topic) {
+    void testGetTableNameForTopicFallsBackToTopicNameWhenNotMapped(String topic) {
+        // When no explicit mapping exists for a topic, the documented default is topic → topic.
         String result = sinkConfig.getTableNameForTopic(topic);
-        
-        assertNull(result);
+
+        assertEquals(topic, result);
     }
 
     @Test
-    void testGetTableNameForTopicWithNullMapping() {
+    void testGetTableNameForTopicWithNullMappingFallsBackToTopicName() {
         configMap.remove(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG);
         SinkConfig testConfig = new SinkConfig(configMap);
-        
+
         String result = testConfig.getTableNameForTopic("any-topic");
-        
-        assertNull(result);
+
+        assertEquals("any-topic", result);
     }
 
     @Test
-    void testGetTableNameForTopicWithEmptyMapping() {
+    void testGetTableNameForTopicWithEmptyMappingFallsBackToTopicName() {
         configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "");
         SinkConfig testConfig = new SinkConfig(configMap);
-        
+
         String result = testConfig.getTableNameForTopic("any-topic");
-        
-        assertNull(result);
+
+        assertEquals("any-topic", result);
     }
 
     @Test
-    void testGetTableNameForTopicWithWhitespaceOnlyMapping() {
+    void testGetTableNameForTopicWithWhitespaceOnlyMappingFallsBackToTopicName() {
         configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "   ");
         SinkConfig testConfig = new SinkConfig(configMap);
-        
+
         String result = testConfig.getTableNameForTopic("any-topic");
-        
-        assertNull(result);
+
+        assertEquals("any-topic", result);
+    }
+
+    @Test
+    void testGetTableNameForTopicFallsBackToTopicNameWhenNoExplicitMapping() {
+        // Documented default: topic → topic when no topic.to.table.mapping is set.
+        configMap.remove(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG);
+        SinkConfig testConfig = new SinkConfig(configMap);
+
+        assertEquals("orders", testConfig.getTableNameForTopic("orders"));
+        assertEquals("user-events", testConfig.getTableNameForTopic("user-events"));
+        assertEquals("metrics", testConfig.getTableNameForTopic("metrics"));
     }
 
     @ParameterizedTest
@@ -176,16 +187,19 @@ public class SinkConfigTest {
     void testGetTableNameForTopicWithMalformedMappings(String malformedMapping) {
         configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, malformedMapping);
         SinkConfig testConfig = new SinkConfig(configMap);
-        
+
         String result = testConfig.getTableNameForTopic("topic1");
-        
-        // Should either return correct value or null for malformed entries
-        if (malformedMapping.equals("topic1:table1:extra")) {
-            assertNull(result); // parts.length != 2
-        } else if (malformedMapping.equals("topic1:")) {
-            assertNull(result); // empty table name
+
+        // Entries with a valid 2-part mapping for topic1 return the mapped table name.
+        // All other (malformed) entries fall back to the topic name itself.
+        if (malformedMapping.equals("topic1:table1,malformed")
+                || malformedMapping.equals("topic1:table1,:") 
+                || malformedMapping.equals("topic1:table1,")) {
+            assertEquals("table1", result); // valid leading entry wins
+        } else {
+            // Malformed or unmatched → topic-name fallback
+            assertEquals("topic1", result);
         }
-        // Other cases should handle gracefully
     }
 
     @Test
@@ -298,11 +312,12 @@ public class SinkConfigTest {
     void testGetTableNameForTopicCaseSensitive() {
         configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "Topic1:Table1,topic2:table2");
         SinkConfig testConfig = new SinkConfig(configMap);
-        
+
         assertEquals("Table1", testConfig.getTableNameForTopic("Topic1"));
         assertEquals("table2", testConfig.getTableNameForTopic("topic2"));
-        assertNull(testConfig.getTableNameForTopic("topic1")); // Case sensitive
-        assertNull(testConfig.getTableNameForTopic("TOPIC2")); // Case sensitive
+        // Case-sensitive: no match → falls back to topic name itself
+        assertEquals("topic1", testConfig.getTableNameForTopic("topic1"));
+        assertEquals("TOPIC2", testConfig.getTableNameForTopic("TOPIC2"));
     }
 
     @Test
@@ -318,15 +333,17 @@ public class SinkConfigTest {
 
     @Test
     void testGetTableNameForTopicWithEmptyTopicName() {
+        // Empty string: no mapping match, returns empty string as fallback (topic → topic).
         String result = sinkConfig.getTableNameForTopic("");
-        
-        assertNull(result);
+
+        assertEquals("", result);
     }
 
     @Test
     void testGetTableNameForTopicWithNullTopicName() {
+        // Null topic: no mapping match, returns null as fallback (topic → topic).
         String result = sinkConfig.getTableNameForTopic(null);
-        
+
         assertNull(result);
     }
 
