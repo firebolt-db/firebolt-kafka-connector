@@ -13,6 +13,8 @@ import com.firebolt.kafka.connect.load.publisher.KafkaMessagePublisher;
 import com.firebolt.kafka.connect.load.verifier.FireboltTableRecordVerifier;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -94,7 +96,12 @@ public class ScenarioLoadTest {
 
 		boolean hasPostProcessingScript = scenarioConfig.isHasPostProcessingScript();
 		if (hasPostProcessingScript) {
-			String postProcessingScript = new String(java.nio.file.Files.readAllBytes(get(postProcessingScriptPath)));
+			Path basePath = Paths.get("src/integrationTest/resources").toAbsolutePath().normalize();
+			Path resolved = basePath.resolve(postProcessingScriptPath).normalize();
+			if (!resolved.startsWith(basePath)) {
+				throw new IllegalArgumentException("Invalid post-processing script path: " + postProcessingScriptPath);
+			}
+			String postProcessingScript = new String(java.nio.file.Files.readAllBytes(resolved));
 
 			connectorOverrides.put(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
 					preparePostProcessingScript(scenarioConfig.getTableName(), postProcessingScript));
