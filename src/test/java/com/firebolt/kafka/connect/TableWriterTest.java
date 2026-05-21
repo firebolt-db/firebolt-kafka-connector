@@ -193,6 +193,22 @@ public class TableWriterTest {
     }
 
     @Test
+    void shouldNotAdvanceLocalOffsetsWhenPersistenceFails() throws SQLException {
+        // Persist-before-local-update invariant: if the DB write throws, the in-memory offset
+        // map must stay at its old value so the next batch retries persisting those offsets.
+        when(mockFireboltRecord1.getPartition()).thenReturn(0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(50L);
+        doThrow(new RuntimeException("DB unavailable"))
+                .when(mockFireboltMetadataService).updateOffsets(any(), any());
+
+        assertThrows(RuntimeException.class,
+                () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+
+        // Local state must not have advanced — offset stays at -1, not 50.
+        assertEquals(-1L, tableWriter.getProcessedPartitionOffsets().get(PARTITION_0));
+    }
+
+    @Test
     void shouldNotCallUpdateOffsetsWhenMetadataServiceIsNull() throws SQLException {
         // At-least-once mode: no metadata service → no persistence call, no NPE.
         TableWriter writerWithoutMetadata = new TableWriter(

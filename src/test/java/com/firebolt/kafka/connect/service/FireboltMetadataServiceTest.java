@@ -103,13 +103,15 @@ class FireboltMetadataServiceTest {
 
         verify(selectPs).setString(1, "t1");
 
-        // second prepared statement is the insert
+        // second prepared statement is the parameterized insert (topic bound as a parameter, not interpolated)
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (?, ?, ?)", insertStatement);
 
-        // verify batch insert invoked for two missing rows
-        verify(insertPs).setInt(1, 0);
-        verify(insertPs).setInt(1, 1);
+        // verify all three parameters are bound for each missing partition
+        verify(insertPs, times(2)).setString(1, "t1");
+        verify(insertPs).setInt(2, 0);
+        verify(insertPs).setInt(2, 1);
+        verify(insertPs, times(2)).setLong(3, -1L);
         verify(insertPs, times(2)).addBatch();
         verify(insertPs).executeBatch();
     }
@@ -143,10 +145,12 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection, times(2)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (?, ?, ?)", insertStatement);
 
-        // verify only one insert for missing partition 1
-        verify(insertPs, times(1)).setInt(1, 1);
+        // verify only one insert for missing partition 1, with all three parameters bound
+        verify(insertPs, times(1)).setString(1, "t1");
+        verify(insertPs, times(1)).setInt(2, 1);
+        verify(insertPs, times(1)).setLong(3, -1L);
         verify(insertPs, times(1)).addBatch();
         verify(insertPs, times(1)).executeBatch();
     }
@@ -166,12 +170,14 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(0);
-        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"t1\" AND topic_partition = ?", updateStatement);
+        // topic is now a bound parameter (position 2), not interpolated into the SQL string
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = ? AND topic_partition = ?", updateStatement);
 
         verify(updatePs).setLong(1, 10L);
-        verify(updatePs).setInt(2, 0);
         verify(updatePs).setLong(1, 20L);
-        verify(updatePs).setInt(2, 1);
+        verify(updatePs, times(2)).setString(2, "t1");
+        verify(updatePs).setInt(3, 0);
+        verify(updatePs).setInt(3, 1);
 
         // verify parameters were bound and batch executed
         verify(updatePs, times(2)).addBatch();
@@ -216,10 +222,11 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection, times(3)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(2);
-        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"topicB\" AND topic_partition = ?", updateStatement);
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = ? AND topic_partition = ?", updateStatement);
 
         verify(updatePs).setLong(1, 7L);
-        verify(updatePs).setInt(2, 1);
+        verify(updatePs).setString(2, "topicB");
+        verify(updatePs).setInt(3, 1);
         verify(updatePs).addBatch();
         verify(updatePs).executeBatch();
 
@@ -240,6 +247,44 @@ class FireboltMetadataServiceTest {
         // total insert invocations remain from the first call only
         verify(insertPsLocal, times(2)).addBatch();
         verify(insertPsLocal, times(1)).executeBatch();
+    }
+
+    @Test
+    void updateOffsetsShouldPassMaliciousTopicNameAsParameterNotInterpolated() throws Exception {
+        // SQL injection guard: a hostile topic name must reach the DB as a bound parameter,
+        // not as raw SQL text. If the old String.format path were used, the DROP TABLE
+        // statement would be syntactically part of the query.
+        String maliciousTopic = "evil_topic'; DROP TABLE users; --";
+        Map<Integer, Long> updates = Map.of(0, 1L);
+
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+                .thenReturn(updatePs);
+
+        metadataService.updateOffsets(maliciousTopic, updates);
+
+        // The topic is bound as a PreparedStatement parameter — it cannot break out of the query.
+        verify(updatePs).setString(2, maliciousTopic);
+        verify(updatePs).addBatch();
+        verify(updatePs).executeBatch();
+    }
+
+    @Test
+    void updateOffsetsShouldPassTopicWithSpecialQuotesAsParameterNotInterpolated() throws Exception {
+        // SQL injection guard: topic names with embedded quotes must be bound safely.
+        String quotedTopic = "topic\"with'quotes";
+        Map<Integer, Long> updates = Map.of(1, 5L);
+
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+                .thenReturn(updatePs);
+
+        metadataService.updateOffsets(quotedTopic, updates);
+
+        // Both single and double quotes in the topic name are harmless when parameterized.
+        verify(updatePs).setString(2, quotedTopic);
+        verify(updatePs).addBatch();
+        verify(updatePs).executeBatch();
     }
 }
 
