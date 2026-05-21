@@ -1,0 +1,9 @@
+branches:
+  defaultBase: main
+  release:
+    enabled: false
+    pattern: release/*
+    base: main
+pr:
+  merge:
+    method: squash
