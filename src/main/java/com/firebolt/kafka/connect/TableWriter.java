@@ -45,11 +45,13 @@ public class TableWriter {
 
         ingestionService.addRecords(fireboltRecords);
 
-        Map<Integer, Long> offsetsToCommit = computeOffsetsToCommit(fireboltRecords);
+        Map<Integer, Long> updatedOffsets = computeUpdatedOffsets(fireboltRecords);
 
-        // Keep local offsets behind durable metadata if the metadata write fails.
-        persistOffsetsIfExactlyOnceEnabled(offsetsToCommit);
-        markOffsetsAsProcessed(offsetsToCommit);
+        // Persist before updating local state so metadata failures do not advance in-memory offsets.
+        if (fireboltMetadataService != null && !updatedOffsets.isEmpty()) {
+            fireboltMetadataService.updateOffsets(topicName, updatedOffsets);
+        }
+        processedPartitionOffsets.putAll(updatedOffsets);
     }
 
     public Map<Integer, Long> getProcessedPartitionOffsets() {
@@ -66,31 +68,19 @@ public class TableWriter {
         }
     }
 
-    private Map<Integer, Long> computeOffsetsToCommit(List<AbstractFireboltRecord> fireboltRecords) {
-        Map<Integer, Long> offsetsToCommit = new HashMap<>();
+    private Map<Integer, Long> computeUpdatedOffsets(List<AbstractFireboltRecord> fireboltRecords) {
+        Map<Integer, Long> updatedOffsets = new HashMap<>();
 
         for (AbstractFireboltRecord fireboltRecord : fireboltRecords) {
-            offsetsToCommit.merge(fireboltRecord.getPartition(), fireboltRecord.getOffset(), Math::max);
+            Integer partition = fireboltRecord.getPartition();
+            Long offset = fireboltRecord.getOffset();
+            Long lastProcessedOffset = processedPartitionOffsets.get(partition);
+
+            if (lastProcessedOffset == null || offset > lastProcessedOffset) {
+                updatedOffsets.merge(partition, offset, Math::max);
+            }
         }
-
-        offsetsToCommit.entrySet()
-                .removeIf(entry -> isAlreadyProcessed(entry.getKey(), entry.getValue()));
-        return offsetsToCommit;
-    }
-
-    private boolean isAlreadyProcessed(Integer partition, Long offset) {
-        Long processedOffset = processedPartitionOffsets.get(partition);
-        return processedOffset != null && offset <= processedOffset;
-    }
-
-    private void persistOffsetsIfExactlyOnceEnabled(Map<Integer, Long> offsetsToCommit) {
-        if (fireboltMetadataService != null && !offsetsToCommit.isEmpty()) {
-            fireboltMetadataService.updateOffsets(topicName, offsetsToCommit);
-        }
-    }
-
-    private void markOffsetsAsProcessed(Map<Integer, Long> offsetsToCommit) {
-        processedPartitionOffsets.putAll(offsetsToCommit);
+        return updatedOffsets;
     }
 
 }
