@@ -120,7 +120,9 @@ public class IngestionServiceWithPostProcessingTest {
 
         verify(mockConnection).setAutoCommit(false);
         verify(mockConnection).rollback();
-        verify(mockConnection).commit();
+        // commit must NOT be called after a rollback — the original code had a bug here
+        verify(mockConnection, times(0)).commit();
+        verify(mockConnection).setAutoCommit(true);
         Mockito.verifyNoInteractions(mockStatement);
     }
 
@@ -166,6 +168,35 @@ public class IngestionServiceWithPostProcessingTest {
         verify(mockStatement, times(1)).execute(Mockito.argThat(sql -> sql.startsWith("DELETE FROM some_tmp")));
         verify(mockConnection, times(1)).rollback();
         verify(mockConnection, times(1)).commit();
+        verify(mockConnection, times(1)).setAutoCommit(true);
+    }
+
+    @Test
+    void shouldNotManageTransactionWhenFlagIsFalse() throws Exception {
+        // In exactly-once mode the transaction is owned by TableWriter, so this decorator
+        // must not call setAutoCommit / commit / rollback.
+        String postProcessingScript = "DELETE FROM some_tmp WHERE batch_id='${firebolt_param.batch_id}'";
+
+        IngestionServiceWithPostProcessing subject = new IngestionServiceWithPostProcessing(
+                mockIngestionService, mockConnection, postProcessingScript, false
+        );
+
+        FireboltRecord record = new FireboltRecord(
+                TABLE_NAME,
+                Collections.emptyMap(),
+                new SinkRecord("topic", 0, null, null, null, null, 1L)
+        );
+
+        assertDoesNotThrow(() -> subject.addRecords(List.of(record)));
+
+        verify(mockIngestionService).addRecords(fireboltRecordListCaptor.capture());
+        verify(mockConnection).createStatement();
+        verify(mockStatement).execute(Mockito.argThat(sql -> sql.startsWith("DELETE FROM some_tmp")));
+
+        // transaction management is the caller's responsibility
+        verify(mockConnection, times(0)).setAutoCommit(false);
+        verify(mockConnection, times(0)).commit();
+        verify(mockConnection, times(0)).rollback();
     }
 }
 

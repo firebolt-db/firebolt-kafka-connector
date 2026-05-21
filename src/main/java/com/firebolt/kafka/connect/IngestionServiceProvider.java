@@ -18,8 +18,13 @@ public class IngestionServiceProvider {
                 new InsertPreparedStatement(connection, tableSchema, errorReporter, tolerateAllErrors) : new BinaryIngestionService(connection, errorReporter, tolerateAllErrors, tableSchema);
 
         Optional<String> postProcessingScript = sinkConfig.getPostProcessingScript(tableSchema.getTableName());
-        return postProcessingScript == null || postProcessingScript.isEmpty() ? ingestionService
-                : new IngestionServiceWithPostProcessing(ingestionService, connection, postProcessingScript.get());
+        if (postProcessingScript == null || postProcessingScript.isEmpty()) {
+            return ingestionService;
+        }
+        // In exactly-once mode the transaction is managed by TableWriter (to include the offset metadata
+        // update atomically), so IngestionServiceWithPostProcessing must not commit on its own.
+        boolean manageTransaction = !sinkConfig.isExactlyOnce();
+        return new IngestionServiceWithPostProcessing(ingestionService, connection, postProcessingScript.get(), manageTransaction);
     }
 
 }
