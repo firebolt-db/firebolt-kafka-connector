@@ -23,7 +23,6 @@ on:
 jobs:
   integration-tests:
     name: Integration Tests (KC ${{ matrix.kafka_connect_version }}, ${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_total }})
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.suite == 'all' || matrix.suite == inputs.suite }}
     strategy:
       fail-fast: false
       matrix:
