@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.json.datatype.Record1TestRecord;
 import com.firebolt.kafka.connect.integration.json.datatype.Record2TestRecord;
 import com.firebolt.kafka.connect.integration.json.datatype.Record3TestRecord;
@@ -16,6 +18,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -27,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.math.BigInteger;
 
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class MultipleTopicsSerializerTest extends SchemaBaseIntegrationTest {
     
     // Topic and table names

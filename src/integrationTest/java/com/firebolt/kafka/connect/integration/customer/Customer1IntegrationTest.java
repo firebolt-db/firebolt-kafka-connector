@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.customer;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.BigIntTestRecord;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * }
  */
 @Slf4j
+@Tag(TestTag.CUSTOMER)
 public class Customer1IntegrationTest extends SchemalessBaseIntegrationTest {
     private static final String TABLE_NAME = "customer1_test_table_schemaless";
     private static final String TOPIC_NAME = "customer1-test-topic-schemaless";

@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.avro;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -25,6 +27,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -35,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTest {
 
     private static final String ALL_DATA_TYPES_TABLE_NAME = "all_data_types_test_table_avro";

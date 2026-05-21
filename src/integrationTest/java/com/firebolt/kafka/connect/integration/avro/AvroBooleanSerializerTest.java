@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.avro;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,6 +19,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -26,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
 
     private static final String TABLE_NAME = "boolean_test_table_avro";

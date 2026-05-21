@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.json.schemaless;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import java.sql.ResultSet;
@@ -18,12 +20,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 
 import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class JsonColumnValueSerializerTest extends SchemalessBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("json_as_text_column");

@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.json.datatype.SimpleRecord;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -15,10 +17,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Slf4j
+@Tag(TestTag.LIFECYCLE)
 public class ConnectorManagementTest extends SchemaBaseIntegrationTest {
 
     private String topic1Name;

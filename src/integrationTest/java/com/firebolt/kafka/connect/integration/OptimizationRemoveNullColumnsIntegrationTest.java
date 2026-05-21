@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("optimization_remove_null_columns_table");

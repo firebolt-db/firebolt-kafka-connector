@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.json.schema;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.NumericTestRecord;
 import java.math.BigDecimal;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
     
     private static final String TABLE_NAME = generateTableName("numeric_test_table");

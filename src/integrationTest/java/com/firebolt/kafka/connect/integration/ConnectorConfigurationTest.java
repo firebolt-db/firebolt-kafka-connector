@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * error messages.
  */
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class ConnectorConfigurationTest extends BaseIntegrationTest {
     
     private final ObjectMapper objectMapper = new ObjectMapper();

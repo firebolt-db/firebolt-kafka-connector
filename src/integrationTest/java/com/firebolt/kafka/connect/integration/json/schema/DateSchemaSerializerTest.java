@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration.json.schema;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.SchemaBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.DateTestRecord;
 import java.sql.Array;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -32,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.SERIALIZATION)
 public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
     private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 

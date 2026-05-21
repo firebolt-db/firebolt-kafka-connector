@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.ResultSet;
@@ -20,6 +22,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -27,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class ColumnNameTest extends SchemalessBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("column_name_table");

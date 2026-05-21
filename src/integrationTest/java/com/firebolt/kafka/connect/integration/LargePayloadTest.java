@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.STRESS)
 public class LargePayloadTest extends SchemaBaseIntegrationTest {
 
     private static final String TABLE_NAME = generateTableName("large_payload_test_table");

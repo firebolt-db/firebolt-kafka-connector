@@ -1,5 +1,7 @@
 package com.firebolt.kafka.connect.integration;
 
+import com.firebolt.kafka.connect.utils.TestTag;
+
 import com.firebolt.kafka.connect.integration.json.datatype.SimpleRecord;
 import java.util.Arrays;
 import java.util.List;
@@ -11,6 +13,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -20,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
+@Tag(TestTag.CONNECTOR)
 public class TableNameTest extends SchemalessBaseIntegrationTest {
 
     private Producer<String, String> producer;
