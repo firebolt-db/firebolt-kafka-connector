@@ -11,7 +11,6 @@ import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -76,13 +75,9 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
 
         Schema avroSchema = parquetAvroSchemaProvider.get(tableSchema);
 
-        List<GenericData.Record> avroRecords = processRecords(records, tableSchema, avroSchema);
-
         InMemoryOutputFile out = inMemoryFileProvider.get();
         try (ParquetWriter<GenericData.Record> writer = avroParquetWriterProvider.get(avroSchema, out)) {
-            for (GenericData.Record avroRecord : avroRecords) {
-                writer.write(avroRecord);
-            }
+            writeRecords(records, tableSchema, avroSchema, writer);
         } catch (Exception e) {
             throw new RuntimeException("Failed to write Parquet content in-memory", e);
         }
@@ -90,13 +85,13 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
         return out.getBuffer();
     }
 
-    private List<GenericData.Record> processRecords(List<AbstractFireboltRecord> records, TableSchema tableSchema, Schema avroSchema) {
-        List<GenericData.Record> avroRecords = new ArrayList<>();
-
+    private void writeRecords(List<AbstractFireboltRecord> records,
+                              TableSchema tableSchema,
+                              Schema avroSchema,
+                              ParquetWriter<GenericData.Record> writer) throws java.io.IOException {
         for (AbstractFireboltRecord record : records) {
             try {
-                GenericData.Record processedRecords = processRecord(record, tableSchema, avroSchema);
-                avroRecords.add(processedRecords);
+                writer.write(processRecord(record, tableSchema, avroSchema));
             } catch (RecordConversionFailedException e) {
                 if (errorToleranceAll) {
                     errorReporter.report(record.getSinkRecord(), e);
@@ -106,7 +101,6 @@ public class ParquetDataGenerator implements BinaryDataGenerator {
                 }
             }
         }
-        return avroRecords;
     }
 
     private GenericData.Record processRecord(AbstractFireboltRecord record, TableSchema tableSchema, Schema avroSchema) {

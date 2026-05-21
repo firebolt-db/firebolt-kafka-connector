@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -347,7 +348,8 @@ class ParquetDataGeneratorTest {
                 .endRecord();
 
         when(mockSchemaProvider.get(schema)).thenReturn(avro);
-        // no writer provider stubbing; writer is not used when conversion fails
+        when(mockWriterProvider.get(eq(avro), any())).thenReturn(mockWriter);
+        doNothing().when(mockWriter).close();
 
         KafkaMessageColumnValue idValue = new SchemalessKafkaMessageColumnValue("bad");
         AbstractFireboltRecord bad = mock(AbstractFireboltRecord.class);
@@ -364,7 +366,6 @@ class ParquetDataGeneratorTest {
         );
 
         assertThrows(RecordConversionFailedException.class, () -> generator.generate(List.of(bad), schema));
-        verifyNoInteractions(mockWriter);
+        verify(mockWriter, never()).write(any(GenericData.Record.class));
     }
 }
-
