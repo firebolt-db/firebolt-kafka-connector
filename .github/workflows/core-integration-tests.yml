@@ -11,15 +11,27 @@ on:
         options:
           - '3.9.1'
           - '4.0'
+      suite:
+        description: 'Test suite to run (serialization, connector, lifecycle, stress, customer, all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'serialization'
+          - 'connector'
+          - 'lifecycle'
+          - 'stress'
+          - 'customer'
       shard_index:
-        description: 'Shard index to run (0-5). Use -1 to run all tests.'
+        description: 'Shard index (0-based). Only used when shard_total > 1.'
         required: false
-        default: '-1'
+        default: '0'
         type: string
       shard_total:
-        description: 'Total number of shards'
+        description: 'Total number of shards for this suite run.'
         required: false
-        default: '6'
+        default: '1'
         type: string
   workflow_call:
     inputs:
@@ -28,15 +40,20 @@ on:
         required: false
         default: '3.9.1'
         type: string
-      shard_index:
-        description: 'Shard index to run (0-5). Use -1 to run all tests.'
+      suite:
+        description: 'Test suite to run (serialization, connector, lifecycle, stress, customer, all)'
         required: false
-        default: -1
+        default: 'all'
+        type: string
+      shard_index:
+        description: 'Shard index (0-based). Only used when shard_total > 1.'
+        required: false
+        default: 0
         type: number
       shard_total:
-        description: 'Total number of shards'
+        description: 'Total number of shards for this suite run.'
         required: false
-        default: 6
+        default: 1
         type: number
      
 env:
@@ -70,27 +87,66 @@ jobs:
         
     - name: Make gradlew executable
       run: chmod +x ./gradlew
+
+    - name: Enforce suite tag coverage
+      run: |
+        UNTAGGED=""
+        for f in $(find src/integrationTest -name "*Test.java" | grep -v "Base" | grep -v "load/" | grep -v "utils/" | grep -v "datatype/"); do
+          if ! grep -q '@Tag(TestTag\.\(SERIALIZATION\|CONNECTOR\|LIFECYCLE\|STRESS\|CUSTOMER\))' "$f"; then
+            UNTAGGED="$UNTAGGED\n  $(basename $f .java)"
+          fi
+        done
+
+        if [ -n "$UNTAGGED" ]; then
+          echo "ERROR: The following integration test classes are missing a suite @Tag annotation:"
+          echo -e "$UNTAGGED"
+          echo ""
+          echo "Every integration test class must have exactly one of: @Tag(TestTag.SERIALIZATION), @Tag(TestTag.CONNECTOR), @Tag(TestTag.LIFECYCLE), @Tag(TestTag.STRESS), @Tag(TestTag.CUSTOMER)"
+          exit 1
+        fi
+        echo "✓ All integration test classes have suite tags"
         
     - name: Display Kafka Connect version
       run: |
         echo "Testing with Kafka Connect version: ${{ inputs.kafka_connect_version }}"
+        echo "Suite: ${{ inputs.suite }}"
+        echo "Shard: ${{ inputs.shard_index }} / ${{ inputs.shard_total }}"
 
-    - name: Compute shard test filter
+    - name: Compute test filter
       run: |
+        SUITE="${{ inputs.suite }}"
         SHARD_INDEX="${{ inputs.shard_index }}"
         SHARD_TOTAL="${{ inputs.shard_total }}"
 
-        if [ "$SHARD_INDEX" = "-1" ] || [ -z "$SHARD_INDEX" ]; then
-          echo "Running all tests (no shard filter)"
+        # Set suite-level include tag filter (empty means run all suites)
+        if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
+          SUITE_TAG_FILTER=""
+        else
+          SUITE_TAG_FILTER="-Djunit.jupiter.includeTags=$SUITE"
+        fi
+
+        # Apply sharding within the suite if shard_total > 1
+        if [ "$SHARD_TOTAL" = "1" ] || [ -z "$SHARD_TOTAL" ]; then
+          echo "Running suite '$SUITE' (no sharding)"
+          echo "SUITE_TAG_FILTER=$SUITE_TAG_FILTER" >> $GITHUB_ENV
           echo "TEST_FILTER=" >> $GITHUB_ENV
         else
-          echo "Computing shard $SHARD_INDEX of $SHARD_TOTAL"
-          # Discover test classes, sort, pick every SHARD_TOTAL-th starting at SHARD_INDEX
-          # (NR-1) converts awk's 1-based line count to 0-based for modulo
-          TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
-            | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
-            | sed 's|.*/||; s|\.java$||' | sort \
-            | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" '(NR-1) % total == shard')
+          echo "Computing shard $SHARD_INDEX of $SHARD_TOTAL within suite '$SUITE'"
+
+          if [ "$SUITE" = "all" ] || [ -z "$SUITE" ]; then
+            # Shard across every integration test class
+            TEST_CLASSES=$(find src/integrationTest -name "*Test.java" \
+              | grep -v "Base" | grep -v "load/" | grep -v "utils/" \
+              | sed 's|.*/||; s|\.java$||' | sort \
+              | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" '(NR-1) % total == shard')
+          else
+            # Shard within the tagged suite subset
+            SUITE_UPPER=$(echo "$SUITE" | tr '[:lower:]' '[:upper:]')
+            TEST_CLASSES=$(grep -rl "@Tag(TestTag.$SUITE_UPPER)" src/integrationTest \
+              | grep -v "Base" | grep -v "load/" | grep -v "utils/" | grep -v "datatype/" \
+              | sed 's|.*/||; s|\.java$||' | sort \
+              | awk -v shard="$SHARD_INDEX" -v total="$SHARD_TOTAL" '(NR-1) % total == shard')
+          fi
 
           # Build --tests arguments (one --tests flag per class)
           TEST_FILTER=""
@@ -102,6 +158,7 @@ jobs:
           CLASS_COUNT=$(echo "$TEST_CLASSES" | grep -c . || true)
           echo "Shard $SHARD_INDEX will run $CLASS_COUNT classes:"
           echo "$TEST_CLASSES"
+          echo "SUITE_TAG_FILTER=$SUITE_TAG_FILTER" >> $GITHUB_ENV
           echo "TEST_FILTER=$TEST_FILTER" >> $GITHUB_ENV
         fi
         
@@ -147,8 +204,8 @@ jobs:
         timeout 60 bash -c 'until curl -f http://localhost:8083/connectors; do sleep 2; done'
         echo "Kafka Connect is ready!"
 
-    - name: Run integration tests (excluding NOT_IMPLEMENTED)
-      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud --no-daemon ${{ env.TEST_FILTER }}
+    - name: Run integration tests (excluding not_implemented and cloud)
+      run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,cloud ${{ env.SUITE_TAG_FILTER }} --no-daemon ${{ env.TEST_FILTER }}
       env:
         KAFKA_BOOTSTRAP_SERVERS: localhost:9092
         SCHEMA_REGISTRY_URL: http://localhost:8081
@@ -194,7 +251,7 @@ jobs:
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: integration-test-results-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
+        name: integration-test-results-${{ inputs.kafka_connect_version }}-${{ inputs.suite }}-shard-${{ inputs.shard_index }}
         path: |
           build/test-results/
           build/reports/tests/
@@ -204,12 +261,12 @@ jobs:
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: integration-test-reports-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
+        name: integration-test-reports-${{ inputs.kafka_connect_version }}-${{ inputs.suite }}-shard-${{ inputs.shard_index }}
         path: build/reports/
         
     - name: Upload Docker logs
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: docker-logs-${{ inputs.kafka_connect_version }}-shard-${{ inputs.shard_index }}
+        name: docker-logs-${{ inputs.kafka_connect_version }}-${{ inputs.suite }}-shard-${{ inputs.shard_index }}
         path: docker-logs/
