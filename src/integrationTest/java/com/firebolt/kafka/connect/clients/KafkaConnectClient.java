@@ -90,7 +90,7 @@ public class KafkaConnectClient {
 
         await()
                 .atMost(timeout)
-                .pollInterval(Duration.ofSeconds(5))
+                .pollInterval(Duration.ofSeconds(2))
                 .until(() -> {
                     try {
                         String state = getConnectorState(connectorName);
