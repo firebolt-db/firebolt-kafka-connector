@@ -139,31 +139,6 @@ producers must set the field or ingestion will fail for that record. Use
 `google.protobuf.Timestamp` for Firebolt `TIMESTAMP` and `TIMESTAMPTZ`; repeated
 fields map to Firebolt arrays.
 
-#### `oneof` and nested messages
-
-Protobuf `oneof` is supported by flattening each branch into its own column —
-matching ClickHouse's [Kafka Connect Sink](https://clickhouse.com/docs/integrations/kafka/clickhouse-kafka-connect-sink#protobuf-schema-support)
-behaviour. Set the following on the connector to opt in to flattening:
-
-```properties
-value.converter.flatten.unions=true
-value.converter.generate.index.for.unions=false
-```
-
-With these settings, every `oneof` member becomes a top-level Connect field and
-maps 1:1 to a Firebolt column of the matching scalar type. Only the member set
-on the wire receives a non-null value; the others are persisted as SQL NULL, so
-the columns must be nullable. This works for `oneof` of scalars, `oneof` of
-arrays (via wrapper messages — Protobuf does not allow `repeated` directly
-inside a `oneof`), and nested `oneof`s.
-
-Plain (non-`oneof`) nested messages currently require a Firebolt `STRUCT`
-column, which **is not yet supported** by the connector's schema-based converter
-path. Records with non-flattened Connect Struct fields are routed to the DLQ
-(when `errors.tolerance=all`) or fail the task (`errors.tolerance=none`). For
-now, restructure your Protobuf schema to keep top-level scalar / array / `oneof`
-fields, or ingest only the fields you care about by adjusting the table schema.
-
 ### Configuration Properties
 
 | Property | Required | Default | Description |
