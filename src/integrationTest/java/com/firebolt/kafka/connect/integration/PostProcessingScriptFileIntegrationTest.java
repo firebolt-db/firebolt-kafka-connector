@@ -32,10 +32,11 @@ import static org.junit.jupiter.api.Assertions.fail;
 @Tag(TestTag.CONNECTOR)
 public class PostProcessingScriptFileIntegrationTest extends SchemalessBaseIntegrationTest {
 
-    private String TABLE_NAME = generateTableName("post_processing_file_table");
-    private String TOPIC_NAME = generateTopicName("post-processing-file-topic");
-
-    private String TARGET_TABLE_NAME = generateTableName("target_table_post_processing_file");
+    // Static names intentional: single @Test method (no parameterized runs), must match
+    // the hardcoded SQL in src/integrationTest/resources/scripts/post_processing_script.sql
+    private static final String TABLE_NAME = "post_processing_file_table_schemaless";
+    private static final String TOPIC_NAME = "post-processing-file-topic-schemaless";
+    private static final String TARGET_TABLE_NAME = "target_table_post_processing_file_schemaless";
 
     private static final String SCRIPT_FILE_PATH = "/etc/kafka-connect/scripts/post_processing_script.sql";
 
