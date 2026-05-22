@@ -13,6 +13,24 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 
+/**
+ * Base for Protobuf integration tests.
+ *
+ * <p>TODO: enable on KC 4.0 once the upstream classpath conflict in Confluent's
+ * {@code cp-kafka-connect:8.0.0} image is resolved. Loading the bundled
+ * {@code kafka-connect-protobuf-converter-8.0.0.jar} on that image throws
+ * {@code java.lang.VerifyError: ... GeneratedMessage$ExtendableMessage} because the worker
+ * classpath ships two incompatible {@code protobuf-java} versions
+ * (3.25.5 in {@code /usr/share/java/kafka/} and 4.29.3 in {@code /usr/share/java/kafka-serde-tools/}).
+ * Bundling our own {@code kafka-connect-protobuf-converter} would fix Protobuf but break the
+ * Avro converter on the same image (it overrides the worker's bundled Confluent serializer
+ * v8.0.0 with our pinned dependency, producing
+ * {@code NoSuchMethodError: AbstractKafkaAvroDeserializer.schemaIdDeserializer(boolean)}).
+ * KC 3.9.1 / Confluent 7.9.1 has a self-consistent classpath and runs the full Protobuf suite,
+ * so until that's resolved subclasses are gated with a
+ * {@link org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable @DisabledIfEnvironmentVariable}
+ * on {@code KAFKA_CONNECT_VERSION=4\.0}.
+ */
 @Slf4j
 public class ProtobufBaseIntegrationTest extends BaseIntegrationTest {
 

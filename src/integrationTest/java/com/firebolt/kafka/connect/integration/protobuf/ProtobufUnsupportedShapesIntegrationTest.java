@@ -68,6 +68,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Slf4j
 @Tag(TestTag.SERIALIZATION)
 @Tag(TestTag.CONNECTOR)
+@org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable(
+        named = "KAFKA_CONNECT_VERSION",
+        matches = "4\\.0",
+        disabledReason = "KC 4.0 image has incompatible protobuf-java versions on the classpath; see ProtobufBaseIntegrationTest")
 public class ProtobufUnsupportedShapesIntegrationTest extends ProtobufBaseIntegrationTest {
 
     private static final String TABLE_NAME = "protobuf_unsupported_shapes_table";
