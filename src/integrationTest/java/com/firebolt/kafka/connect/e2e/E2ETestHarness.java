@@ -31,10 +31,17 @@ import static org.awaitility.Awaitility.await;
 @Slf4j
 public class E2ETestHarness {
 
-    /** Default Docker Compose service endpoints. */
+    /** Default Docker Compose service endpoints (host-side mapped ports). */
     private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String DEFAULT_SCHEMA_REGISTRY_URL = "http://localhost:8081";
     private static final String DEFAULT_CONNECT_URL = "http://localhost:8083";
+
+    /**
+     * Schema Registry URL as seen from inside the Docker network.
+     * Kafka Connect runs in Docker so it cannot reach Schema Registry via localhost;
+     * it must use the Docker service hostname instead.
+     */
+    private static final String DOCKER_SCHEMA_REGISTRY_URL = "http://schema-registry:8081";
 
     private static final MediaType JSON_MEDIA = MediaType.parse("application/json");
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()
@@ -448,12 +455,12 @@ public class E2ETestHarness {
                 break;
             case AVRO:
                 props.put("value.converter", "io.confluent.connect.avro.AvroConverter");
-                props.put("value.converter.schema.registry.url", schemaRegistryUrl);
+                props.put("value.converter.schema.registry.url", DOCKER_SCHEMA_REGISTRY_URL);
                 break;
             case PROTOBUF:
                 props.put("value.converter",
                         "io.confluent.connect.protobuf.ProtobufConverter");
-                props.put("value.converter.schema.registry.url", schemaRegistryUrl);
+                props.put("value.converter.schema.registry.url", DOCKER_SCHEMA_REGISTRY_URL);
                 break;
             default:
                 throw new IllegalArgumentException(

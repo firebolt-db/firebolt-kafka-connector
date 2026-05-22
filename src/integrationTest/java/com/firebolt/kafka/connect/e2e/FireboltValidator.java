@@ -49,7 +49,7 @@ public class FireboltValidator {
      * Checks that sequential IDs 1, N/2, and N exist with correct name prefix.
      */
     public void validateDataIntegrity(String tableName, long totalRecords) throws SQLException {
-        long[] sampleIds = {1, totalRecords / 2, totalRecords};
+        long[] sampleIds = {1, Math.max(1L, totalRecords / 2), totalRecords};
         for (long sampleId : sampleIds) {
             validateRecordExists(tableName, sampleId);
         }
