@@ -48,7 +48,20 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
             return connection.createArrayOf(typeName, elements.toArray());
         }
 
-        if (isNestedIntegerArray(fireboltColumn)) {
+        if (isNestedArray(fireboltColumn)) {
+            // Nested arrays land here regardless of inner type. Element-level
+            // converters (timestamp/date/decimal/bytea) are not applied per
+            // inner element today: the connector currently only supports
+            // nested arrays of passthrough scalar types (integer/bigint/real
+            // (non-FLOAT32)/double/boolean/text). Inner types that need
+            // element-level conversion are rejected up front so callers get a
+            // clear conversion error instead of malformed data downstream.
+            if (requiresElementWiseConversion(fireboltColumn, schemaKafkaMessageColumnValue)) {
+                throw new ColumnConversionFailedException(
+                        fireboltColumn.getName(),
+                        fireboltColumn.getDataType(),
+                        "Nested arrays with element-level conversion (timestamp/date/decimal/bytea) are not supported");
+            }
             return connection.createArrayOf(typeName, elements.stream().map(this::asNestedArrayElement).toArray());
         }
 
@@ -96,9 +109,15 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
             return toObjectArray((List<Object>) element);
         }
         if (element instanceof Struct) {
-            return toObjectArray(extractArrayField((Struct) element));
+            // Protobuf models nested arrays as `repeated WrapperMessage { repeated X values; }`.
+            // Confluent's ProtobufConverter therefore surfaces nested arrays as a list of single-field
+            // Connect Structs whose only field is the inner array. Unwrap that field here. The struct's
+            // array field can also be null (e.g., absent repeated proto field with null value), in
+            // which case we propagate null rather than NPE.
+            List<Object> innerList = extractArrayField((Struct) element);
+            return innerList == null ? null : toObjectArray(innerList);
         }
-        throw new ColumnConversionFailedException("", "", "failed to convert nested array element");
+        throw new ColumnConversionFailedException("", "", "failed to convert nested array element of type " + element.getClass().getName());
     }
 
     private List<Object> extractArrayField(Struct struct) {
@@ -107,40 +126,87 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
                 return (List<Object>) struct.get(field);
             }
         }
-        throw new ColumnConversionFailedException("", "", "failed to convert nested array struct");
+        throw new ColumnConversionFailedException("", "", "failed to convert nested array struct: no inner array field");
+    }
+
+    private boolean requiresElementWiseConversion(TableSchema.Column fireboltColumn, SchemaKafkaMessageColumnValue value) {
+        String inner = innerNestedArrayType(fireboltColumn.getDataType());
+        if (inner == null) {
+            return false;
+        }
+        // Element-level conversion is required for these types because the inner
+        // values arrive in formats (Long millis, ByteBuffer, ISO strings, ...)
+        // that need translating before being shipped to the JDBC driver.
+        switch (inner) {
+            case "timestamp":
+            case "timestamptz":
+            case "date":
+            case "numeric":
+            case "bytea":
+                return true;
+            case "real":
+                // FLOAT32 values must be re-stringified, see 1D path above.
+                return value.getSchemaSubType() == Schema.Type.FLOAT32;
+            default:
+                return false;
+        }
+    }
+
+    /** Returns the inner element type for `array(array(<inner>))`, else null. */
+    private String innerNestedArrayType(String dataType) {
+        if (dataType == null || !dataType.startsWith("array(array(") || !dataType.endsWith("))")) {
+            return null;
+        }
+        return dataType.substring("array(array(".length(), dataType.length() - 2);
     }
 
     private String detectTypeName(TableSchema.Column fireboltColumn) {
-        if (fireboltColumn.getDataType().equals("array(integer)") || isNestedIntegerArray(fireboltColumn)) {
-            return "integer";
-        } else if (fireboltColumn.getDataType().equals("array(timestamp)")) {
-            return TIMESTAMP_ARRAY_TYPE_NAME;
-        } else if (fireboltColumn.getDataType().equals("array(timestamptz)")) {
-            return TIMESTAMPTZ_ARRAY_TYPE_NAME;
-        } else if (fireboltColumn.getDataType().equals("array(date)")) {
-            return DATE_ARRAY_TYPE_NAME;
-        } else if (fireboltColumn.getDataType().equals("array(numeric)")) {
-            return "numeric";
-        } else if (fireboltColumn.getDataType().equals("array(bigint)")) {
-            return "bigint";
-        } else if (fireboltColumn.getDataType().equals("array(real)")) {
-            return "real";
-        } else if (fireboltColumn.getDataType().equals("array(double)")) {
-            return "double";
-        } else if (fireboltColumn.getDataType().equals("array(text)")) {
-            return "string";
-        } else if (fireboltColumn.getDataType().equals("array(bytea)")) {
-            return BYTEA_ARRAY_TYPE_NAME;
-        } else if (fireboltColumn.getDataType().equals("array(boolean)")) {
-            return "boolean";
+        String dataType = fireboltColumn.getDataType();
+        // For nested arrays, the JDBC driver expects the *inner* element type so it
+        // can format `[[a,b],[c]]` as that type. Map the inner type the same way as
+        // 1D arrays (text -> "string", bool -> "boolean", ...).
+        String nestedInner = innerNestedArrayType(dataType);
+        if (nestedInner != null) {
+            return mapInnerToJdbcType(nestedInner);
         }
-
+        if (dataType.startsWith("array(") && dataType.endsWith(")")) {
+            return mapInnerToJdbcType(dataType.substring("array(".length(), dataType.length() - 1));
+        }
         // add more data types
         return "string";
     }
 
-    private boolean isNestedIntegerArray(TableSchema.Column fireboltColumn) {
-        return "array(array(integer))".equals(fireboltColumn.getDataType());
+    private String mapInnerToJdbcType(String inner) {
+        switch (inner) {
+            case "integer":
+                return "integer";
+            case "timestamp":
+                return TIMESTAMP_ARRAY_TYPE_NAME;
+            case "timestamptz":
+                return TIMESTAMPTZ_ARRAY_TYPE_NAME;
+            case "date":
+                return DATE_ARRAY_TYPE_NAME;
+            case "numeric":
+                return "numeric";
+            case "bigint":
+                return "bigint";
+            case "real":
+                return "real";
+            case "double":
+                return "double";
+            case "text":
+                return "string";
+            case "bytea":
+                return BYTEA_ARRAY_TYPE_NAME;
+            case "boolean":
+                return "boolean";
+            default:
+                return "string";
+        }
+    }
+
+    private boolean isNestedArray(TableSchema.Column fireboltColumn) {
+        return innerNestedArrayType(fireboltColumn.getDataType()) != null;
     }
 
     private Array createByteaArray(Connection connection, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {

@@ -9,16 +9,23 @@ import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
@@ -133,6 +140,13 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         }
     }
 
+    /**
+     * Exercises nested array support across multiple inner element types — Protobuf models nested
+     * arrays as `repeated WrapperMessage { repeated X values; }`, which Confluent's
+     * ProtobufConverter surfaces as `List<Struct>` to the connector. Each inner type must round-trip
+     * correctly. Inner types that need element-level conversion (timestamp/date/decimal/bytea) are
+     * not supported today and are covered separately by `testNestedArrayWithUnsupportedInnerType`.
+     */
     @Test
     void testNestedArrayProtobufSerializationWithSqlIngestion() throws Exception {
         setupProtobufTestResources(
@@ -143,20 +157,52 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
         Descriptor recordDescriptor = fileDescriptor.findMessageTypeByName("NestedArrayRecord");
         Descriptor intArrayDescriptor = fileDescriptor.findMessageTypeByName("IntArray");
+        Descriptor longArrayDescriptor = fileDescriptor.findMessageTypeByName("LongArray");
+        Descriptor doubleArrayDescriptor = fileDescriptor.findMessageTypeByName("DoubleArray");
+        Descriptor stringArrayDescriptor = fileDescriptor.findMessageTypeByName("StringArray");
+        Descriptor boolArrayDescriptor = fileDescriptor.findMessageTypeByName("BoolArray");
         List<DynamicMessage> records = List.of(
+                // Two-row record with populated inner arrays for every type.
                 DynamicMessage.newBuilder(recordDescriptor)
                         .setField(recordDescriptor.findFieldByName("id"), 1)
                         .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
                                 intArray(intArrayDescriptor, 1, 2))
                         .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
                                 intArray(intArrayDescriptor, 3, 4))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedLongs"),
+                                longArray(longArrayDescriptor, 100L, 200L))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedLongs"),
+                                longArray(longArrayDescriptor, 300L))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedDoubles"),
+                                doubleArray(doubleArrayDescriptor, 1.5, 2.5))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedDoubles"),
+                                doubleArray(doubleArrayDescriptor, 3.5))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedStrings"),
+                                stringArray(stringArrayDescriptor, "alpha", "beta"))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedStrings"),
+                                stringArray(stringArrayDescriptor, "gamma"))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedBooleans"),
+                                boolArray(boolArrayDescriptor, true, false))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedBooleans"),
+                                boolArray(boolArrayDescriptor, true))
                         .build(),
+                // Asymmetric and ragged: differing inner array sizes per type.
                 DynamicMessage.newBuilder(recordDescriptor)
                         .setField(recordDescriptor.findFieldByName("id"), 2)
                         .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
                                 intArray(intArrayDescriptor, 5))
                         .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
                                 intArray(intArrayDescriptor, 6, 7, 8))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedLongs"),
+                                longArray(longArrayDescriptor, Long.MAX_VALUE))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedDoubles"),
+                                doubleArray(doubleArrayDescriptor, -1.25, 0.0, 1.25))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedStrings"),
+                                stringArray(stringArrayDescriptor))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedStrings"),
+                                stringArray(stringArrayDescriptor, "single"))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedBooleans"),
+                                boolArray(boolArrayDescriptor, false))
                         .build());
 
         try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
@@ -170,17 +216,174 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         waitForDataInFirebolt(TABLE_NAME, records.size());
 
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
-                "SELECT \"id\", \"nestedInts\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+                "SELECT \"id\", \"nestedInts\", \"nestedLongs\", \"nestedDoubles\", \"nestedStrings\", \"nestedBooleans\" " +
+                        "FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
             assertTrue(rs.next());
             assertEquals(1, rs.getInt("id"));
             assertEquals(List.of(List.of(1, 2), List.of(3, 4)),
                     parseNestedIntegerArray(rs.getString("nestedInts")));
+            assertEquals(List.of(List.of(100L, 200L), List.of(300L)),
+                    parseNestedLongArray(rs.getString("nestedLongs")));
+            assertEquals(List.of(List.of(1.5, 2.5), List.of(3.5)),
+                    parseNestedDoubleArray(rs.getString("nestedDoubles")));
+            assertEquals(List.of(List.of("alpha", "beta"), List.of("gamma")),
+                    parseNestedStringArray(rs.getString("nestedStrings")));
+            assertEquals(List.of(List.of(true, false), List.of(true)),
+                    parseNestedBooleanArray(rs.getString("nestedBooleans")));
 
             assertTrue(rs.next());
             assertEquals(2, rs.getInt("id"));
             assertEquals(List.of(List.of(5), List.of(6, 7, 8)),
                     parseNestedIntegerArray(rs.getString("nestedInts")));
+            assertEquals(List.of(List.of(Long.MAX_VALUE)),
+                    parseNestedLongArray(rs.getString("nestedLongs")));
+            assertEquals(List.of(List.of(-1.25, 0.0, 1.25)),
+                    parseNestedDoubleArray(rs.getString("nestedDoubles")));
+            // First inner string array is empty; second has a single element.
+            assertEquals(List.of(List.of(), List.of("single")),
+                    parseNestedStringArray(rs.getString("nestedStrings")));
+            assertEquals(List.of(List.of(false)),
+                    parseNestedBooleanArray(rs.getString("nestedBooleans")));
         }
+    }
+
+    /**
+     * Records that omit a Protobuf field mapped to a NOT NULL Firebolt column should not silently
+     * succeed: the connector forwards the absent field as SQL NULL to the database, which rejects
+     * the row at insert time (NOT NULL constraint violation). With errors.tolerance="all" + a DLQ
+     * topic the failed records must end up in the DLQ rather than the target table.
+     */
+    @Test
+    @Tag(TestTag.CONNECTOR)
+    void testAbsentOptionalProtobufFieldFailsForNotNullFireboltColumnAndFlowsToDlq() throws Exception {
+        String dlqTopicName = "dlq-protobuf-not-null-" + UUID.randomUUID();
+        createKafkaTopic(dlqTopicName);
+
+        Map<String, String> connectorOverride = Map.of(
+                "errors.tolerance", "all",
+                "errors.deadletterqueue.topic.name", dlqTopicName,
+                "errors.deadletterqueue.context.headers.enable", "true",
+                "ingestion.type", "sql"
+        );
+
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                notNullTableSchema(), optionalFieldsProtobufSchema(), connectorOverride);
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(optionalFieldsProtobufSchema().get());
+        Descriptor descriptor = parsedSchema.toDescriptor().getFile().findMessageTypeByName("OptionalFieldsRecord");
+
+        // Two records, both missing the optional fields that map to NOT NULL columns. Sending
+        // multiple records guarantees we see batch-level rejection regardless of how the connector
+        // groups them: the table should still have zero rows after the put attempt(s), and at least
+        // one record must arrive in the DLQ.
+        List<DynamicMessage> records = List.of(
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 1)
+                        .build(),
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 2)
+                        .build());
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer();
+             KafkaConsumer<String, byte[]> dlqConsumer = createDlqConsumer(dlqTopicName)) {
+
+            for (DynamicMessage record : records) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+
+            // The connector either fails the batch (errors.tolerance="all" routes everything to
+            // DLQ) or fails to even build a complete INSERT (the NOT NULL columns get dropped
+            // because all records have them as null) -- in either case nothing must be written.
+            // Poll for DLQ messages with a generous timeout so slow CI hosts have a chance to
+            // process the records.
+            int dlqMessages = 0;
+            long deadline = System.currentTimeMillis() + Duration.ofSeconds(60).toMillis();
+            while (dlqMessages < records.size() && System.currentTimeMillis() < deadline) {
+                ConsumerRecords<String, byte[]> polled = dlqConsumer.poll(Duration.ofSeconds(5));
+                dlqMessages += polled.count();
+            }
+
+            // The Firebolt table must remain empty: a NOT NULL violation is *not* allowed to be
+            // silently swallowed.
+            assertEquals(0, fireboltDefaultDbClient.countRows(TABLE_NAME),
+                    "No records should land in Firebolt when NOT NULL columns are missing");
+            assertTrue(dlqMessages >= 1,
+                    "Expected at least one record in DLQ when NOT NULL columns receive null values, got " + dlqMessages);
+        } finally {
+            safelyDeleteKafkaTopic(dlqTopicName);
+        }
+    }
+
+    /**
+     * Nested arrays whose inner element type needs per-element conversion (e.g. timestamp/date/
+     * decimal/bytea) are explicitly rejected by SchemaArrayDataTypeConverter today. The connector
+     * therefore reports the failed record to the DLQ rather than corrupting the row.
+     */
+    @Test
+    @Tag(TestTag.CONNECTOR)
+    void testNestedArrayWithUnsupportedInnerTypeIsRoutedToDlq() throws Exception {
+        String dlqTopicName = "dlq-protobuf-nested-unsupported-" + UUID.randomUUID();
+        createKafkaTopic(dlqTopicName);
+
+        Map<String, String> connectorOverride = Map.of(
+                "errors.tolerance", "all",
+                "errors.deadletterqueue.topic.name", dlqTopicName,
+                "errors.deadletterqueue.context.headers.enable", "true",
+                "ingestion.type", "sql"
+        );
+
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                nestedTimestampTableSchema(), nestedTimestampProtobufSchema(), connectorOverride);
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(nestedTimestampProtobufSchema().get());
+        FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
+        Descriptor recordDescriptor = fileDescriptor.findMessageTypeByName("NestedTimestampRecord");
+        Descriptor wrapper = fileDescriptor.findMessageTypeByName("StringArray");
+        DynamicMessage record = DynamicMessage.newBuilder(recordDescriptor)
+                .setField(recordDescriptor.findFieldByName("id"), 1)
+                .addRepeatedField(recordDescriptor.findFieldByName("nestedTimestamps"),
+                        stringArray(wrapper, "2024-01-01T00:00:00Z"))
+                .build();
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer();
+             KafkaConsumer<String, byte[]> dlqConsumer = createDlqConsumer(dlqTopicName)) {
+
+            producer.send(new ProducerRecord<>(TOPIC_NAME, "1", record)).get();
+            producer.flush();
+
+            int dlqMessages = 0;
+            long deadline = System.currentTimeMillis() + Duration.ofSeconds(60).toMillis();
+            while (dlqMessages < 1 && System.currentTimeMillis() < deadline) {
+                ConsumerRecords<String, byte[]> polled = dlqConsumer.poll(Duration.ofSeconds(5));
+                dlqMessages += polled.count();
+            }
+
+            assertEquals(0, fireboltDefaultDbClient.countRows(TABLE_NAME),
+                    "No record should land in Firebolt when nested array conversion fails");
+            assertTrue(dlqMessages >= 1,
+                    "Expected the unsupported nested array record to land in the DLQ");
+        } finally {
+            safelyDeleteKafkaTopic(dlqTopicName);
+        }
+    }
+
+    private KafkaConsumer<String, byte[]> createDlqConsumer(String dlqTopicName) {
+        Properties props = new Properties();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "protobuf-dlq-it-consumer-" + UUID.randomUUID());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                org.apache.kafka.common.serialization.ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                org.apache.kafka.common.serialization.ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
+        KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(props);
+        consumer.subscribe(Collections.singletonList(dlqTopicName));
+        return consumer;
     }
 
     // ---------------------------------------------------------------------------
@@ -279,7 +482,11 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     private Supplier<String> nestedArrayTableSchema() {
         return () -> "CREATE TABLE \"%s\" (" +
                 "\"id\" INTEGER NOT NULL, " +
-                "\"nestedInts\" ARRAY(ARRAY(INTEGER)) " +
+                "\"nestedInts\" ARRAY(ARRAY(INTEGER)), " +
+                "\"nestedLongs\" ARRAY(ARRAY(BIGINT)), " +
+                "\"nestedDoubles\" ARRAY(ARRAY(DOUBLE PRECISION)), " +
+                "\"nestedStrings\" ARRAY(ARRAY(TEXT)), " +
+                "\"nestedBooleans\" ARRAY(ARRAY(BOOLEAN)) " +
                 ");";
     }
 
@@ -290,9 +497,53 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 "message IntArray {\n" +
                 "  repeated int32 values = 1;\n" +
                 "}\n" +
+                "message LongArray {\n" +
+                "  repeated int64 values = 1;\n" +
+                "}\n" +
+                "message DoubleArray {\n" +
+                "  repeated double values = 1;\n" +
+                "}\n" +
+                "message StringArray {\n" +
+                "  repeated string values = 1;\n" +
+                "}\n" +
+                "message BoolArray {\n" +
+                "  repeated bool values = 1;\n" +
+                "}\n" +
                 "message NestedArrayRecord {\n" +
                 "  int32 id = 1;\n" +
                 "  repeated IntArray nestedInts = 2;\n" +
+                "  repeated LongArray nestedLongs = 3;\n" +
+                "  repeated DoubleArray nestedDoubles = 4;\n" +
+                "  repeated StringArray nestedStrings = 5;\n" +
+                "  repeated BoolArray nestedBooleans = 6;\n" +
+                "}\n";
+    }
+
+    private Supplier<String> notNullTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"optionalText\" TEXT NOT NULL, " +
+                "\"optionalNumeric\" NUMERIC(38,9) NOT NULL " +
+                ");";
+    }
+
+    private Supplier<String> nestedTimestampTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"nestedTimestamps\" ARRAY(ARRAY(TIMESTAMP)) " +
+                ");";
+    }
+
+    private Supplier<String> nestedTimestampProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message StringArray {\n" +
+                "  repeated string values = 1;\n" +
+                "}\n" +
+                "message NestedTimestampRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  repeated StringArray nestedTimestamps = 2;\n" +
                 "}\n";
     }
 
@@ -357,18 +608,28 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 .setField(descriptor.findFieldByName("colBytea"), ByteString.copyFrom("edge_case_binary_data".getBytes()))
                 .build());
 
-        // Record 3: proto3 zero-defaults for most fields.
+        // Record 3: proto3 zero-defaults for scalar fields.
+        //
         // Proto3 scalar defaults (0, false, "") arrive as zero values in the Connect Struct.
         // SchemaBasedRecordConverter passes them through as-is; the SQL/binary converters then
-        // map them to their Firebolt equivalents (0 → 0, false → false, "" → NULL for NUMERIC/DATE
-        // since an empty string is not a valid NUMERIC/DATE literal).
-        // We therefore set colNumeric and colDate explicitly to avoid converter rejection of "", and
-        // leave remaining string-typed scalars (colText, colBytea) unset — they arrive as "" / empty
-        // bytes and map to empty string / empty bytea in Firebolt.
+        // map them to their Firebolt equivalents (0 -> 0, false -> false, "" -> NULL for NUMERIC/DATE
+        // since an empty string is not a valid NUMERIC/DATE literal). We therefore set colNumeric
+        // and colDate explicitly to avoid converter rejection of "", and leave remaining string-typed
+        // scalars (colText, colBytea) unset -- they arrive as "" / empty bytes and map to empty
+        // string / empty bytea in Firebolt.
+        //
+        // Note that google.protobuf.Timestamp is a *message-type* field, not a scalar. Confluent's
+        // ProtobufConverter behavior for unset proto3 message fields is configuration-dependent
+        // (driven by flags like useOptionalForNullables / generateStructForNulls), so to keep this
+        // test deterministic we explicitly set both Timestamp fields here. The dedicated
+        // testOptionalProtobufFieldsCanBeAbsentForNullableColumns test exercises the absent-field
+        // path via `optional` markers.
         records.add(DynamicMessage.newBuilder(descriptor)
                 .setField(descriptor.findFieldByName("colInteger"), 3)
                 .setField(descriptor.findFieldByName("colNumeric"), "0")
                 .setField(descriptor.findFieldByName("colDate"), "2000-01-01")
+                .setField(descriptor.findFieldByName("colTimestamp"), toProtobufTimestamp(LocalDateTime.of(2010, 6, 15, 8, 30, 0, 0)))
+                .setField(descriptor.findFieldByName("colTimestamptz"), toProtobufTimestamp(OffsetDateTime.of(2010, 6, 15, 8, 30, 0, 0, ZoneOffset.UTC)))
                 .build());
 
         // Record 4: geographic sample data
@@ -488,26 +749,24 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                     assertNull(actualDate, "colDate should be null at " + idx);
                 }
 
-                // TIMESTAMP: DynamicMessage.getField() on a message-type field returns DynamicMessage,
-                // not com.google.protobuf.Timestamp — use extractInstant() to decode seconds/nanos.
+                // TIMESTAMP: A non-optional google.protobuf.Timestamp field that is not set on the
+                // wire is reconstructed by ProtobufConverter as the default Timestamp (seconds=0,
+                // nanos=0), which the connector's schema-based timestamp converter persists as
+                // 1970-01-01 00:00:00 UTC, NOT as SQL NULL. This is the same behavior callers
+                // would observe with any other proto3 scalar default (0, false, ""). To get a
+                // SQL NULL the producer must mark the field as `optional` and leave it absent.
+                // DynamicMessage.getField() on a message-type field returns DynamicMessage, not
+                // com.google.protobuf.Timestamp — use extractInstant() to decode seconds/nanos.
                 Instant expectedTsInstant = extractInstant(rec.getField(descriptor.findFieldByName("colTimestamp")));
                 java.sql.Timestamp actualTs = rs.getTimestamp("colTimestamp");
-                if (!Instant.EPOCH.equals(expectedTsInstant)) {
-                    assertNotNull(actualTs, "colTimestamp should not be null at " + idx);
-                    assertEquals(expectedTsInstant.toEpochMilli(), actualTs.getTime(), "colTimestamp mismatch at " + idx);
-                } else {
-                    assertNull(actualTs, "colTimestamp should be null at " + idx);
-                }
+                assertNotNull(actualTs, "colTimestamp should not be null at " + idx);
+                assertEquals(expectedTsInstant.toEpochMilli(), actualTs.getTime(), "colTimestamp mismatch at " + idx);
 
-                // TIMESTAMPTZ: same approach
+                // TIMESTAMPTZ: same proto3-defaults reasoning as TIMESTAMP above.
                 Instant expectedTstzInstant = extractInstant(rec.getField(descriptor.findFieldByName("colTimestamptz")));
                 java.sql.Timestamp actualTstz = rs.getTimestamp("colTimestamptz");
-                if (!Instant.EPOCH.equals(expectedTstzInstant)) {
-                    assertNotNull(actualTstz, "colTimestamptz should not be null at " + idx);
-                    assertEquals(expectedTstzInstant, actualTstz.toInstant(), "colTimestamptz mismatch at " + idx);
-                } else {
-                    assertNull(actualTstz, "colTimestamptz should be null at " + idx);
-                }
+                assertNotNull(actualTstz, "colTimestamptz should not be null at " + idx);
+                assertEquals(expectedTstzInstant, actualTstz.toInstant(), "colTimestamptz mismatch at " + idx);
 
                 // BYTEA: proto bytes → byte[]
                 // Proto3 default ByteString.EMPTY may arrive as null or empty byte[] from Firebolt.
@@ -567,8 +826,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
      */
     private void verifyStringArray(String field, List<String> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
-                    field + " should be null or empty at " + idx);
+            assertNullOrEmptyArray(field, actualStr, idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -578,8 +836,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyIntArray(String field, List<Integer> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
-                    field + " should be null or empty at " + idx);
+            assertNullOrEmptyArray(field, actualStr, idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -591,8 +848,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyFloatArray(String field, List<Float> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
-                    field + " should be null or empty at " + idx);
+            assertNullOrEmptyArray(field, actualStr, idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -604,8 +860,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyDoubleArray(String field, List<Double> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
-                    field + " should be null or empty at " + idx);
+            assertNullOrEmptyArray(field, actualStr, idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -617,8 +872,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyDecimalStringArray(String field, List<String> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
-                    field + " should be null or empty at " + idx);
+            assertNullOrEmptyArray(field, actualStr, idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -638,8 +892,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     private void verifyTimestamptzArray(
             String field, List<DynamicMessage> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
-                    field + " should be null or empty at " + idx);
+            assertNullOrEmptyArray(field, actualStr, idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -660,8 +913,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     private void verifyTimestampArray(
             String field, List<DynamicMessage> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
-                    field + " should be null or empty at " + idx);
+            assertNullOrEmptyArray(field, actualStr, idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -687,6 +939,22 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 assertEquals(exp.getSecond(), act.getSecond(), field + " second mismatch at " + idx);
             }
         }
+    }
+
+    /**
+     * Asserts that a Firebolt array column is either SQL NULL (returned to the JDBC client as
+     * the literal {@code "NULL"} or {@code null}) or an empty array (rendered as {@code {}}).
+     * {@link #parsePostgreSQLArray(String)} returns {@code null} for the literal {@code "NULL"}
+     * string, which previously caused a NullPointerException when the caller invoked
+     * {@code .isEmpty()} on the result.
+     */
+    private void assertNullOrEmptyArray(String field, String actualStr, int idx) {
+        if (actualStr == null) {
+            return;
+        }
+        List<String> parsed = parsePostgreSQLArray(actualStr);
+        assertTrue(parsed == null || parsed.isEmpty(),
+                field + " should be null or empty at " + idx + " (got: " + actualStr + ")");
     }
 
     /**
@@ -738,6 +1006,38 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         return builder.build();
     }
 
+    private DynamicMessage longArray(Descriptor descriptor, long... values) {
+        DynamicMessage.Builder builder = DynamicMessage.newBuilder(descriptor);
+        for (long value : values) {
+            builder.addRepeatedField(descriptor.findFieldByName("values"), value);
+        }
+        return builder.build();
+    }
+
+    private DynamicMessage doubleArray(Descriptor descriptor, double... values) {
+        DynamicMessage.Builder builder = DynamicMessage.newBuilder(descriptor);
+        for (double value : values) {
+            builder.addRepeatedField(descriptor.findFieldByName("values"), value);
+        }
+        return builder.build();
+    }
+
+    private DynamicMessage stringArray(Descriptor descriptor, String... values) {
+        DynamicMessage.Builder builder = DynamicMessage.newBuilder(descriptor);
+        for (String value : values) {
+            builder.addRepeatedField(descriptor.findFieldByName("values"), value);
+        }
+        return builder.build();
+    }
+
+    private DynamicMessage boolArray(Descriptor descriptor, boolean... values) {
+        DynamicMessage.Builder builder = DynamicMessage.newBuilder(descriptor);
+        for (boolean value : values) {
+            builder.addRepeatedField(descriptor.findFieldByName("values"), value);
+        }
+        return builder.build();
+    }
+
     // ---------------------------------------------------------------------------
     // PostgreSQL array string parser (mirrors AllDataTypesAvroSchemaSerializerTest)
     // ---------------------------------------------------------------------------
@@ -770,7 +1070,40 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     }
 
     private List<List<Integer>> parseNestedIntegerArray(String arrayString) {
-        List<List<Integer>> result = new ArrayList<>();
+        return parseNestedArray(arrayString, Integer::parseInt);
+    }
+
+    private List<List<Long>> parseNestedLongArray(String arrayString) {
+        return parseNestedArray(arrayString, Long::parseLong);
+    }
+
+    private List<List<Double>> parseNestedDoubleArray(String arrayString) {
+        return parseNestedArray(arrayString, Double::parseDouble);
+    }
+
+    private List<List<String>> parseNestedStringArray(String arrayString) {
+        return parseNestedArray(arrayString, s -> s);
+    }
+
+    private List<List<Boolean>> parseNestedBooleanArray(String arrayString) {
+        return parseNestedArray(arrayString, s -> {
+            // Firebolt renders boolean arrays using lowercase t/true,f/false depending on
+            // version; accept both formats so the test is resilient.
+            String lower = s.toLowerCase();
+            if (lower.equals("t") || lower.equals("true")) return Boolean.TRUE;
+            if (lower.equals("f") || lower.equals("false")) return Boolean.FALSE;
+            throw new IllegalArgumentException("Unrecognized boolean literal: " + s);
+        });
+    }
+
+    /**
+     * Parses a Firebolt-rendered nested array string like {@code {{1,2},{3,4}}} into a
+     * {@code List<List<T>>} via the supplied element parser. Returns an empty outer list when the
+     * input is null/empty/{@code "NULL"} so callers can detect both SQL NULL and an empty array
+     * uniformly.
+     */
+    private <T> List<List<T>> parseNestedArray(String arrayString, java.util.function.Function<String, T> elemParser) {
+        List<List<T>> result = new ArrayList<>();
         if (arrayString == null || arrayString.trim().isEmpty() || arrayString.equals("NULL")) {
             return result;
         }
@@ -786,9 +1119,12 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 }
             } else if (c == '}') {
                 if (--depth == 0) {
-                    List<Integer> inner = parsePostgreSQLArray("{" + current + "}").stream()
-                            .map(value -> value == null ? null : Integer.parseInt(value))
-                            .collect(Collectors.toList());
+                    List<String> rawElements = parsePostgreSQLArray("{" + current + "}");
+                    List<T> inner = rawElements == null
+                            ? new ArrayList<>()
+                            : rawElements.stream()
+                                    .map(value -> value == null ? null : elemParser.apply(value))
+                                    .collect(Collectors.toList());
                     result.add(inner);
                     current = new StringBuilder();
                 } else {
