@@ -49,20 +49,24 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
         }
 
         if (isNestedArray(fireboltColumn)) {
-            // Nested arrays land here regardless of inner type. Element-level
-            // converters (timestamp/date/decimal/bytea) are not applied per
-            // inner element today: the connector currently only supports
-            // nested arrays of passthrough scalar types (integer/bigint/real
-            // (non-FLOAT32)/double/boolean/text). Inner types that need
-            // element-level conversion are rejected up front so callers get a
-            // clear conversion error instead of malformed data downstream.
+            // Any `array(array(...))` column lands here, including triple- and quadruple-nested
+            // arrays. Element-level converters (timestamp/date/decimal/bytea) are not applied per
+            // inner element today: the connector currently only supports nested arrays of
+            // passthrough scalar types (integer/bigint/real (non-FLOAT32)/double/boolean/text).
+            // Inner types that need element-level conversion are rejected up front so callers get
+            // a clear conversion error instead of malformed data downstream.
+            //
+            // TODO: fold the element-level conversion logic (createTimestampArray /
+            // createTimestamptzArray / createDateArray / createByteaArray / numeric stringify /
+            // FLOAT32 stringify) into the recursive deep-unwrap below so nested arrays of those
+            // types can also be ingested.
             if (requiresElementWiseConversion(fireboltColumn, schemaKafkaMessageColumnValue)) {
                 throw new ColumnConversionFailedException(
                         fireboltColumn.getName(),
                         fireboltColumn.getDataType(),
                         "Nested arrays with element-level conversion (timestamp/date/decimal/bytea) are not supported");
             }
-            return connection.createArrayOf(typeName, elements.stream().map(this::asNestedArrayElement).toArray());
+            return connection.createArrayOf(typeName, deepUnwrap(elements, arrayNestingDepth(fireboltColumn.getDataType()) - 1));
         }
 
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
@@ -101,23 +105,45 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
         return elements.toArray();
     }
 
-    private Object asNestedArrayElement(Object element) {
+    /**
+     * Recursively unwraps a nested array of arbitrary depth into a Java {@code Object[]} hierarchy
+     * suitable for {@link Connection#createArrayOf(String, Object[])}. Handles two surface shapes
+     * at every level:
+     *
+     * <ul>
+     *   <li>List (Avro / direct nested arrays).</li>
+     *   <li>Connect {@link Struct} wrapping a single repeated field (Protobuf models nested
+     *       arrays as {@code repeated WrapperMessage { repeated X values; }} at every level, so a
+     *       triple-nested protobuf array surfaces as List&lt;Struct&lt;List&lt;Struct&lt;List&lt;X&gt;&gt;&gt;&gt;&gt;).</li>
+     * </ul>
+     *
+     * The {@code remainingDepth} argument is the number of array levels still to traverse: at
+     * depth 0 we have reached the leaf scalar layer and elements are returned as-is. A null inner
+     * List from a wrapper Struct propagates as null instead of NPE'ing.
+     */
+    private Object[] deepUnwrap(List<Object> elements, int remainingDepth) {
+        if (remainingDepth <= 0) {
+            return elements.toArray();
+        }
+        return elements.stream().map(element -> deepUnwrapElement(element, remainingDepth)).toArray();
+    }
+
+    private Object deepUnwrapElement(Object element, int remainingDepth) {
         if (element == null) {
             return null;
         }
+        if (remainingDepth <= 0) {
+            return element;
+        }
         if (element instanceof List) {
-            return toObjectArray((List<Object>) element);
+            return deepUnwrap((List<Object>) element, remainingDepth - 1);
         }
         if (element instanceof Struct) {
-            // Protobuf models nested arrays as `repeated WrapperMessage { repeated X values; }`.
-            // Confluent's ProtobufConverter therefore surfaces nested arrays as a list of single-field
-            // Connect Structs whose only field is the inner array. Unwrap that field here. The struct's
-            // array field can also be null (e.g., absent repeated proto field with null value), in
-            // which case we propagate null rather than NPE.
             List<Object> innerList = extractArrayField((Struct) element);
-            return innerList == null ? null : toObjectArray(innerList);
+            return innerList == null ? null : deepUnwrap(innerList, remainingDepth - 1);
         }
-        throw new ColumnConversionFailedException("", "", "failed to convert nested array element of type " + element.getClass().getName());
+        throw new ColumnConversionFailedException(
+                "", "", "failed to convert nested array element of type " + element.getClass().getName());
     }
 
     private List<Object> extractArrayField(Struct struct) {
@@ -130,14 +156,14 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
     }
 
     private boolean requiresElementWiseConversion(TableSchema.Column fireboltColumn, SchemaKafkaMessageColumnValue value) {
-        String inner = innerNestedArrayType(fireboltColumn.getDataType());
-        if (inner == null) {
+        String leaf = leafScalarType(fireboltColumn.getDataType());
+        if (leaf == null) {
             return false;
         }
         // Element-level conversion is required for these types because the inner
         // values arrive in formats (Long millis, ByteBuffer, ISO strings, ...)
         // that need translating before being shipped to the JDBC driver.
-        switch (inner) {
+        switch (leaf) {
             case "timestamp":
             case "timestamptz":
             case "date":
@@ -152,31 +178,38 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
         }
     }
 
-    /** Returns the inner element type for `array(array(<inner>))`, else null. */
-    private String innerNestedArrayType(String dataType) {
-        if (dataType == null || !dataType.startsWith("array(array(") || !dataType.endsWith("))")) {
-            return null;
+    /** Returns the innermost scalar type for an `array(array(...(<scalar>)))` column, peeling off
+     *  every `array(...)` wrapper. Returns the dataType unchanged for non-array columns. */
+    private String leafScalarType(String dataType) {
+        String inner = dataType;
+        while (inner != null && inner.startsWith("array(") && inner.endsWith(")")) {
+            inner = inner.substring("array(".length(), inner.length() - 1);
         }
-        return dataType.substring("array(array(".length(), dataType.length() - 2);
+        return inner;
+    }
+
+    /** Counts how many array levels wrap the leaf scalar type. */
+    private int arrayNestingDepth(String dataType) {
+        int depth = 0;
+        String inner = dataType;
+        while (inner != null && inner.startsWith("array(") && inner.endsWith(")")) {
+            depth++;
+            inner = inner.substring("array(".length(), inner.length() - 1);
+        }
+        return depth;
     }
 
     private String detectTypeName(TableSchema.Column fireboltColumn) {
-        String dataType = fireboltColumn.getDataType();
-        // For nested arrays, the JDBC driver expects the *inner* element type so it
-        // can format `[[a,b],[c]]` as that type. Map the inner type the same way as
-        // 1D arrays (text -> "string", bool -> "boolean", ...).
-        String nestedInner = innerNestedArrayType(dataType);
-        if (nestedInner != null) {
-            return mapInnerToJdbcType(nestedInner);
-        }
-        if (dataType.startsWith("array(") && dataType.endsWith(")")) {
-            return mapInnerToJdbcType(dataType.substring("array(".length(), dataType.length() - 1));
-        }
-        // add more data types
-        return "string";
+        // The JDBC driver expects the leaf scalar type name regardless of nesting depth -- it
+        // formats nested arrays recursively using a single base type, so `array(integer)`,
+        // `array(array(integer))`, and `array(array(array(integer)))` all resolve to "integer".
+        return mapInnerToJdbcType(leafScalarType(fireboltColumn.getDataType()));
     }
 
     private String mapInnerToJdbcType(String inner) {
+        if (inner == null) {
+            return "string";
+        }
         switch (inner) {
             case "integer":
                 return "integer";
@@ -206,7 +239,7 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
     }
 
     private boolean isNestedArray(TableSchema.Column fireboltColumn) {
-        return innerNestedArrayType(fireboltColumn.getDataType()) != null;
+        return arrayNestingDepth(fireboltColumn.getDataType()) >= 2;
     }
 
     private Array createByteaArray(Connection connection, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {

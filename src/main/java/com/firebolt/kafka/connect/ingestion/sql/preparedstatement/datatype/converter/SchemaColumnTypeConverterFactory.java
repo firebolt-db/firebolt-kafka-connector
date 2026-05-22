@@ -110,6 +110,14 @@ public class SchemaColumnTypeConverterFactory implements ColumnDataTypeConverter
                 return booleanDataTypeConverter;
             case JSON:
                 return jsonDataTypeConverter;
+            // TODO(firebolt-kafka-connector): implement a SchemaStructDataTypeConverter so that
+            // Connect Struct values from non-flattened Protobuf nested messages can ingest into
+            // Firebolt STRUCT columns directly. Today the connector requires `value.converter.
+            // flatten.unions=true` (and similar handling for plain nested messages). Once the
+            // VARIANT type ships in Firebolt, the converter should also accept VARIANT columns.
+            case STRUCT:
+            case GEOGRAPHY:
+                break;
         }
 
         throw new IllegalArgumentException("Column type is not yet supported: " + fireboltTableColumn.getDataType() + " for column " + fireboltTableColumn.getName());

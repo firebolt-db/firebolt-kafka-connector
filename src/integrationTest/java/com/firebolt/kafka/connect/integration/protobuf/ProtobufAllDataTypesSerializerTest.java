@@ -248,6 +248,309 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     }
 
     /**
+     * Triple-nested arrays still round-trip through the connector. Protobuf has no native support
+     * for nested repeated fields so the schema layers wrapper messages at every level
+     * ({@code repeated WrapperA { repeated WrapperB { repeated int32 values; } values; }}); the
+     * connector unwraps each Struct level recursively before handing the array to the JDBC driver.
+     */
+    @Test
+    void testTripleNestedArrayProtobufSerializationWithSqlIngestion() throws Exception {
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                tripleNestedArrayTableSchema(), tripleNestedArrayProtobufSchema(), Map.of("ingestion.type", "sql"));
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(tripleNestedArrayProtobufSchema().get());
+        FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
+        Descriptor recordDescriptor = fileDescriptor.findMessageTypeByName("TripleNestedRecord");
+        Descriptor intArray = fileDescriptor.findMessageTypeByName("IntArray");
+        Descriptor intArrayOfArray = fileDescriptor.findMessageTypeByName("IntArrayOfArray");
+
+        DynamicMessage row1 = DynamicMessage.newBuilder(recordDescriptor)
+                .setField(recordDescriptor.findFieldByName("id"), 1)
+                .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
+                        DynamicMessage.newBuilder(intArrayOfArray)
+                                .addRepeatedField(intArrayOfArray.findFieldByName("values"), intArray(intArray, 1, 2))
+                                .addRepeatedField(intArrayOfArray.findFieldByName("values"), intArray(intArray, 3))
+                                .build())
+                .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
+                        DynamicMessage.newBuilder(intArrayOfArray)
+                                .addRepeatedField(intArrayOfArray.findFieldByName("values"), intArray(intArray, 4, 5, 6))
+                                .build())
+                .build();
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            producer.send(new ProducerRecord<>(TOPIC_NAME, "1", row1)).get();
+            producer.flush();
+        }
+
+        waitForDataInFirebolt(TABLE_NAME, 1);
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"nestedInts\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals(
+                    List.of(
+                            List.of(List.of(1, 2), List.of(3)),
+                            List.of(List.of(4, 5, 6))),
+                    parseTripleNestedIntegerArray(rs.getString("nestedInts")));
+        }
+    }
+
+    /**
+     * Protobuf {@code oneof} fields are flattened by the value converter (see
+     * {@link ProtobufBaseIntegrationTest#registerProtobufConnector}) into one Connect field per
+     * member. Each member maps to its own Firebolt column; only the member set on the wire
+     * receives a non-null value, the rest are SQL NULL. Mirrors ClickHouse's flattening
+     * behaviour:
+     * <a href="https://clickhouse.com/docs/integrations/kafka/clickhouse-kafka-connect-sink#protobuf-schema-support">ClickHouse Kafka Connect Sink Protobuf docs</a>.
+     */
+    @Test
+    void testOneofProtobufFieldFlattensToColumnsWithSqlIngestion() throws Exception {
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                oneofTableSchema(), oneofProtobufSchema(), Map.of("ingestion.type", "sql"));
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(oneofProtobufSchema().get());
+        Descriptor descriptor = parsedSchema.toDescriptor().getFile().findMessageTypeByName("OneofRecord");
+
+        // Three records each picking a different oneof branch.
+        List<DynamicMessage> records = List.of(
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 1)
+                        .setField(descriptor.findFieldByName("textValue"), "hello")
+                        .build(),
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 2)
+                        .setField(descriptor.findFieldByName("intValue"), 42)
+                        .build(),
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 3)
+                        .setField(descriptor.findFieldByName("doubleValue"), 3.14)
+                        .build());
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : records) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        waitForDataInFirebolt(TABLE_NAME, records.size());
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"textValue\", \"intValue\", \"doubleValue\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("hello", rs.getString("textValue"));
+            assertNull(rs.getObject("intValue"), "intValue must be SQL NULL when textValue is set");
+            assertNull(rs.getObject("doubleValue"), "doubleValue must be SQL NULL when textValue is set");
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertNull(rs.getString("textValue"), "textValue must be SQL NULL when intValue is set");
+            assertEquals(42, rs.getInt("intValue"));
+            assertNull(rs.getObject("doubleValue"), "doubleValue must be SQL NULL when intValue is set");
+
+            assertTrue(rs.next());
+            assertEquals(3, rs.getInt("id"));
+            assertNull(rs.getString("textValue"), "textValue must be SQL NULL when doubleValue is set");
+            assertNull(rs.getObject("intValue"), "intValue must be SQL NULL when doubleValue is set");
+            assertEquals(3.14, rs.getDouble("doubleValue"), 1e-9);
+        }
+    }
+
+    /**
+     * A {@code oneof} branch may itself be a {@code repeated} field via wrapper messages.
+     * After flattening, each branch is a top-level Connect field whose schema reflects the
+     * underlying repeated-message shape; the connector's array converter picks it up the same way
+     * as a regular {@code array(<scalar>)} (with the wrapper-Struct unwrap path used for nested
+     * arrays).
+     */
+    @Test
+    void testOneofOfArrayProtobufFieldFlattensToArrayColumnWithSqlIngestion() throws Exception {
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                oneofOfArrayTableSchema(), oneofOfArrayProtobufSchema(), Map.of("ingestion.type", "sql"));
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(oneofOfArrayProtobufSchema().get());
+        FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
+        Descriptor descriptor = fileDescriptor.findMessageTypeByName("OneofOfArrayRecord");
+        Descriptor stringArray = fileDescriptor.findMessageTypeByName("StringArray");
+        Descriptor intArray = fileDescriptor.findMessageTypeByName("IntArray");
+
+        List<DynamicMessage> records = List.of(
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 1)
+                        .setField(descriptor.findFieldByName("textArray"),
+                                stringArray(stringArray, "alpha", "beta"))
+                        .build(),
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 2)
+                        .setField(descriptor.findFieldByName("intArray"),
+                                intArray(intArray, 7, 8, 9))
+                        .build());
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : records) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        waitForDataInFirebolt(TABLE_NAME, records.size());
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"textArray\", \"intArray\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals(List.of("alpha", "beta"), parsePostgreSQLArray(rs.getString("textArray")));
+            assertNullOrEmptyArray("intArray", rs.getString("intArray"), 0);
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertNullOrEmptyArray("textArray", rs.getString("textArray"), 1);
+            assertEquals(List.of(7, 8, 9),
+                    parsePostgreSQLArray(rs.getString("intArray")).stream()
+                            .map(Integer::parseInt)
+                            .collect(Collectors.toList()));
+        }
+    }
+
+    /**
+     * Nested {@code oneof}s — a branch of one {@code oneof} is itself a message containing another
+     * {@code oneof} — should fully flatten through both levels with {@code flatten.unions=true}.
+     */
+    @Test
+    void testNestedOneofProtobufFieldFlattensToColumnsWithSqlIngestion() throws Exception {
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                nestedOneofTableSchema(), nestedOneofProtobufSchema(), Map.of("ingestion.type", "sql"));
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(nestedOneofProtobufSchema().get());
+        FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
+        Descriptor descriptor = fileDescriptor.findMessageTypeByName("NestedOneofRecord");
+        Descriptor inner = fileDescriptor.findMessageTypeByName("InnerOneof");
+
+        DynamicMessage rowInnerText = DynamicMessage.newBuilder(descriptor)
+                .setField(descriptor.findFieldByName("id"), 1)
+                .setField(descriptor.findFieldByName("nested"),
+                        DynamicMessage.newBuilder(inner)
+                                .setField(inner.findFieldByName("nestedText"), "deep")
+                                .build())
+                .build();
+        DynamicMessage rowInnerInt = DynamicMessage.newBuilder(descriptor)
+                .setField(descriptor.findFieldByName("id"), 2)
+                .setField(descriptor.findFieldByName("nested"),
+                        DynamicMessage.newBuilder(inner)
+                                .setField(inner.findFieldByName("nestedInt"), 99)
+                                .build())
+                .build();
+        DynamicMessage rowFlatBool = DynamicMessage.newBuilder(descriptor)
+                .setField(descriptor.findFieldByName("id"), 3)
+                .setField(descriptor.findFieldByName("flatBool"), true)
+                .build();
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : List.of(rowInnerText, rowInnerInt, rowFlatBool)) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        waitForDataInFirebolt(TABLE_NAME, 3);
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"nestedText\", \"nestedInt\", \"flatBool\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("deep", rs.getString("nestedText"));
+            assertNull(rs.getObject("nestedInt"));
+            assertNull(rs.getObject("flatBool"));
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertNull(rs.getString("nestedText"));
+            assertEquals(99, rs.getInt("nestedInt"));
+            assertNull(rs.getObject("flatBool"));
+
+            assertTrue(rs.next());
+            assertEquals(3, rs.getInt("id"));
+            assertNull(rs.getString("nestedText"));
+            assertNull(rs.getObject("nestedInt"));
+            assertEquals(Boolean.TRUE, rs.getObject("flatBool", Boolean.class));
+        }
+    }
+
+    /**
+     * Plain Protobuf nested messages (a non-{@code oneof} sub-message) currently surface as a
+     * Connect Struct value targeting a Firebolt {@code STRUCT} column. The connector's
+     * {@code SchemaColumnTypeConverterFactory} does not yet provide a STRUCT converter
+     * (see {@code FireboltColumnDataType.STRUCT}), so the connector must reject the record and
+     * route it to the DLQ rather than silently dropping or corrupting it.
+     *
+     * <p>TODO: implement a SchemaStructDataTypeConverter so nested protobuf messages and
+     * non-flattened Connect Structs ingest into Firebolt STRUCT columns directly. Once Firebolt
+     * ships its VARIANT type, the converter should also accept VARIANT columns.
+     */
+    @Test
+    @Tag(TestTag.CONNECTOR)
+    void testNestedProtobufMessageTargetingFireboltStructColumnFailsTodayAndRoutesToDlq() throws Exception {
+        String dlqTopicName = "dlq-protobuf-nested-message-" + UUID.randomUUID();
+        createKafkaTopic(dlqTopicName);
+
+        Map<String, String> connectorOverride = Map.of(
+                "errors.tolerance", "all",
+                "errors.deadletterqueue.topic.name", dlqTopicName,
+                "errors.deadletterqueue.context.headers.enable", "true",
+                "ingestion.type", "sql"
+        );
+
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                nestedMessageStructTableSchema(), nestedMessageProtobufSchema(), connectorOverride);
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(nestedMessageProtobufSchema().get());
+        FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
+        Descriptor descriptor = fileDescriptor.findMessageTypeByName("NestedMessageRecord");
+        Descriptor inner = fileDescriptor.findMessageTypeByName("Inner");
+
+        DynamicMessage record = DynamicMessage.newBuilder(descriptor)
+                .setField(descriptor.findFieldByName("id"), 1)
+                .setField(descriptor.findFieldByName("payload"),
+                        DynamicMessage.newBuilder(inner)
+                                .setField(inner.findFieldByName("a"), "x")
+                                .setField(inner.findFieldByName("b"), 7)
+                                .build())
+                .build();
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer();
+             KafkaConsumer<String, byte[]> dlqConsumer = createDlqConsumer(dlqTopicName)) {
+            producer.send(new ProducerRecord<>(TOPIC_NAME, "1", record)).get();
+            producer.flush();
+
+            int dlqMessages = 0;
+            long deadline = System.currentTimeMillis() + Duration.ofSeconds(60).toMillis();
+            while (dlqMessages < 1 && System.currentTimeMillis() < deadline) {
+                ConsumerRecords<String, byte[]> polled = dlqConsumer.poll(Duration.ofSeconds(5));
+                dlqMessages += polled.count();
+            }
+
+            assertEquals(0, fireboltDefaultDbClient.countRows(TABLE_NAME),
+                    "Nested message records must not land in Firebolt while STRUCT support is missing");
+            assertTrue(dlqMessages >= 1,
+                    "Expected the nested-message record to land in the DLQ -- if this assertion " +
+                            "starts failing, STRUCT support has likely landed and this test should be " +
+                            "updated to assert successful ingestion instead.");
+        } finally {
+            safelyDeleteKafkaTopic(dlqTopicName);
+        }
+    }
+
+    /**
      * Records that omit a Protobuf field mapped to a NOT NULL Firebolt column should not silently
      * succeed: the connector forwards the absent field as SQL NULL to the database, which rejects
      * the row at insert time (NOT NULL constraint violation). With errors.tolerance="all" + a DLQ
@@ -544,6 +847,136 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 "message NestedTimestampRecord {\n" +
                 "  int32 id = 1;\n" +
                 "  repeated StringArray nestedTimestamps = 2;\n" +
+                "}\n";
+    }
+
+    private Supplier<String> tripleNestedArrayTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"nestedInts\" ARRAY(ARRAY(ARRAY(INTEGER))) " +
+                ");";
+    }
+
+    private Supplier<String> tripleNestedArrayProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message IntArray {\n" +
+                "  repeated int32 values = 1;\n" +
+                "}\n" +
+                "message IntArrayOfArray {\n" +
+                "  repeated IntArray values = 1;\n" +
+                "}\n" +
+                "message TripleNestedRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  repeated IntArrayOfArray nestedInts = 2;\n" +
+                "}\n";
+    }
+
+    private Supplier<String> oneofTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"textValue\" TEXT, " +
+                "\"intValue\" INTEGER, " +
+                "\"doubleValue\" DOUBLE PRECISION " +
+                ");";
+    }
+
+    private Supplier<String> oneofProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message OneofRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  oneof value {\n" +
+                "    string textValue = 2;\n" +
+                "    int32 intValue = 3;\n" +
+                "    double doubleValue = 4;\n" +
+                "  }\n" +
+                "}\n";
+    }
+
+    private Supplier<String> oneofOfArrayTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"textArray\" ARRAY(TEXT), " +
+                "\"intArray\" ARRAY(INTEGER) " +
+                ");";
+    }
+
+    private Supplier<String> oneofOfArrayProtobufSchema() {
+        // Protobuf doesn't allow `repeated` directly inside a `oneof`, so each branch is a
+        // wrapper message. After flatten.unions=true, both branches become top-level fields whose
+        // schema mirrors the wrapper (List<Struct{values: List<X>}> on the Connect side, which the
+        // connector unwraps the same way as a regular `array(<scalar>)`).
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message StringArray {\n" +
+                "  repeated string values = 1;\n" +
+                "}\n" +
+                "message IntArray {\n" +
+                "  repeated int32 values = 1;\n" +
+                "}\n" +
+                "message OneofOfArrayRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  oneof payload {\n" +
+                "    StringArray textArray = 2;\n" +
+                "    IntArray intArray = 3;\n" +
+                "  }\n" +
+                "}\n";
+    }
+
+    private Supplier<String> nestedOneofTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"nestedText\" TEXT, " +
+                "\"nestedInt\" INTEGER, " +
+                "\"flatBool\" BOOLEAN " +
+                ");";
+    }
+
+    private Supplier<String> nestedOneofProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message InnerOneof {\n" +
+                "  oneof inner {\n" +
+                "    string nestedText = 1;\n" +
+                "    int32 nestedInt = 2;\n" +
+                "  }\n" +
+                "}\n" +
+                "message NestedOneofRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  oneof outer {\n" +
+                "    InnerOneof nested = 2;\n" +
+                "    bool flatBool = 3;\n" +
+                "  }\n" +
+                "}\n";
+    }
+
+    private Supplier<String> nestedMessageStructTableSchema() {
+        // `STRUCT(...)` is the Firebolt struct column type. The integration test relies on this
+        // syntax being accepted by the engine; if Firebolt rejects the DDL the test will fail at
+        // setup and surface a clear "STRUCT not supported by this Firebolt account" diagnostic
+        // instead of a misleading converter-level error.
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"payload\" STRUCT(a TEXT, b INTEGER) " +
+                ");";
+    }
+
+    private Supplier<String> nestedMessageProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message Inner {\n" +
+                "  string a = 1;\n" +
+                "  int32 b = 2;\n" +
+                "}\n" +
+                "message NestedMessageRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  Inner payload = 2;\n" +
                 "}\n";
     }
 
@@ -1094,6 +1527,39 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
             if (lower.equals("f") || lower.equals("false")) return Boolean.FALSE;
             throw new IllegalArgumentException("Unrecognized boolean literal: " + s);
         });
+    }
+
+    /**
+     * Parses a Firebolt-rendered triple-nested integer array such as
+     * {@code {{{1,2},{3}},{{4,5,6}}}}. Returns an empty outer list for null / empty / "NULL"
+     * input.
+     */
+    private List<List<List<Integer>>> parseTripleNestedIntegerArray(String arrayString) {
+        List<List<List<Integer>>> result = new ArrayList<>();
+        if (arrayString == null || arrayString.trim().isEmpty() || arrayString.equals("NULL")) {
+            return result;
+        }
+        String content = arrayString.substring(1, arrayString.length() - 1);
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (c == '{') {
+                if (depth++ > 0) {
+                    current.append(c);
+                }
+            } else if (c == '}') {
+                if (--depth == 0) {
+                    result.add(parseNestedIntegerArray("{" + current + "}"));
+                    current = new StringBuilder();
+                } else {
+                    current.append(c);
+                }
+            } else if (depth > 0) {
+                current.append(c);
+            }
+        }
+        return result;
     }
 
     /**

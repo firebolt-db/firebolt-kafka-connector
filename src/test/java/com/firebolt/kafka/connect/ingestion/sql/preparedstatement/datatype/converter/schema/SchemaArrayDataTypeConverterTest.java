@@ -407,6 +407,145 @@ public class SchemaArrayDataTypeConverterTest {
     }
 
     @Test
+    void testConvertAndSetWithTripleNestedAvroLikeListIntegerArray() throws SQLException {
+        // Avro / direct nested arrays: List<List<List<Integer>>>.
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(Arrays.asList(
+                        Arrays.asList(Arrays.asList(1, 2), Arrays.asList(3)),
+                        Arrays.asList(Arrays.asList(4, 5, 6))))
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.ARRAY)
+                .build();
+        TableSchema.Column col = new TableSchema.Column("c", "array(array(array(integer)))", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, col);
+
+        Object[] expected = new Object[] {
+                new Object[] { new Object[] {1, 2}, new Object[] {3} },
+                new Object[] { new Object[] {4, 5, 6} }
+        };
+        verify(mockConnection).createArrayOf(eq("integer"), argThat(actual -> Arrays.deepEquals(expected, actual)));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTripleNestedProtobufWrapperStructIntegerArray() throws SQLException {
+        // Protobuf models triple-nested arrays as
+        //   repeated WrapperA { repeated WrapperB { repeated int32 values; }; }
+        // which surfaces as List<Struct<List<Struct<List<Integer>>>>>.
+        org.apache.kafka.connect.data.Schema bSchema = org.apache.kafka.connect.data.SchemaBuilder.struct()
+                .field("values", org.apache.kafka.connect.data.SchemaBuilder.array(Schema.OPTIONAL_INT32_SCHEMA).build())
+                .build();
+        org.apache.kafka.connect.data.Schema aSchema = org.apache.kafka.connect.data.SchemaBuilder.struct()
+                .field("values", org.apache.kafka.connect.data.SchemaBuilder.array(bSchema).build())
+                .build();
+
+        org.apache.kafka.connect.data.Struct b1 = new org.apache.kafka.connect.data.Struct(bSchema)
+                .put("values", Arrays.asList(1, 2));
+        org.apache.kafka.connect.data.Struct b2 = new org.apache.kafka.connect.data.Struct(bSchema)
+                .put("values", Arrays.asList(3));
+        org.apache.kafka.connect.data.Struct b3 = new org.apache.kafka.connect.data.Struct(bSchema)
+                .put("values", Arrays.asList(4, 5, 6));
+        org.apache.kafka.connect.data.Struct a1 = new org.apache.kafka.connect.data.Struct(aSchema)
+                .put("values", Arrays.asList(b1, b2));
+        org.apache.kafka.connect.data.Struct a2 = new org.apache.kafka.connect.data.Struct(aSchema)
+                .put("values", Arrays.asList(b3));
+
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(Arrays.asList(a1, a2))
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRUCT)
+                .build();
+        TableSchema.Column col = new TableSchema.Column("c", "array(array(array(integer)))", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, col);
+
+        Object[] expected = new Object[] {
+                new Object[] { new Object[] {1, 2}, new Object[] {3} },
+                new Object[] { new Object[] {4, 5, 6} }
+        };
+        verify(mockConnection).createArrayOf(eq("integer"), argThat(actual -> Arrays.deepEquals(expected, actual)));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithQuadrupleNestedAvroLikeListStringArray() throws SQLException {
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(Arrays.asList(
+                        Arrays.asList(
+                                Arrays.asList(Arrays.asList("aa")),
+                                Arrays.asList(Arrays.asList("bb", "cc"))),
+                        Arrays.asList(
+                                Arrays.asList(Arrays.asList("dd")))))
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.ARRAY)
+                .build();
+        TableSchema.Column col = new TableSchema.Column("c", "array(array(array(array(text))))", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, col);
+
+        Object[] expected = new Object[] {
+                new Object[] {
+                        new Object[] { new Object[] {"aa"} },
+                        new Object[] { new Object[] {"bb", "cc"} }
+                },
+                new Object[] {
+                        new Object[] { new Object[] {"dd"} }
+                }
+        };
+        verify(mockConnection).createArrayOf(eq("string"), argThat(actual -> Arrays.deepEquals(expected, actual)));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithTripleNestedProtobufWrapperStructWithNullInnerArrayDoesNotNPE() throws SQLException {
+        org.apache.kafka.connect.data.Schema bSchema = org.apache.kafka.connect.data.SchemaBuilder.struct()
+                .field("values", org.apache.kafka.connect.data.SchemaBuilder.array(Schema.OPTIONAL_INT32_SCHEMA).optional().build())
+                .build();
+        org.apache.kafka.connect.data.Schema aSchema = org.apache.kafka.connect.data.SchemaBuilder.struct()
+                .field("values", org.apache.kafka.connect.data.SchemaBuilder.array(bSchema).build())
+                .build();
+
+        org.apache.kafka.connect.data.Struct nullInnerB = new org.apache.kafka.connect.data.Struct(bSchema);
+        nullInnerB.put("values", null);
+        org.apache.kafka.connect.data.Struct populatedB = new org.apache.kafka.connect.data.Struct(bSchema)
+                .put("values", Arrays.asList(7, 8));
+        org.apache.kafka.connect.data.Struct a1 = new org.apache.kafka.connect.data.Struct(aSchema)
+                .put("values", Arrays.asList(nullInnerB, populatedB));
+
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(Arrays.asList(a1))
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRUCT)
+                .build();
+        TableSchema.Column col = new TableSchema.Column("c", "array(array(array(integer)))", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, col);
+
+        Object[] expected = new Object[] {
+                new Object[] { null, new Object[] {7, 8} }
+        };
+        verify(mockConnection).createArrayOf(eq("integer"), argThat(actual -> Arrays.deepEquals(expected, actual)));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithDeepNestedTimestampArrayThrows() {
+        // Element-level conversion is still required for timestamps even in deeply nested
+        // arrays.  Triple-nested timestamp arrays must therefore land in the DLQ rather than
+        // accidentally bypass the type check.
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(Arrays.asList(Arrays.asList(Arrays.asList(1L))))
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.ARRAY)
+                .build();
+        TableSchema.Column col = new TableSchema.Column("c", "array(array(array(timestamp)))", 2003, true);
+
+        assertThrows(ColumnConversionFailedException.class, () ->
+                converter.convertAndSet(mockStatement, 1, kafkaValue, col));
+    }
+
+    @Test
     void testConvertAndSetWithEmptyArray() throws SQLException {
         List<Long> emptyArray = new ArrayList<>();
         SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()

@@ -99,6 +99,15 @@ public class ProtobufBaseIntegrationTest extends BaseIntegrationTest {
         connectorConfig.put("value.converter.latest.compatibility.strict", "false");
         connectorConfig.put("schemas.enable", "true");
 
+        // Flatten Protobuf `oneof` into a separate top-level Connect field per member, mirroring
+        // ClickHouse's behaviour (see https://clickhouse.com/docs/integrations/kafka/clickhouse-kafka-connect-sink#protobuf-schema-support).
+        // Each member must have a corresponding column in the Firebolt table; only the member set
+        // on the wire receives a non-null value and the others land as SQL NULL. Disabling the
+        // discriminator index keeps the resulting Connect schema minimal so the connector does
+        // not need to map an extra synthetic column.
+        connectorConfig.put("value.converter.flatten.unions", "true");
+        connectorConfig.put("value.converter.generate.index.for.unions", "false");
+
         if (connectorDefinitionOverride != null && !connectorDefinitionOverride.isEmpty()) {
             log.info("Applying connector definition override");
             connectorConfig.putAll(connectorDefinitionOverride);
