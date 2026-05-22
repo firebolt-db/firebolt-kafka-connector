@@ -117,3 +117,17 @@ jobs:
       suite: ${{ matrix.suite }}
       shard_index: ${{ matrix.shard_index }}
       shard_total: ${{ matrix.shard_total }}
+
+  all-integration-tests-passed:
+    name: All Integration Tests Passed
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: always()
+    steps:
+      - name: Check all matrix jobs succeeded
+        run: |
+          if [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "One or more integration test jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "All integration test jobs passed."
