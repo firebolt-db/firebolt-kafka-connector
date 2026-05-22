@@ -24,6 +24,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -90,6 +91,98 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         verifyRecordsInFirebolt(testRecords, descriptor);
     }
 
+    @Test
+    void testOptionalProtobufFieldsCanBeAbsentForNullableColumns() throws Exception {
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                optionalFieldsTableSchema(), optionalFieldsProtobufSchema(), Map.of("ingestion.type", "sql"));
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(optionalFieldsProtobufSchema().get());
+        Descriptor descriptor = parsedSchema.toDescriptor().getFile().findMessageTypeByName("OptionalFieldsRecord");
+        List<DynamicMessage> records = List.of(
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 1)
+                        .setField(descriptor.findFieldByName("optionalText"), "present")
+                        .setField(descriptor.findFieldByName("optionalNumeric"), "123.456789")
+                        .build(),
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 2)
+                        .build());
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : records) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        waitForDataInFirebolt(TABLE_NAME, records.size());
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"optionalText\", \"optionalNumeric\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("present", rs.getString("optionalText"));
+            assertEquals(0, new BigDecimal("123.456789").compareTo(rs.getBigDecimal("optionalNumeric")));
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertNull(rs.getString("optionalText"));
+            assertNull(rs.getBigDecimal("optionalNumeric"));
+        }
+    }
+
+    @Test
+    void testNestedArrayProtobufSerializationWithSqlIngestion() throws Exception {
+        setupProtobufTestResources(
+                TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                nestedArrayTableSchema(), nestedArrayProtobufSchema(), Map.of("ingestion.type", "sql"));
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(nestedArrayProtobufSchema().get());
+        FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
+        Descriptor recordDescriptor = fileDescriptor.findMessageTypeByName("NestedArrayRecord");
+        Descriptor intArrayDescriptor = fileDescriptor.findMessageTypeByName("IntArray");
+        List<DynamicMessage> records = List.of(
+                DynamicMessage.newBuilder(recordDescriptor)
+                        .setField(recordDescriptor.findFieldByName("id"), 1)
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
+                                intArray(intArrayDescriptor, 1, 2))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
+                                intArray(intArrayDescriptor, 3, 4))
+                        .build(),
+                DynamicMessage.newBuilder(recordDescriptor)
+                        .setField(recordDescriptor.findFieldByName("id"), 2)
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
+                                intArray(intArrayDescriptor, 5))
+                        .addRepeatedField(recordDescriptor.findFieldByName("nestedInts"),
+                                intArray(intArrayDescriptor, 6, 7, 8))
+                        .build());
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : records) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(recordDescriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        waitForDataInFirebolt(TABLE_NAME, records.size());
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"nestedInts\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals(List.of(List.of(1, 2), List.of(3, 4)),
+                    parseNestedIntegerArray(rs.getString("nestedInts")));
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertEquals(List.of(List.of(5), List.of(6, 7, 8)),
+                    parseNestedIntegerArray(rs.getString("nestedInts")));
+        }
+    }
+
     // ---------------------------------------------------------------------------
     // Table DDL
     // ---------------------------------------------------------------------------
@@ -134,8 +227,6 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     //   BOOLEAN  -> bool   (Connect BOOLEAN)
     //   BYTEA    -> bytes  (Connect BYTES)
     //   ARRAY    -> repeated fields (Connect ARRAY)
-    //   TODO: Add nested array coverage when schema array converters can infer
-    //         nested Firebolt element types; proto models this via wrapper messages.
     // ---------------------------------------------------------------------------
 
     private Supplier<String> protobufSchema() {
@@ -163,6 +254,45 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 "  repeated double colArrayDoublePrecision = 17;\n" +
                 "  repeated google.protobuf.Timestamp colArrayTimestamptz = 18;\n" +
                 "  repeated google.protobuf.Timestamp colArrayTimestamp = 19;\n" +
+                "}\n";
+    }
+
+    private Supplier<String> optionalFieldsTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"optionalText\" TEXT, " +
+                "\"optionalNumeric\" NUMERIC(38,9) " +
+                ");";
+    }
+
+    private Supplier<String> optionalFieldsProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message OptionalFieldsRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  optional string optionalText = 2;\n" +
+                "  optional string optionalNumeric = 3;\n" +
+                "}\n";
+    }
+
+    private Supplier<String> nestedArrayTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"nestedInts\" ARRAY(ARRAY(INTEGER)) " +
+                ");";
+    }
+
+    private Supplier<String> nestedArrayProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message IntArray {\n" +
+                "  repeated int32 values = 1;\n" +
+                "}\n" +
+                "message NestedArrayRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  repeated IntArray nestedInts = 2;\n" +
                 "}\n";
     }
 
@@ -600,6 +730,14 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 .build();
     }
 
+    private DynamicMessage intArray(Descriptor descriptor, int... values) {
+        DynamicMessage.Builder builder = DynamicMessage.newBuilder(descriptor);
+        for (int value : values) {
+            builder.addRepeatedField(descriptor.findFieldByName("values"), value);
+        }
+        return builder.build();
+    }
+
     // ---------------------------------------------------------------------------
     // PostgreSQL array string parser (mirrors AllDataTypesAvroSchemaSerializerTest)
     // ---------------------------------------------------------------------------
@@ -628,6 +766,38 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
             }
         }
         result.add(parseElement(current.toString().trim()));
+        return result;
+    }
+
+    private List<List<Integer>> parseNestedIntegerArray(String arrayString) {
+        List<List<Integer>> result = new ArrayList<>();
+        if (arrayString == null || arrayString.trim().isEmpty() || arrayString.equals("NULL")) {
+            return result;
+        }
+
+        String content = arrayString.substring(1, arrayString.length() - 1);
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (c == '{') {
+                if (depth++ > 0) {
+                    current.append(c);
+                }
+            } else if (c == '}') {
+                if (--depth == 0) {
+                    List<Integer> inner = parsePostgreSQLArray("{" + current + "}").stream()
+                            .map(value -> value == null ? null : Integer.parseInt(value))
+                            .collect(Collectors.toList());
+                    result.add(inner);
+                    current = new StringBuilder();
+                } else {
+                    current.append(c);
+                }
+            } else if (depth > 0) {
+                current.append(c);
+            }
+        }
         return result;
     }
 
