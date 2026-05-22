@@ -558,20 +558,26 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     }
 
     /**
-     * Extracts an Instant from a google.protobuf.Timestamp field value returned by DynamicMessage.
-     * DynamicMessage.getField() on a message-type field always returns DynamicMessage, never the
-     * compiled com.google.protobuf.Timestamp — even when the field was set with a compiled Timestamp.
+     * Extracts an Instant from a google.protobuf.Timestamp field value returned by
+     * DynamicMessage.getField().
+     *
+     * The runtime type depends on whether the field was explicitly set:
+     *   SET   → com.google.protobuf.Timestamp  (compiled well-known type)
+     *   UNSET → com.google.protobuf.DynamicMessage  (proto3 default empty message)
+     *
+     * Both cases must be handled; assuming either type exclusively causes a ClassCastException
+     * on the other path.
      */
     private Instant extractInstant(Object timestampMsg) {
-        if (timestampMsg instanceof DynamicMessage) {
-            DynamicMessage dm = (DynamicMessage) timestampMsg;
-            long seconds = (long) dm.getField(dm.getDescriptorForType().findFieldByName("seconds"));
-            int nanos = (int) dm.getField(dm.getDescriptorForType().findFieldByName("nanos"));
-            return Instant.ofEpochSecond(seconds, nanos);
+        if (timestampMsg instanceof com.google.protobuf.Timestamp) {
+            com.google.protobuf.Timestamp ts = (com.google.protobuf.Timestamp) timestampMsg;
+            return Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos());
         }
-        // Fallback for compiled Timestamp (should not occur with DynamicMessage, but kept for safety)
-        com.google.protobuf.Timestamp ts = (com.google.protobuf.Timestamp) timestampMsg;
-        return Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos());
+        // UNSET proto3 Timestamp field: DynamicMessage with seconds=0, nanos=0 (epoch)
+        DynamicMessage dm = (DynamicMessage) timestampMsg;
+        long seconds = (long) dm.getField(dm.getDescriptorForType().findFieldByName("seconds"));
+        int nanos = (int) dm.getField(dm.getDescriptorForType().findFieldByName("nanos"));
+        return Instant.ofEpochSecond(seconds, nanos);
     }
 
     /** Builds a google.protobuf.Timestamp from a LocalDateTime (treated as UTC). */
