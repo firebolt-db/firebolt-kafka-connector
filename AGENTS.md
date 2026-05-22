@@ -34,3 +34,5 @@ timeout 90 bash -c 'until curl -sf http://localhost:8083/connectors; do sleep 3;
 - The firebolt-core container runs as UID 1111 — the mounted data directory must be `chown 1111:1111`.
 - Docker runs nested (DinD in Firecracker). Requires `fuse-overlayfs` storage driver and `iptables-legacy`. The update script configures this; if dockerd fails to start, check `/etc/docker/daemon.json` and iptables alternatives.
 - No dedicated linter exists — `./gradlew check` is compilation + tests + JaCoCo.
+- PRs are squash-merged to `main`. Conventional commits preferred (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).
+- Cloud integration tests (tagged `cloud`) need additional secrets: `firebolt.clientId`, `firebolt.clientSecret`, `firebolt.jdbc.url`, plus Confluent Cloud vars (`confluent.environment.id`, `confluent.cluster.id`, `confluent.firebolt.connector.plugin.id`). These are excluded by default with `-Djunit.jupiter.excludeTags=not_implemented,cloud`.
