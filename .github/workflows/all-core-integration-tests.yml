@@ -21,6 +21,10 @@ on:
           - 'customer'
           - 'e2e'
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   integration-tests:
     name: Integration Tests (KC ${{ matrix.kafka_connect_version }}, ${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_total }})
@@ -127,6 +131,14 @@ jobs:
       suite: ${{ matrix.suite }}
       shard_index: ${{ matrix.shard_index }}
       shard_total: ${{ matrix.shard_total }}
+
+  benchmark:
+    name: Throughput Benchmark
+    uses: ./.github/workflows/throughput-benchmark.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number || 0 }}
+      head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+    secrets: inherit
 
   all-integration-tests-passed:
     name: All Integration Tests Passed

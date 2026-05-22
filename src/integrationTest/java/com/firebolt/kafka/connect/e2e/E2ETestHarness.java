@@ -230,10 +230,17 @@ public class E2ETestHarness {
         ingestDurationSeconds = (System.nanoTime() - startNanos) / 1_000_000_000.0;
         log.warn("[INGEST] Done: {} rows landed in {}s",
                 expected, String.format("%.1f", ingestDurationSeconds));
-        writeBenchmarkResult();
     }
 
-    private void writeBenchmarkResult() {
+    /**
+     * Writes benchmark metrics to {@code build/reports/benchmark/results.json}.
+     * Only active when {@code -De2e.benchmark=true}; call this after all validations
+     * so that metrics are only persisted when the test fully passes.
+     */
+    public void writeBenchmarkResult() {
+        if (!Boolean.getBoolean("e2e.benchmark")) {
+            return;
+        }
         try {
             long produceRate = produceDurationSeconds > 0
                     ? (long) (totalProduced / produceDurationSeconds) : 0;
@@ -264,7 +271,7 @@ public class E2ETestHarness {
             log.warn("[BENCHMARK] produce={}rec/s ({}MB/s), ingest={}rec/s",
                     produceRate, String.format("%.1f", throughputMb), ingestRate);
         } catch (Exception e) {
-            log.warn("[BENCHMARK] Failed to write results: {}", e.getMessage());
+            throw new RuntimeException("[BENCHMARK] Failed to write results.json", e);
         }
     }
 

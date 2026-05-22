@@ -1,6 +1,21 @@
 name: Throughput Benchmark
 
 on:
+  # Called from all-core-integration-tests.yml on every PR/push to main.
+  # Receives pr_number and head_sha so the comment lands on the right PR.
+  workflow_call:
+    inputs:
+      pr_number:
+        description: 'PR number for posting the comment (0 = push to main)'
+        required: false
+        type: number
+        default: 0
+      head_sha:
+        description: 'Head commit SHA to label results'
+        required: false
+        type: string
+        default: ''
+  # Standalone triggers: useful for manual re-runs after merge.
   pull_request:
     branches: [main]
   push:
@@ -67,23 +82,30 @@ jobs:
           -De2e.singleCell=at_least_once-sql \
           -De2e.duration=PT30S \
           -De2e.ingestionTimeout=PT10M \
+          -De2e.benchmark=true \
           --no-daemon \
           --tests "com.firebolt.kafka.connect.e2e.E2EMessageTypeTest.testIngestion"
       env:
         KAFKA_BOOTSTRAP_SERVERS: localhost:9092
         SCHEMA_REGISTRY_URL: http://localhost:8081
         KAFKA_CONNECT_URL: http://localhost:8083
-        GITHUB_SHA: ${{ github.sha }}
+        # Prefer the PR head SHA; fall back to push SHA.
+        GITHUB_SHA: ${{ inputs.head_sha || github.event.pull_request.head.sha || github.sha }}
 
     - name: Upload benchmark results
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       if: always()
       with:
-        name: benchmark-results-${{ github.sha }}
+        name: benchmark-results-${{ inputs.head_sha || github.event.pull_request.head.sha || github.sha }}
         path: build/reports/benchmark/results.json
 
     - name: Post PR comment
-      if: github.event_name == 'pull_request' && success()
+      # Post when triggered via workflow_call with a pr_number, or directly on a pull_request event.
+      if: >
+        success() && (
+          (github.event_name == 'workflow_call' && inputs.pr_number != 0) ||
+          github.event_name == 'pull_request'
+        )
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
       with:
         script: |
@@ -100,7 +122,7 @@ jobs:
 
           function fmt(n) { return Number(n).toLocaleString('en-US'); }
           function delta(cur, base) {
-            if (!base) return '';
+            if (base === null || base === undefined || base === 0) return '';
             const pct = ((cur - base) / base * 100).toFixed(1);
             const sign = pct >= 0 ? '+' : '';
             const icon = pct >= -5 ? (pct >= 5 ? ' 🚀' : ' ✅') : ' ⚠️';
@@ -134,12 +156,17 @@ jobs:
           ].join('\n');
 
           const MARKER = '## Throughput Benchmark Results';
-          const { data: comments } = await github.rest.issues.listComments({
+          // inputs.pr_number is set when called from all-core-integration-tests.yml;
+          // context.issue.number is set for direct pull_request events.
+          const issueNumber = ${{ inputs.pr_number || 0 }} || context.issue.number;
+
+          // Paginate to handle PRs with many comments.
+          const allComments = await github.paginate(github.rest.issues.listComments, {
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: context.issue.number,
+            issue_number: issueNumber,
           });
-          const existing = comments.find(c => c.body.includes(MARKER));
+          const existing = allComments.find(c => c.body.includes(MARKER));
           if (existing) {
             await github.rest.issues.updateComment({
               owner: context.repo.owner,
@@ -151,13 +178,17 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: issueNumber,
               body,
             });
           }
 
     - name: Update baseline (main only)
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+      if: >
+        success() && (
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_call' && inputs.pr_number == 0)
+        )
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"

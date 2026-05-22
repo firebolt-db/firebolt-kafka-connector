@@ -80,6 +80,7 @@ public class E2EMessageTypeTest {
         harness.waitForIngestion();
         harness.validateRecordCount();
         harness.validateDataIntegrity();
+        harness.writeBenchmarkResult();
     }
 
     @ParameterizedTest(name = "full: {0}")
@@ -93,6 +94,7 @@ public class E2EMessageTypeTest {
         harness.waitForIngestion();
         harness.validateRecordCount();
         harness.validateDataIntegrity();
+        harness.writeBenchmarkResult();
     }
 
     @AfterEach
