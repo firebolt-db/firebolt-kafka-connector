@@ -47,6 +47,11 @@ public class RecordConverterFactory {
             throws RecordConversionException {
 
         RecordConverter selectedConverter = selectConverter(record);
+        if (selectedConverter == null) {
+            throw new RecordConversionException(
+                "No converter found for record with schema=" + record.valueSchema()
+                + ", value type=" + (record.value() == null ? "null" : record.value().getClass().getSimpleName()));
+        }
         return selectedConverter.convert(record);
     }
 

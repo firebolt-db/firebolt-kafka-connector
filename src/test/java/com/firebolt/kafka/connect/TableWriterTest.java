@@ -146,6 +146,9 @@ public class TableWriterTest {
     void shouldThrowSQLExceptionWhenIngestionFails() throws SQLException {
         doThrow(SQLException.class).when(mockIngestionService).addRecords(anyList());
         assertThrows(SQLException.class, () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+        // Exactly-once invariant: offsets must NOT be persisted when ingestion fails —
+        // persisting them would cause records to be skipped on restart even though they were never written.
+        verify(mockFireboltMetadataService, never()).updateOffsets(any(), any());
     }
 
 
@@ -169,6 +172,54 @@ public class TableWriterTest {
         tableWriter.close();
         tableWriter.close();
         verify(mockIngestionService, times(2)).close();
+    }
+
+    @Test
+    void shouldPersistOffsetsViaMetadataServiceAfterSuccessfulBatch() throws SQLException {
+        // Exactly-once: after inserting records, updateOffsets must be called so restarts
+        // don't reprocess already-committed records.
+        when(mockFireboltRecord1.getPartition()).thenReturn(0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(42L);
+        when(mockFireboltRecord2.getPartition()).thenReturn(1);
+        when(mockFireboltRecord2.getOffset()).thenReturn(99L);
+
+        List<AbstractFireboltRecord> records = List.of(mockFireboltRecord1, mockFireboltRecord2);
+        doNothing().when(mockIngestionService).addRecords(records);
+
+        tableWriter.insertRecords(records);
+
+        // Offset map must be persisted after the batch, not just updated in memory.
+        verify(mockFireboltMetadataService).updateOffsets(TOPIC_NAME, tableWriter.getProcessedPartitionOffsets());
+    }
+
+    @Test
+    void shouldNotAdvanceLocalOffsetsWhenPersistenceFails() throws SQLException {
+        // Persist-before-local-update invariant: if the DB write throws, the in-memory offset
+        // map must stay at its old value so the next batch retries persisting those offsets.
+        when(mockFireboltRecord1.getPartition()).thenReturn(0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(50L);
+        doThrow(new RuntimeException("DB unavailable"))
+                .when(mockFireboltMetadataService).updateOffsets(any(), any());
+
+        assertThrows(RuntimeException.class,
+                () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+
+        // Local state must not have advanced — offset stays at -1, not 50.
+        assertEquals(-1L, tableWriter.getProcessedPartitionOffsets().get(PARTITION_0));
+    }
+
+    @Test
+    void shouldNotCallUpdateOffsetsWhenMetadataServiceIsNull() throws SQLException {
+        // At-least-once mode: no metadata service → no persistence call, no NPE.
+        TableWriter writerWithoutMetadata = new TableWriter(
+                mockTableSchema, null, TOPIC_NAME,
+                new HashMap<>(Map.of(0, -1L)), mockIngestionService);
+
+        when(mockFireboltRecord1.getPartition()).thenReturn(0);
+        when(mockFireboltRecord1.getOffset()).thenReturn(10L);
+        doNothing().when(mockIngestionService).addRecords(anyList());
+
+        assertDoesNotThrow(() -> writerWithoutMetadata.insertRecords(List.of(mockFireboltRecord1)));
     }
 
 }

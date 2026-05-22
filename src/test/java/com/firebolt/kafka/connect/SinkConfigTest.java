@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +13,8 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import org.apache.kafka.common.config.ConfigException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -77,115 +78,124 @@ public class SinkConfigTest {
         assertNull(result);
     }
 
-    @ParameterizedTest
-    @CsvSource({
-        "topic1, table1",
-        "topic2, table2"
-    })
-    void testGetTableNameForTopicWithValidMappings(String topic, String expectedTable) {
-        String result = sinkConfig.getTableNameForTopic(topic);
-        
-        assertEquals(expectedTable, result);
-    }
+    // =========================
+    // TOPIC-TO-TABLE MAPPING TESTS
+    // =========================
 
     @Test
-    void testGetTableNameForTopicWithSingleMapping() {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "single-topic:single_table");
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        String result = testConfig.getTableNameForTopic("single-topic");
-        
-        assertEquals("single_table", result);
-    }
+    void shouldHandleAllValidTopicToTableMappingScenarios() {
+        // --- Explicit match: setUp config has "topic1:table1,topic2:table2" ---
+        assertEquals("table1", sinkConfig.getTableNameForTopic("topic1"));
+        assertEquals("table2", sinkConfig.getTableNameForTopic("topic2"));
 
-    @Test
-    void testGetTableNameForTopicWithComplexMapping() {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, 
+        // --- Single mapping ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "orders:orders_table");
+        assertEquals("orders_table", new SinkConfig(configMap).getTableNameForTopic("orders"));
+
+        // --- Multiple mappings with three entries ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG,
                 "user-events:user_events_table,order-data:orders_table,metrics:metrics_table");
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        assertEquals("user_events_table", testConfig.getTableNameForTopic("user-events"));
-        assertEquals("orders_table", testConfig.getTableNameForTopic("order-data"));
-        assertEquals("metrics_table", testConfig.getTableNameForTopic("metrics"));
-    }
+        SinkConfig complex = new SinkConfig(configMap);
+        assertEquals("user_events_table", complex.getTableNameForTopic("user-events"));
+        assertEquals("orders_table",      complex.getTableNameForTopic("order-data"));
+        assertEquals("metrics_table",     complex.getTableNameForTopic("metrics"));
 
-    @Test
-    void testGetTableNameForTopicWithSpacesInMapping() {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, 
-                " topic1 : table1 , topic2 : table2 ");
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        assertEquals("table1", testConfig.getTableNameForTopic("topic1"));
-        assertEquals("table2", testConfig.getTableNameForTopic("topic2"));
-    }
+        // --- Whitespace around separators is trimmed ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, " topic1 : table1 , topic2 : table2 ");
+        SinkConfig spaced = new SinkConfig(configMap);
+        assertEquals("table1", spaced.getTableNameForTopic("topic1"));
+        assertEquals("table2", spaced.getTableNameForTopic("topic2"));
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-        "topic3",
-        "nonexistent-topic",
-        "TOPIC1",
-        "topic1_different",
-        ""
-    })
-    void testGetTableNameForTopicWithNonexistentTopic(String topic) {
-        String result = sinkConfig.getTableNameForTopic(topic);
-        
-        assertNull(result);
-    }
+        // --- Various naming conventions: dashes, underscores, dots ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic-with-dashes:table_with_underscores");
+        assertEquals("table_with_underscores", new SinkConfig(configMap).getTableNameForTopic("topic-with-dashes"));
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "test.topic:test.table");
+        assertEquals("test.table", new SinkConfig(configMap).getTableNameForTopic("test.topic"));
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "metrics_topic:metrics_db_table");
+        assertEquals("metrics_db_table", new SinkConfig(configMap).getTableNameForTopic("metrics_topic"));
 
-    @Test
-    void testGetTableNameForTopicWithNullMapping() {
+        // --- Case-sensitive: exact match wins; wrong-case falls back to topic name ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "Topic1:Table1,topic2:table2");
+        SinkConfig caseSensitive = new SinkConfig(configMap);
+        assertEquals("Table1", caseSensitive.getTableNameForTopic("Topic1"));
+        assertEquals("table2", caseSensitive.getTableNameForTopic("topic2"));
+        assertEquals("topic1", caseSensitive.getTableNameForTopic("topic1")); // wrong case → fallback
+        assertEquals("TOPIC2", caseSensitive.getTableNameForTopic("TOPIC2")); // wrong case → fallback
+
+        // --- Duplicate topic entries: first match wins ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1,topic1:table2");
+        assertEquals("table1", new SinkConfig(configMap).getTableNameForTopic("topic1"));
+
+        // --- Unmapped topic: fallback to topic name when a mapping is configured but topic is absent ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1,topic2:table2");
+        SinkConfig withMapping = new SinkConfig(configMap);
+        assertEquals("topic3",         withMapping.getTableNameForTopic("topic3"));
+        assertEquals("TOPIC1",         withMapping.getTableNameForTopic("TOPIC1"));
+        assertEquals("nonexistent",    withMapping.getTableNameForTopic("nonexistent"));
+
+        // --- No mapping configured at all: every topic falls back to its own name ---
         configMap.remove(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG);
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        String result = testConfig.getTableNameForTopic("any-topic");
-        
-        assertNull(result);
-    }
+        SinkConfig noMapping = new SinkConfig(configMap);
+        assertEquals("orders",      noMapping.getTableNameForTopic("orders"));
+        assertEquals("user-events", noMapping.getTableNameForTopic("user-events"));
+        assertEquals("metrics",     noMapping.getTableNameForTopic("metrics"));
 
-    @Test
-    void testGetTableNameForTopicWithEmptyMapping() {
+        // --- Empty or whitespace-only mapping string: treated as unconfigured, fallback applies ---
         configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "");
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        String result = testConfig.getTableNameForTopic("any-topic");
-        
-        assertNull(result);
+        assertEquals("any-topic", new SinkConfig(configMap).getTableNameForTopic("any-topic"));
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "   ");
+        assertEquals("any-topic", new SinkConfig(configMap).getTableNameForTopic("any-topic"));
+
+        // --- Null/empty topic name: falls back to the topic itself (null → null, "" → "") ---
+        assertEquals("", sinkConfig.getTableNameForTopic(""));
+        assertNull(sinkConfig.getTableNameForTopic(null));
     }
 
     @Test
-    void testGetTableNameForTopicWithWhitespaceOnlyMapping() {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "   ");
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        String result = testConfig.getTableNameForTopic("any-topic");
-        
-        assertNull(result);
-    }
+    void shouldRejectAllMalformedTopicToTableMappingConfigurations() {
+        // A configured-but-malformed mapping is always a misconfiguration and must throw
+        // ConfigException. The fallback (topic → topic) applies only when NO mapping is configured.
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-        "topic1",
-        "topic1:table1:extra",
-        "topic1:",
-        ":table1",
-        "topic1:table1,malformed",
-        "topic1:table1,:",
-        "topic1:table1,"
-    })
-    void testGetTableNameForTopicWithMalformedMappings(String malformedMapping) {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, malformedMapping);
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        String result = testConfig.getTableNameForTopic("topic1");
-        
-        // Should either return correct value or null for malformed entries
-        if (malformedMapping.equals("topic1:table1:extra")) {
-            assertNull(result); // parts.length != 2
-        } else if (malformedMapping.equals("topic1:")) {
-            assertNull(result); // empty table name
-        }
-        // Other cases should handle gracefully
+        // --- No colon separator ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1");
+        assertThrows(ConfigException.class, () -> new SinkConfig(configMap).getTableNameForTopic("topic1"),
+                "Entry without a colon separator must throw");
+
+        // --- Too many colons ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1:extra");
+        assertThrows(ConfigException.class, () -> new SinkConfig(configMap).getTableNameForTopic("topic1"),
+                "Entry with extra colons must throw");
+
+        // --- Empty table name ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:");
+        assertThrows(ConfigException.class, () -> new SinkConfig(configMap).getTableNameForTopic("topic1"),
+                "Empty table name must throw");
+
+        // --- Empty topic name ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, ":table1");
+        assertThrows(ConfigException.class, () -> new SinkConfig(configMap).getTableNameForTopic("topic1"),
+                "Empty topic name in mapping must throw");
+
+        // --- Malformed trailing entry: valid first entry returned before bad entry; iterating past it throws ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1,malformed");
+        SinkConfig trailingMalformed = new SinkConfig(configMap);
+        assertEquals("table1", trailingMalformed.getTableNameForTopic("topic1")); // found before bad entry
+        assertThrows(ConfigException.class, () -> trailingMalformed.getTableNameForTopic("other-topic"),
+                "Malformed trailing entry must throw when scanned");
+
+        // --- Trailing colon-only entry (empty topic and table) ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1,:");
+        SinkConfig trailingColonOnly = new SinkConfig(configMap);
+        assertEquals("table1", trailingColonOnly.getTableNameForTopic("topic1"));
+        assertThrows(ConfigException.class, () -> trailingColonOnly.getTableNameForTopic("other-topic"),
+                "Trailing colon-only entry must throw when scanned");
+
+        // --- Trailing comma (produces an empty string entry) ---
+        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1,");
+        SinkConfig trailingComma = new SinkConfig(configMap);
+        assertEquals("table1", trailingComma.getTableNameForTopic("topic1"));
+        assertThrows(ConfigException.class, () -> trailingComma.getTableNameForTopic("other-topic"),
+                "Trailing comma (empty entry) must throw when scanned");
     }
 
     @Test
@@ -275,59 +285,6 @@ public class SinkConfigTest {
         
         assertSame(result1, result2);
         assertSame(configMap, result1);
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-        "'topic1:table1', topic1, table1",
-        "'user-events:user_table', user-events, user_table",
-        "'metrics_topic:metrics_db_table', metrics_topic, metrics_db_table",
-        "'test.topic:test.table', test.topic, test.table",
-        "'topic-with-dashes:table_with_underscores', topic-with-dashes, table_with_underscores"
-    })
-    void testGetTableNameForTopicWithVariousNamingConventions(String mapping, String topic, String expectedTable) {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, mapping);
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        String result = testConfig.getTableNameForTopic(topic);
-        
-        assertEquals(expectedTable, result);
-    }
-
-    @Test
-    void testGetTableNameForTopicCaseSensitive() {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "Topic1:Table1,topic2:table2");
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        assertEquals("Table1", testConfig.getTableNameForTopic("Topic1"));
-        assertEquals("table2", testConfig.getTableNameForTopic("topic2"));
-        assertNull(testConfig.getTableNameForTopic("topic1")); // Case sensitive
-        assertNull(testConfig.getTableNameForTopic("TOPIC2")); // Case sensitive
-    }
-
-    @Test
-    void testGetTableNameForTopicWithDuplicateTopics() {
-        configMap.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1,topic1:table2");
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        // Should return the first match
-        String result = testConfig.getTableNameForTopic("topic1");
-        
-        assertEquals("table1", result);
-    }
-
-    @Test
-    void testGetTableNameForTopicWithEmptyTopicName() {
-        String result = sinkConfig.getTableNameForTopic("");
-        
-        assertNull(result);
-    }
-
-    @Test
-    void testGetTableNameForTopicWithNullTopicName() {
-        String result = sinkConfig.getTableNameForTopic(null);
-        
-        assertNull(result);
     }
 
     @ParameterizedTest

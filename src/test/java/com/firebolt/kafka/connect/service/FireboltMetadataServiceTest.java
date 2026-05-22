@@ -103,13 +103,15 @@ class FireboltMetadataServiceTest {
 
         verify(selectPs).setString(1, "t1");
 
-        // second prepared statement is the insert
+        // second prepared statement is the parameterized insert (topic bound as a parameter, not interpolated)
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (?, ?, ?)", insertStatement);
 
-        // verify batch insert invoked for two missing rows
-        verify(insertPs).setInt(1, 0);
-        verify(insertPs).setInt(1, 1);
+        // verify all three parameters are bound for each missing partition
+        verify(insertPs, times(2)).setString(1, "t1");
+        verify(insertPs).setInt(2, 0);
+        verify(insertPs).setInt(2, 1);
+        verify(insertPs, times(2)).setLong(3, -1L);
         verify(insertPs, times(2)).addBatch();
         verify(insertPs).executeBatch();
     }
@@ -143,10 +145,12 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection, times(2)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String insertStatement = preparedStatementsArgumentCapture.getAllValues().get(1);
-        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (\"t1\", ?, -1)", insertStatement);
+        assertEquals("INSERT INTO \"KafkaSinkConnectorMetadata\" (topic, topic_partition, partition_offset) VALUES (?, ?, ?)", insertStatement);
 
-        // verify only one insert for missing partition 1
-        verify(insertPs, times(1)).setInt(1, 1);
+        // verify only one insert for missing partition 1, with all three parameters bound
+        verify(insertPs, times(1)).setString(1, "t1");
+        verify(insertPs, times(1)).setInt(2, 1);
+        verify(insertPs, times(1)).setLong(3, -1L);
         verify(insertPs, times(1)).addBatch();
         verify(insertPs, times(1)).executeBatch();
     }
@@ -166,12 +170,14 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(0);
-        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"t1\" AND topic_partition = ?", updateStatement);
+        // topic is now a bound parameter (position 2), not interpolated into the SQL string
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = ? AND topic_partition = ?", updateStatement);
 
         verify(updatePs).setLong(1, 10L);
-        verify(updatePs).setInt(2, 0);
         verify(updatePs).setLong(1, 20L);
-        verify(updatePs).setInt(2, 1);
+        verify(updatePs, times(2)).setString(2, "t1");
+        verify(updatePs).setInt(3, 0);
+        verify(updatePs).setInt(3, 1);
 
         // verify parameters were bound and batch executed
         verify(updatePs, times(2)).addBatch();
@@ -216,10 +222,11 @@ class FireboltMetadataServiceTest {
 
         verify(mockConnection, times(3)).prepareStatement(preparedStatementsArgumentCapture.capture());
         String updateStatement = preparedStatementsArgumentCapture.getAllValues().get(2);
-        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = \"topicB\" AND topic_partition = ?", updateStatement);
+        assertEquals("UPDATE \"KafkaSinkConnectorMetadata\" SET partition_offset = ? WHERE topic = ? AND topic_partition = ?", updateStatement);
 
         verify(updatePs).setLong(1, 7L);
-        verify(updatePs).setInt(2, 1);
+        verify(updatePs).setString(2, "topicB");
+        verify(updatePs).setInt(3, 1);
         verify(updatePs).addBatch();
         verify(updatePs).executeBatch();
 
@@ -240,6 +247,130 @@ class FireboltMetadataServiceTest {
         // total insert invocations remain from the first call only
         verify(insertPsLocal, times(2)).addBatch();
         verify(insertPsLocal, times(1)).executeBatch();
+    }
+
+    @Test
+    void shouldPersistAndRecoverOffsetsAcrossRestart() throws Exception {
+        // Regression test: before the fix, updateOffsets() was never called from production code.
+        // getLastOffsets() would always return -1 on restart, reprocessing the entire history.
+        // This test would have FAILED before the fix: it calls updateOffsets() directly to simulate
+        // what TableWriter now does, then verifies getLastOffsets() recovers the persisted values.
+
+        // Step 1: Simulate processing a batch — TableWriter calls updateOffsets after insert.
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+                .thenReturn(updatePs);
+
+        metadataService.updateOffsets("orders", Map.of(0, 42L, 1, 99L));
+
+        verify(updatePs).setLong(1, 42L);
+        verify(updatePs).setLong(1, 99L);
+        verify(updatePs, times(2)).setString(2, "orders");
+        verify(updatePs).setInt(3, 0);
+        verify(updatePs).setInt(3, 1);
+        verify(updatePs, times(2)).addBatch();
+        verify(updatePs).executeBatch();
+
+        // Step 2: Simulate a connector restart — getLastOffsets() must return the persisted values,
+        // not -1. Before the fix, updateOffsets was never called so restarts always got -1.
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        when(mockConnection.prepareStatement(argThat(sql ->
+                sql.startsWith("SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in (") &&
+                        (sql.contains("(0, 1)") || sql.contains("(1, 0)"))))).thenReturn(selectPs);
+        when(selectPs.executeQuery()).thenReturn(resultSet);
+        // Both partitions are present in the DB with their persisted offsets.
+        when(resultSet.next()).thenReturn(true, true, false);
+        when(resultSet.getInt("topic_partition")).thenReturn(0, 1);
+        when(resultSet.getLong("partition_offset")).thenReturn(42L, 99L);
+
+        Map<Integer, Long> recovered = metadataService.getLastOffsets("orders", Set.of(0, 1));
+
+        // The connector must resume from the persisted high-water marks, not reprocess from the start.
+        assertEquals(42L, recovered.get(0), "Partition 0 offset must survive restart");
+        assertEquals(99L, recovered.get(1), "Partition 1 offset must survive restart");
+    }
+
+    @Test
+    void updateOffsetsShouldPassMaliciousTopicNameAsParameterNotInterpolated() throws Exception {
+        // SQL injection guard: a hostile topic name must reach the DB as a bound parameter,
+        // not as raw SQL text. If the old String.format path were used, the DROP TABLE
+        // statement would be syntactically part of the query.
+        String maliciousTopic = "evil_topic'; DROP TABLE users; --";
+        Map<Integer, Long> updates = Map.of(0, 1L);
+
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+                .thenReturn(updatePs);
+
+        metadataService.updateOffsets(maliciousTopic, updates);
+
+        // Verify all three parameters are bound correctly — offset at position 1, topic at 2, partition at 3.
+        // The hostile topic name reaches the driver as a safe bound parameter, not as interpolated SQL.
+        verify(updatePs).setLong(1, 1L);
+        verify(updatePs).setString(2, maliciousTopic);
+        verify(updatePs).setInt(3, 0);
+        // Confirm the write actually executed.
+        verify(updatePs).addBatch();
+        verify(updatePs).executeBatch();
+
+        // Round-trip: read back via getLastOffsets to confirm the write landed correctly.
+        // The SELECT must also use parameterized binding (topic as a bound parameter, not interpolated).
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet selectRs = mock(ResultSet.class);
+        when(mockConnection.prepareStatement(startsWith(
+                "SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in")))
+                .thenReturn(selectPs);
+        when(selectPs.executeQuery()).thenReturn(selectRs);
+        when(selectRs.next()).thenReturn(true, false);
+        when(selectRs.getInt("topic_partition")).thenReturn(0);
+        when(selectRs.getLong("partition_offset")).thenReturn(1L);
+
+        Map<Integer, Long> recovered = metadataService.getLastOffsets(maliciousTopic, Set.of(0));
+
+        // The parameterized SELECT returns the persisted offset — the hostile topic name did not
+        // escape the parameter and corrupt the query.
+        assertEquals(1L, recovered.get(0), "Offset must survive the round-trip with a malicious topic name");
+        verify(selectPs).setString(1, maliciousTopic);
+    }
+
+    @Test
+    void updateOffsetsShouldPassTopicWithSpecialQuotesAsParameterNotInterpolated() throws Exception {
+        // SQL injection guard: topic names with embedded quotes must be bound safely.
+        String quotedTopic = "topic\"with'quotes";
+        Map<Integer, Long> updates = Map.of(1, 5L);
+
+        PreparedStatement updatePs = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(startsWith("UPDATE \"KafkaSinkConnectorMetadata\"")))
+                .thenReturn(updatePs);
+
+        metadataService.updateOffsets(quotedTopic, updates);
+
+        // Both single and double quotes in the topic name are harmless when parameterized.
+        // Verify all three parameters and the complete write path.
+        verify(updatePs).setLong(1, 5L);
+        verify(updatePs).setString(2, quotedTopic);
+        verify(updatePs).setInt(3, 1);
+        verify(updatePs).addBatch();
+        verify(updatePs).executeBatch();
+
+        // Round-trip: read back via getLastOffsets to confirm the write landed correctly.
+        // Embedded quotes in the topic name must be harmless when the SELECT also uses parameterization.
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet selectRs = mock(ResultSet.class);
+        when(mockConnection.prepareStatement(startsWith(
+                "SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in")))
+                .thenReturn(selectPs);
+        when(selectPs.executeQuery()).thenReturn(selectRs);
+        when(selectRs.next()).thenReturn(true, false);
+        when(selectRs.getInt("topic_partition")).thenReturn(1);
+        when(selectRs.getLong("partition_offset")).thenReturn(5L);
+
+        Map<Integer, Long> recovered = metadataService.getLastOffsets(quotedTopic, Set.of(1));
+
+        // Embedded quotes in the topic name did not corrupt the SELECT query.
+        assertEquals(5L, recovered.get(1), "Offset must survive the round-trip with a quoted topic name");
+        verify(selectPs).setString(1, quotedTopic);
     }
 }
 

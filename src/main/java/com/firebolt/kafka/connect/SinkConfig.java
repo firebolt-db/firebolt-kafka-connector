@@ -13,6 +13,7 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.config.ConfigException;
 
 /**
  * Simple configuration wrapper for the Firebolt Sink Connector.
@@ -35,20 +36,27 @@ public class SinkConfig {
 
     public String getTableNameForTopic(String topic) {
         String mapping = getTopicToTableMapping();
-        if (mapping == null || mapping.trim().isEmpty()) {
-            return null;
-        }
-
-        String[] mappings = mapping.split(",");
-        for (String map : mappings) {
-            String trimmed = map.trim();
-            String[] parts = trimmed.split(":");
-            if (parts.length == 2 && parts[0].trim().equals(topic)) {
-                return parts[1].trim();
+        if (mapping != null && !mapping.trim().isEmpty()) {
+            String[] mappings = mapping.split(",", -1); // -1 preserves trailing empties so they hit the format check
+            for (String map : mappings) {
+                String trimmed = map.trim();
+                if (trimmed.isEmpty()) {
+                    throw new ConfigException(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, mapping,
+                            "Empty mapping entry found. Expected format: 'topic1:table1,topic2:table2'");
+                }
+                String[] parts = trimmed.split(":", -1);
+                if (parts.length != 2 || parts[0].trim().isEmpty() || parts[1].trim().isEmpty()) {
+                    throw new ConfigException(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, mapping,
+                            "Invalid mapping entry '" + trimmed + "'. Expected format: 'topic:table'");
+                }
+                if (parts[0].trim().equals(topic)) {
+                    return parts[1].trim();
+                }
             }
         }
 
-        return null;
+        // Documented default: when no mapping is configured, use the topic name as the table name.
+        return topic;
     }
 
     public JdbcConfig getJdbcConfig() {

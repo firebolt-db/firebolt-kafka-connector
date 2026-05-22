@@ -6,6 +6,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,14 +69,24 @@ public class TableWriter {
     }
 
     private void updateProcessedOffsets(List<AbstractFireboltRecord> fireboltRecords) {
+        // Compute the new high-water marks without touching processedPartitionOffsets yet.
+        Map<Integer, Long> updatedOffsets = new HashMap<>(processedPartitionOffsets);
         fireboltRecords.forEach(fireboltRecord -> {
             Integer partition = fireboltRecord.getPartition();
             Long offset = fireboltRecord.getOffset();
-            if (processedPartitionOffsets.get(partition) < offset) {
-                processedPartitionOffsets.put(partition, offset);
+            if (updatedOffsets.get(partition) < offset) {
+                updatedOffsets.put(partition, offset);
             }
         });
 
+        // Persist first. If the DB write fails, local state stays at the old values so
+        // the next batch retries persisting the same offsets rather than diverging.
+        if (fireboltMetadataService != null) {
+            fireboltMetadataService.updateOffsets(topicName, updatedOffsets);
+        }
+
+        // Advance local state only after a successful persist.
+        processedPartitionOffsets = updatedOffsets;
     }
 
 }
