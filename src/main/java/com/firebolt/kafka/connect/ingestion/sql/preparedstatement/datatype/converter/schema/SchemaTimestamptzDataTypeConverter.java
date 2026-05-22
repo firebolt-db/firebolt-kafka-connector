@@ -18,6 +18,8 @@ public class SchemaTimestamptzDataTypeConverter extends AbstractColumnTypeConver
     @Override
     public void convertAndSet(PreparedStatement statement, int paramIndex, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
         Object value = schemaKafkaMessageColumnValue.getValue();
+        // TODO: Consolidate timestamp/timestamptz handling across schema, schemaless,
+        // SQL, and binary converters so format-specific cases do not keep spreading.
         // ProtobufConverter maps google.protobuf.Timestamp to Connect Timestamp logical type,
         // whose Java value is java.util.Date (millis since epoch), not Long.
         if (value instanceof Date) {
