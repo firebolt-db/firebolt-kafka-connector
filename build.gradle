@@ -108,6 +108,19 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
+    compileOnly("io.confluent:kafka-protobuf-serializer:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    compileOnly("io.confluent:kafka-connect-protobuf-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
     implementation("org.apache.avro:avro:${avroVersion}") {
         exclude group: 'org.apache.kafka'
         exclude group: 'org.slf4j'
@@ -453,6 +466,18 @@ dependencies {
         exclude group: 'org.apache.logging.log4j'
     }
     integrationTestImplementation("io.confluent:kafka-connect-avro-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    // Confluent Protobuf serializer and converter for Protobuf integration tests
+    integrationTestImplementation("io.confluent:kafka-protobuf-serializer:${confluentVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    integrationTestImplementation("io.confluent:kafka-connect-protobuf-converter:${confluentVersion}") {
         exclude group: 'org.apache.kafka', module: 'kafka-clients'
         exclude group: 'org.apache.kafka', module: 'connect-api'
         exclude group: 'org.apache.kafka', module: 'connect-transforms'
