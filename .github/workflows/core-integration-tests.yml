@@ -97,12 +97,12 @@ jobs:
       run: |
         UNTAGGED=$(find src/integrationTest -name "*Test.java" \
           | grep -v "Base" | grep -v "load/" | grep -v "utils/" | grep -v "datatype/" \
-          | xargs grep -EL '@Tag\(TestTag\.(SERIALIZATION|CONNECTOR|LIFECYCLE|STRESS|CUSTOMER)\)' \
+          | xargs grep -EL '@Tag\(TestTag\.(SERIALIZATION|CONNECTOR|LIFECYCLE|STRESS|CUSTOMER|E2E)\)' \
           | sed 's|.*/||; s|\.java$||')
         if [ -n "$UNTAGGED" ]; then
           echo "ERROR: Missing suite @Tag on:"
           echo "$UNTAGGED"
-          echo "Each class must have one of: @Tag(TestTag.SERIALIZATION/CONNECTOR/LIFECYCLE/STRESS/CUSTOMER)"
+          echo "Each class must have one of: @Tag(TestTag.SERIALIZATION/CONNECTOR/LIFECYCLE/STRESS/CUSTOMER/E2E)"
           exit 1
         fi
         echo "✓ All integration test classes have suite tags"

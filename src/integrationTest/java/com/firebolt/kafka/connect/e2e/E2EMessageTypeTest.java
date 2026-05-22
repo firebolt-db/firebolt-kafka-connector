@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
+import com.firebolt.kafka.connect.utils.TestTag;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -20,7 +21,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * validates correctness, and cleans up. Requires Docker Compose stack running.
  */
 @Slf4j
-@Tag("e2e")
+@Tag(TestTag.E2E)
 public class E2EMessageTypeTest {
 
     private final E2ETestHarness harness = new E2ETestHarness();
