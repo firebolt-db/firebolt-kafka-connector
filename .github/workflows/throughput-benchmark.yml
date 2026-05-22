@@ -1,0 +1,174 @@
+name: Throughput Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+  FIREBOLT_CORE_IMAGE: ${{ vars.FIREBOLT_CORE_IMAGE }}
+  COMPOSE_FILE: src/integrationTest/docker/kafka-connect-3.9.1/docker-compose.yml
+  COMPOSE_FILE_DIR: src/integrationTest/docker/kafka-connect-3.9.1
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e
+
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+
+    - name: Setup firebolt core permissions
+      run: |
+        WHO="$(docker run --rm --entrypoint whoami ${{ vars.FIREBOLT_CORE_IMAGE }})"
+        if [ "$WHO" = "firebolt-core" ]; then
+          mkdir -p "$COMPOSE_FILE_DIR/firebolt-core"
+          sudo chown 1111:1111 "$COMPOSE_FILE_DIR/firebolt-core"
+        fi
+
+    - name: Start Docker services
+      run: |
+        docker compose -f "$COMPOSE_FILE" up -d
+        echo "Waiting for services to be ready..."
+        sleep 30
+        timeout 60 bash -c 'until curl -sf http://localhost:8083/connectors; do sleep 2; done'
+        echo "Kafka Connect is ready!"
+
+    - name: Build project
+      run: ./gradlew build --no-daemon
+
+    - name: Deploy to Kafka Connect
+      run: ./gradlew deployToKafkaConnect --no-daemon
+
+    - name: Run benchmark (30s produce window, JSON / at_least_once / sql)
+      run: |
+        ./gradlew integrationTest \
+          -Djunit.jupiter.includeTags=e2e \
+          -De2e.singleCell=at_least_once-sql \
+          -De2e.duration=PT30S \
+          -De2e.ingestionTimeout=PT10M \
+          --no-daemon \
+          --tests "com.firebolt.kafka.connect.e2e.E2EMessageTypeTest.testIngestion"
+      env:
+        KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+        SCHEMA_REGISTRY_URL: http://localhost:8081
+        KAFKA_CONNECT_URL: http://localhost:8083
+        GITHUB_SHA: ${{ github.sha }}
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+      if: always()
+      with:
+        name: benchmark-results-${{ github.sha }}
+        path: build/reports/benchmark/results.json
+
+    - name: Post PR comment
+      if: github.event_name == 'pull_request' && success()
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+      with:
+        script: |
+          const fs = require('fs');
+
+          const results = JSON.parse(fs.readFileSync('build/reports/benchmark/results.json', 'utf8'));
+
+          let baseline = null;
+          try {
+            baseline = JSON.parse(fs.readFileSync('specs/benchmarks/baseline.json', 'utf8'));
+          } catch (e) {
+            console.log('No baseline found — showing results only');
+          }
+
+          function fmt(n) { return Number(n).toLocaleString('en-US'); }
+          function delta(cur, base) {
+            if (!base) return '';
+            const pct = ((cur - base) / base * 100).toFixed(1);
+            const sign = pct >= 0 ? '+' : '';
+            const icon = pct >= -5 ? (pct >= 5 ? ' 🚀' : ' ✅') : ' ⚠️';
+            return `${sign}${pct}%${icon}`;
+          }
+
+          const sha = results.commit_sha.slice(0, 7);
+          let table;
+          if (baseline) {
+            const bsha = baseline.commit_sha.slice(0, 7);
+            table = `| Metric | This PR (\`${sha}\`) | Baseline (main @ \`${bsha}\`) | Delta |\n`;
+            table += `|--------|------|------|-------|\n`;
+            table += `| Produce rate | ${fmt(results.produce_rate_records_per_sec)} rec/s | ${fmt(baseline.produce_rate_records_per_sec)} rec/s | ${delta(results.produce_rate_records_per_sec, baseline.produce_rate_records_per_sec)} |\n`;
+            table += `| Produce throughput | ${results.produce_throughput_mb_per_sec} MB/s | ${baseline.produce_throughput_mb_per_sec} MB/s | ${delta(results.produce_throughput_mb_per_sec, baseline.produce_throughput_mb_per_sec)} |\n`;
+            table += `| Ingest rate | ${fmt(results.ingest_rate_records_per_sec)} rec/s | ${fmt(baseline.ingest_rate_records_per_sec)} rec/s | ${delta(results.ingest_rate_records_per_sec, baseline.ingest_rate_records_per_sec)} |\n`;
+            table += `| Total records | ${fmt(results.total_records_produced)} | ${fmt(baseline.total_records_produced)} | — |\n`;
+          } else {
+            table = `| Metric | This PR (\`${sha}\`) |\n`;
+            table += `|--------|------|\n`;
+            table += `| Produce rate | ${fmt(results.produce_rate_records_per_sec)} rec/s |\n`;
+            table += `| Produce throughput | ${results.produce_throughput_mb_per_sec} MB/s |\n`;
+            table += `| Ingest rate | ${fmt(results.ingest_rate_records_per_sec)} rec/s |\n`;
+            table += `| Total records | ${fmt(results.total_records_produced)} |\n`;
+          }
+
+          const body = [
+            '## Throughput Benchmark Results',
+            '',
+            table,
+            `_JSON / AT_LEAST_ONCE / SQL · ${results.duration_seconds}s produce window · ${results.record_size_bytes}B records_`,
+          ].join('\n');
+
+          const MARKER = '## Throughput Benchmark Results';
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find(c => c.body.includes(MARKER));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
+
+    - name: Update baseline (main only)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        mkdir -p specs/benchmarks
+        cp build/reports/benchmark/results.json specs/benchmarks/baseline.json
+        git add specs/benchmarks/baseline.json
+        git diff --staged --quiet && echo "Baseline unchanged" && exit 0
+        git commit -m "chore: update benchmark baseline [skip ci]"
+        git pull --rebase
+        git push
+
+    - name: Stop Docker services
+      if: always()
+      run: docker compose -f "$COMPOSE_FILE" down -v
