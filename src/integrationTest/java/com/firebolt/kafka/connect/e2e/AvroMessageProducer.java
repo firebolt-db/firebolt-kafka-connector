@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -25,6 +26,7 @@ public class AvroMessageProducer implements MessageProducer {
 
     private final Producer<String, Object> producer;
     private final Schema avroSchema;
+    private final AtomicLong failedSendCount = new AtomicLong();
 
     public AvroMessageProducer(String bootstrapServers, String schemaRegistryUrl) {
         this.avroSchema = loadSchema();
@@ -49,6 +51,7 @@ public class AvroMessageProducer implements MessageProducer {
             producer.send(new ProducerRecord<>(topicName, String.valueOf(record.getId()), avroRecord),
                     (metadata, exception) -> {
                         if (exception != null) {
+                            failedSendCount.incrementAndGet();
                             log.error("Failed to produce Avro record id={}: {}",
                                     record.getId(), exception.getMessage());
                         }
@@ -59,6 +62,11 @@ public class AvroMessageProducer implements MessageProducer {
     @Override
     public void flush() {
         producer.flush();
+    }
+
+    @Override
+    public long getFailedSendCount() {
+        return failedSendCount.get();
     }
 
     @Override

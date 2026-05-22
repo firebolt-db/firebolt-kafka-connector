@@ -79,8 +79,9 @@ public class E2ETestHarness {
         createFireboltTable(table);
         this.validator = new FireboltValidator(fireboltClient);
 
-        // 3. Deploy Kafka Connect connector
+        // 3. Deploy Kafka Connect connector and wait until it is RUNNING
         deployConnector(config);
+        awaitConnectorRunning(connectorName(config));
 
         // 4. Create message producer
         this.producer = MessageProducerFactory.create(
@@ -96,9 +97,9 @@ public class E2ETestHarness {
     private static final int PRODUCE_BATCH_SIZE = 1_000;
 
     /** Total records produced (set after production completes). */
-    private volatile int totalProduced;
+    private volatile long totalProduced;
 
-    public int getTotalProduced() {
+    public long getTotalProduced() {
         return totalProduced;
     }
 
@@ -124,7 +125,7 @@ public class E2ETestHarness {
 
         long startNanos = System.nanoTime();
         long deadlineNanos = startNanos + targetDuration.toNanos();
-        int produced = 0;
+        long produced = 0;
         int batchesSinceLog = 0;
         while (System.nanoTime() < deadlineNanos) {
             List<E2ETestRecord> batch = new ArrayList<>(PRODUCE_BATCH_SIZE);
@@ -148,7 +149,11 @@ public class E2ETestHarness {
             waitForBackpressure(table, produced);
         }
         producer.flush();
-        totalProduced = produced;
+        long failed = producer.getFailedSendCount();
+        totalProduced = produced - failed;
+        if (failed > 0) {
+            log.warn("[PRODUCE] {} sends failed; adjusting expected count to {}", failed, totalProduced);
+        }
 
         double totalSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
         log.warn("[PRODUCE] Done: {} records to '{}' in {}s ({} rec/s)",
@@ -160,11 +165,11 @@ public class E2ETestHarness {
      * Stalls if the producer has run too far ahead of Firebolt ingestion.
      * Skips the countRows query entirely when produced is safely below the limit.
      */
-    private void waitForBackpressure(String table, int produced) {
+    private void waitForBackpressure(String table, long produced) {
         if (produced <= MAX_PRODUCER_LEAD_ROWS) return;
         try {
-            int ingested = fireboltClient.countRows(table);
-            int lead = produced - ingested;
+            long ingested = fireboltClient.countRows(table);
+            long lead = produced - ingested;
             if (lead > MAX_PRODUCER_LEAD_ROWS) {
                 log.info("Backpressure: produced={}, ingested={}, lead={} > {} — stalling",
                         produced, ingested, lead, MAX_PRODUCER_LEAD_ROWS);
@@ -172,7 +177,7 @@ public class E2ETestHarness {
                         .atMost(Duration.ofMinutes(5))
                         .pollInterval(Duration.ofSeconds(2))
                         .until(() -> {
-                            int current = fireboltClient.countRows(table);
+                            long current = fireboltClient.countRows(table);
                             return (produced - current) <= MAX_PRODUCER_LEAD_ROWS / 2;
                         });
                 log.info("Backpressure released, resuming production");
@@ -189,7 +194,7 @@ public class E2ETestHarness {
      */
     public void waitForIngestion() {
         String table = config.resolvedTableName();
-        int expected = totalProduced;
+        long expected = totalProduced;
         long startNanos = System.nanoTime();
         log.warn("[INGEST] Waiting for {} rows in table '{}' (timeout={})...",
                 expected, table, config.getIngestionTimeout());
@@ -199,7 +204,7 @@ public class E2ETestHarness {
                 .pollInterval(config.getPollInterval())
                 .until(() -> {
                     try {
-                        int count = fireboltClient.countRows(table);
+                        long count = fireboltClient.countRows(table);
                         double elapsedSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
                         int pct = expected > 0 ? (int) (100L * count / expected) : 100;
                         log.info("[INGEST] {}/{} rows ({}%) — {}s elapsed",
@@ -375,6 +380,27 @@ public class E2ETestHarness {
             }
             log.info("Deployed connector '{}'", connName);
         }
+    }
+
+    private void awaitConnectorRunning(String connectorName) throws IOException {
+        log.info("[E2E] Waiting for connector '{}' to reach RUNNING state...", connectorName);
+        await()
+                .atMost(Duration.ofSeconds(60))
+                .pollInterval(Duration.ofSeconds(2))
+                .until(() -> {
+                    Request req = new Request.Builder()
+                            .url(connectUrl + "/connectors/" + connectorName + "/status")
+                            .get()
+                            .build();
+                    try (Response resp = HTTP.newCall(req).execute()) {
+                        if (!resp.isSuccessful()) return false;
+                        String body = resp.body().string();
+                        return body.contains("\"RUNNING\"");
+                    } catch (Exception e) {
+                        return false;
+                    }
+                });
+        log.warn("[E2E] Connector '{}' is RUNNING", connectorName);
     }
 
     private void deleteConnector(String connectorName) throws IOException {

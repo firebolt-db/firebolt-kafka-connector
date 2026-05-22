@@ -29,9 +29,9 @@ public class FireboltValidator {
      *  - EXACTLY_ONCE: count == produced (no duplicates).
      *  - AT_LEAST_ONCE: count >= produced (duplicates allowed, no data loss).
      */
-    public void validateRecordCount(String tableName, int produced, DeliveryMode deliveryMode)
+    public void validateRecordCount(String tableName, long produced, DeliveryMode deliveryMode)
             throws SQLException {
-        int actual = fireboltClient.countRows(tableName);
+        long actual = fireboltClient.countRows(tableName);
         log.info("Table '{}' row count: produced={}, actual={}, mode={}",
                 tableName, produced, actual, deliveryMode);
         if (deliveryMode == DeliveryMode.EXACTLY_ONCE) {
@@ -48,7 +48,7 @@ public class FireboltValidator {
      * Spot-checks data integrity by verifying a few known records.
      * Checks that sequential IDs 1, N/2, and N exist with correct name prefix.
      */
-    public void validateDataIntegrity(String tableName, int totalRecords) throws SQLException {
+    public void validateDataIntegrity(String tableName, long totalRecords) throws SQLException {
         long[] sampleIds = {1, totalRecords / 2, totalRecords};
         for (long sampleId : sampleIds) {
             validateRecordExists(tableName, sampleId);

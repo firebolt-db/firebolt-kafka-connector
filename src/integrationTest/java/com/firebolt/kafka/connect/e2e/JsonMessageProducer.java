@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -21,6 +22,7 @@ public class JsonMessageProducer implements MessageProducer {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final Producer<String, String> producer;
+    private final AtomicLong failedSendCount = new AtomicLong();
 
     public JsonMessageProducer(String bootstrapServers) {
         Properties props = new Properties();
@@ -40,6 +42,7 @@ public class JsonMessageProducer implements MessageProducer {
             producer.send(new ProducerRecord<>(topicName, String.valueOf(record.getId()), json),
                     (metadata, exception) -> {
                         if (exception != null) {
+                            failedSendCount.incrementAndGet();
                             log.error("Failed to produce JSON record id={}: {}", record.getId(), exception.getMessage());
                         }
                     });
@@ -49,6 +52,11 @@ public class JsonMessageProducer implements MessageProducer {
     @Override
     public void flush() {
         producer.flush();
+    }
+
+    @Override
+    public long getFailedSendCount() {
+        return failedSendCount.get();
     }
 
     @Override

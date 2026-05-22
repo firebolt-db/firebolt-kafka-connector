@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -25,6 +26,7 @@ public class ProtobufMessageProducer implements MessageProducer {
 
     private final Producer<String, DynamicMessage> producer;
     private final Descriptors.Descriptor messageDescriptor;
+    private final AtomicLong failedSendCount = new AtomicLong();
 
     public ProtobufMessageProducer(String bootstrapServers, String schemaRegistryUrl) {
         this.messageDescriptor = buildDescriptor();
@@ -49,6 +51,7 @@ public class ProtobufMessageProducer implements MessageProducer {
             producer.send(new ProducerRecord<>(topicName, String.valueOf(record.getId()), msg),
                     (metadata, exception) -> {
                         if (exception != null) {
+                            failedSendCount.incrementAndGet();
                             log.error("Failed to produce Protobuf record id={}: {}",
                                     record.getId(), exception.getMessage());
                         }
@@ -59,6 +62,11 @@ public class ProtobufMessageProducer implements MessageProducer {
     @Override
     public void flush() {
         producer.flush();
+    }
+
+    @Override
+    public long getFailedSendCount() {
+        return failedSendCount.get();
     }
 
     @Override

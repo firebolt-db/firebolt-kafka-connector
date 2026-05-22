@@ -21,4 +21,12 @@ public interface MessageProducer extends Closeable {
      * Flushes any buffered records and waits for acknowledgments.
      */
     void flush();
+
+    /**
+     * Returns the number of records whose async Kafka send callback reported a failure.
+     * Defaults to 0 for producers that do not track failures.
+     */
+    default long getFailedSendCount() {
+        return 0;
+    }
 }
