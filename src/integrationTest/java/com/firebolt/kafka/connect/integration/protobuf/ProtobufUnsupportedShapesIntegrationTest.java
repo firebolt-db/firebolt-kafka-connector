@@ -50,15 +50,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code array(array(integer))} path. A follow-up PR will revisit the overall
  * serialization/deserialization architecture; specifically the connector should grow:
  * <ul>
- *   <li>A {@code SchemaStructDataTypeConverter} so non-flattened Connect Struct values (Protobuf
- *       nested messages, non-flattened {@code oneof}) ingest into Firebolt {@code STRUCT}
- *       columns. Once Firebolt ships {@code VARIANT}, the converter should also cover that.</li>
+ *   <li>A {@code SchemaStructDataTypeConverter} so plain (non-{@code oneof}) Protobuf nested
+ *       messages can ingest into Firebolt {@code STRUCT} columns. Once Firebolt ships
+ *       {@code VARIANT}, the converter should also cover that.</li>
  *   <li>Generalised nested-array support for any depth and any inner scalar type
  *       (currently only {@code array(array(integer))} is wired up).</li>
- *   <li>Documented guidance for {@code value.converter.flatten.unions=true} so
- *       {@code oneof} can flatten into per-branch columns (mirrors ClickHouse's behaviour),
- *       once the flattened Struct shape is supported.</li>
  * </ul>
+ *
+ * <h2>What does work today</h2>
+ * Confluent's {@code ProtobufConverter} flattens {@code oneof} branches into top-level Connect
+ * fields by default (it adds an {@code <oneof>_0} discriminator that the connector silently
+ * ignores). As a result <em>{@code oneof} of scalars, {@code oneof} of arrays, and nested
+ * {@code oneof}s all round-trip end-to-end</em> through the existing converter as long as each
+ * branch maps to a regular scalar / array Firebolt column. Positive coverage for those shapes
+ * lives in {@link ProtobufAllDataTypesSerializerTest}.
  */
 @Slf4j
 @Tag(TestTag.SERIALIZATION)
@@ -177,20 +182,33 @@ public class ProtobufUnsupportedShapesIntegrationTest extends ProtobufBaseIntegr
     }
 
     /**
-     * <strong>Protobuf {@code oneof}.</strong> Confluent's {@code ProtobufConverter} produces a
-     * sub-Struct for the union by default. Without the connector supporting Connect Struct values
-     * (or the converter being configured with {@code value.converter.flatten.unions=true}), the
-     * record fails at conversion time.
+     * <strong>{@code oneof} without {@code flatten.unions=true}.</strong> By default Confluent's
+     * {@code ProtobufConverter} wraps {@code oneof} members in a sub-Struct named after the
+     * {@code oneof}. The connector has no SQL-side STRUCT handler so the sub-Struct field is
+     * silently dropped (only the {@code id} column lands), losing all branch data without a
+     * clear error.
      *
-     * <p>TODO: either (a) add STRUCT support and flatten on the connector side, or (b) document /
-     * default {@code flatten.unions=true} in the connector's recommended converter settings, then
-     * flip this test to a positive assertion that each {@code oneof} branch lands in its own
-     * column (mirroring ClickHouse).
+     * <p>This is the worst kind of negative behaviour — silent data loss. It is documented here
+     * so that:
+     * <ol>
+     *   <li>Users running with default Confluent settings see this assertion break the moment
+     *       a code change starts surfacing the data correctly (good: flip to a positive test).</li>
+     *   <li>Until the architectural rework lands, users are funnelled toward the
+     *       {@code value.converter.flatten.unions=true} setting which is exercised positively
+     *       by {@code ProtobufAllDataTypesSerializerTest#testOneofOfScalarsProtobufFlattensToColumns}.</li>
+     * </ol>
+     *
+     * <p>TODO: detect Connect Struct values targeting non-STRUCT columns at conversion time and
+     * raise a {@code ColumnConversionFailedException} with a message recommending
+     * {@code flatten.unions=true}, instead of silently dropping the data.
      */
     @Test
-    void oneofProtobufFailsAndRoutesToDlq() throws Exception {
+    void oneofProtobufWithoutFlattenUnionsSilentlyDropsBranchData() throws Exception {
+        // Note: NO `flatten.unions=true` override -- this test exercises the default Confluent
+        // configuration where the oneof becomes a sub-Struct field that the connector cannot
+        // handle.
         setupProtobufTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                oneofTableSchema(), oneofProtobufSchema(), dlqOverride());
+                oneofTableSchema(), oneofProtobufSchema(), Map.of("ingestion.type", "sql"));
 
         ProtobufSchema parsedSchema = new ProtobufSchema(oneofProtobufSchema().get());
         Descriptor descriptor = parsedSchema.toDescriptor().getFile().findMessageTypeByName("OneofRecord");
@@ -204,32 +222,164 @@ public class ProtobufUnsupportedShapesIntegrationTest extends ProtobufBaseIntegr
                 .setField(descriptor.findFieldByName("intValue"), 42)
                 .build();
 
-        runAndAssertDlq(List.of(textRecord, intRecord), descriptor, "id");
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : List.of(textRecord, intRecord)) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        // The connector inserts the rows (without flagging the oneof drop) -- that's the silent
+        // data loss being documented.
+        org.awaitility.Awaitility.await()
+                .atMost(Duration.ofSeconds(30))
+                .pollInterval(Duration.ofSeconds(1))
+                .until(() -> fireboltDefaultDbClient.countRows(TABLE_NAME) >= 2);
+
+        try (java.sql.ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"textValue\", \"intValue\", \"doubleValue\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals(null, rs.getString("textValue"),
+                    "TODO: oneof branch data silently dropped without flatten.unions=true; see class-level Javadoc");
+            assertEquals(null, rs.getObject("intValue"));
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertEquals(null, rs.getString("textValue"));
+            assertEquals(null, rs.getObject("intValue"),
+                    "TODO: oneof branch data silently dropped without flatten.unions=true; see class-level Javadoc");
+        }
     }
 
     /**
-     * <strong>{@code oneof} of arrays.</strong> Each branch is a wrapper message containing a
-     * repeated field. Same root cause as the plain {@code oneof} case above.
+     * Schema mirror of {@code ProtobufAllDataTypesSerializerTest#oneofTableSchema}. Kept here so
+     * the negative test stays self-contained -- the assertion compares the silent-drop default
+     * behaviour against the positive {@code flatten.unions=true} ingestion that the all-data-types
+     * test exercises.
+     */
+    private Supplier<String> oneofTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"textValue\" TEXT, " +
+                "\"intValue\" INTEGER, " +
+                "\"doubleValue\" DOUBLE PRECISION " +
+                ");";
+    }
+
+    private Supplier<String> oneofProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message OneofRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  oneof value {\n" +
+                "    string textValue = 2;\n" +
+                "    int32 intValue = 3;\n" +
+                "    double doubleValue = 4;\n" +
+                "  }\n" +
+                "}\n";
+    }
+
+    /**
+     * <strong>Nested {@code oneof} with message-type branches.</strong>
+     * {@code value.converter.flatten.unions=true} flattens the <em>top-level</em>
+     * {@code oneof} into per-branch top-level Connect fields, but if a branch is itself a
+     * <em>message</em> (here, the inner {@code oneof} wrapper), that message stays as a Connect
+     * Struct field. The connector silently drops the Struct, losing all branch data inside the
+     * inner {@code oneof}.
      *
-     * <p>TODO: see {@code oneofProtobufFailsAndRoutesToDlq}.
+     * <p>Scalar branches at the outer level (e.g., {@code flatBool}) <em>do</em> flatten because
+     * they aren't message-typed; the test asserts that asymmetry — outer scalar lands, inner
+     * branch payload disappears.
+     *
+     * <p>TODO: support flattening of nested message-type branches, or at minimum surface a clear
+     * conversion error when a Struct value targets a non-STRUCT column.
      */
     @Test
-    void oneofOfArrayProtobufFailsAndRoutesToDlq() throws Exception {
+    void nestedOneofWithMessageBranchesSilentlyDropsInnerData() throws Exception {
+        Map<String, String> override = new java.util.HashMap<>();
+        override.put("ingestion.type", "sql");
+        override.put("value.converter.flatten.unions", "true");
         setupProtobufTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                oneofOfArrayTableSchema(), oneofOfArrayProtobufSchema(), dlqOverride());
+                nestedOneofTableSchema(), nestedOneofProtobufSchema(), override);
 
-        ProtobufSchema parsedSchema = new ProtobufSchema(oneofOfArrayProtobufSchema().get());
+        ProtobufSchema parsedSchema = new ProtobufSchema(nestedOneofProtobufSchema().get());
         FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
-        Descriptor descriptor = fileDescriptor.findMessageTypeByName("OneofOfArrayRecord");
-        Descriptor stringArrayDescriptor = fileDescriptor.findMessageTypeByName("StringArray");
+        Descriptor descriptor = fileDescriptor.findMessageTypeByName("NestedOneofRecord");
+        Descriptor inner = fileDescriptor.findMessageTypeByName("InnerOneof");
 
-        DynamicMessage record = DynamicMessage.newBuilder(descriptor)
-                .setField(descriptor.findFieldByName("id"), 1)
-                .setField(descriptor.findFieldByName("textArray"),
-                        stringArrayMsg(stringArrayDescriptor, "alpha", "beta"))
-                .build();
+        List<DynamicMessage> records = List.of(
+                // Outer branch is the message-typed `nested` -> dropped; nestedText/nestedInt
+                // remain NULL in Firebolt despite being set on the wire.
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 1)
+                        .setField(descriptor.findFieldByName("nested"),
+                                DynamicMessage.newBuilder(inner)
+                                        .setField(inner.findFieldByName("nestedText"), "deep")
+                                        .build())
+                        .build(),
+                // Outer branch is the scalar `flatBool` -> flattens to its column.
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 2)
+                        .setField(descriptor.findFieldByName("flatBool"), true)
+                        .build());
 
-        runAndAssertDlq(List.of(record), descriptor, "id");
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : records) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        org.awaitility.Awaitility.await()
+                .atMost(Duration.ofSeconds(30))
+                .pollInterval(Duration.ofSeconds(1))
+                .until(() -> fireboltDefaultDbClient.countRows(TABLE_NAME) >= 2);
+
+        try (java.sql.ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"nestedText\", \"nestedInt\", \"flatBool\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals(null, rs.getString("nestedText"),
+                    "TODO: nested oneof branch (message-typed) is silently dropped; see class-level Javadoc");
+            assertEquals(null, rs.getObject("nestedInt"));
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            // Scalar branch at the outer level flattens correctly even when an inner oneof exists.
+            assertEquals(Boolean.TRUE, rs.getObject("flatBool", Boolean.class));
+        }
+    }
+
+    private Supplier<String> nestedOneofTableSchema() {
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"nestedText\" TEXT, " +
+                "\"nestedInt\" INTEGER, " +
+                "\"flatBool\" BOOLEAN " +
+                ");";
+    }
+
+    private Supplier<String> nestedOneofProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message InnerOneof {\n" +
+                "  oneof inner {\n" +
+                "    string nestedText = 1;\n" +
+                "    int32 nestedInt = 2;\n" +
+                "  }\n" +
+                "}\n" +
+                "message NestedOneofRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  oneof outer {\n" +
+                "    InnerOneof nested = 2;\n" +
+                "    bool flatBool = 3;\n" +
+                "  }\n" +
+                "}\n";
     }
 
     /**
@@ -261,34 +411,6 @@ public class ProtobufUnsupportedShapesIntegrationTest extends ProtobufBaseIntegr
                 .build();
 
         runAndAssertDlq(List.of(r1, r2), descriptor, "id");
-    }
-
-    /**
-     * <strong>Nested {@code oneof}.</strong> The outer {@code oneof} branch is itself a message
-     * containing another {@code oneof}; full flattening would require recursive Struct handling
-     * across both levels.
-     *
-     * <p>TODO: see {@code oneofProtobufFailsAndRoutesToDlq}.
-     */
-    @Test
-    void oneofOfOneofProtobufFailsAndRoutesToDlq() throws Exception {
-        setupProtobufTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                nestedOneofTableSchema(), nestedOneofProtobufSchema(), dlqOverride());
-
-        ProtobufSchema parsedSchema = new ProtobufSchema(nestedOneofProtobufSchema().get());
-        FileDescriptor fileDescriptor = parsedSchema.toDescriptor().getFile();
-        Descriptor descriptor = fileDescriptor.findMessageTypeByName("NestedOneofRecord");
-        Descriptor inner = fileDescriptor.findMessageTypeByName("InnerOneof");
-
-        DynamicMessage record = DynamicMessage.newBuilder(descriptor)
-                .setField(descriptor.findFieldByName("id"), 1)
-                .setField(descriptor.findFieldByName("nested"),
-                        DynamicMessage.newBuilder(inner)
-                                .setField(inner.findFieldByName("nestedText"), "deep")
-                                .build())
-                .build();
-
-        runAndAssertDlq(List.of(record), descriptor, "id");
     }
 
     // ---------------------------------------------------------------------------
@@ -431,57 +553,6 @@ public class ProtobufUnsupportedShapesIntegrationTest extends ProtobufBaseIntegr
                 "}\n";
     }
 
-    private Supplier<String> oneofTableSchema() {
-        // The schema mirrors what a flattened `oneof` would land in -- one nullable column per
-        // branch. Once flattening lands, the negative assertion in the test should flip to a
-        // positive one without the table layout needing to change.
-        return () -> "CREATE TABLE \"%s\" (" +
-                "\"id\" INTEGER NOT NULL, " +
-                "\"textValue\" TEXT, " +
-                "\"intValue\" INTEGER " +
-                ");";
-    }
-
-    private Supplier<String> oneofProtobufSchema() {
-        return () ->
-                "syntax = \"proto3\";\n" +
-                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
-                "message OneofRecord {\n" +
-                "  int32 id = 1;\n" +
-                "  oneof value {\n" +
-                "    string textValue = 2;\n" +
-                "    int32 intValue = 3;\n" +
-                "  }\n" +
-                "}\n";
-    }
-
-    private Supplier<String> oneofOfArrayTableSchema() {
-        return () -> "CREATE TABLE \"%s\" (" +
-                "\"id\" INTEGER NOT NULL, " +
-                "\"textArray\" ARRAY(TEXT), " +
-                "\"intArray\" ARRAY(INTEGER) " +
-                ");";
-    }
-
-    private Supplier<String> oneofOfArrayProtobufSchema() {
-        return () ->
-                "syntax = \"proto3\";\n" +
-                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
-                "message StringArray {\n" +
-                "  repeated string values = 1;\n" +
-                "}\n" +
-                "message IntArray {\n" +
-                "  repeated int32 values = 1;\n" +
-                "}\n" +
-                "message OneofOfArrayRecord {\n" +
-                "  int32 id = 1;\n" +
-                "  oneof payload {\n" +
-                "    StringArray textArray = 2;\n" +
-                "    IntArray intArray = 3;\n" +
-                "  }\n" +
-                "}\n";
-    }
-
     private Supplier<String> notNullTableSchema() {
         return () -> "CREATE TABLE \"%s\" (" +
                 "\"id\" INTEGER NOT NULL, " +
@@ -501,31 +572,4 @@ public class ProtobufUnsupportedShapesIntegrationTest extends ProtobufBaseIntegr
                 "}\n";
     }
 
-    private Supplier<String> nestedOneofTableSchema() {
-        return () -> "CREATE TABLE \"%s\" (" +
-                "\"id\" INTEGER NOT NULL, " +
-                "\"nestedText\" TEXT, " +
-                "\"nestedInt\" INTEGER, " +
-                "\"flatBool\" BOOLEAN " +
-                ");";
-    }
-
-    private Supplier<String> nestedOneofProtobufSchema() {
-        return () ->
-                "syntax = \"proto3\";\n" +
-                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
-                "message InnerOneof {\n" +
-                "  oneof inner {\n" +
-                "    string nestedText = 1;\n" +
-                "    int32 nestedInt = 2;\n" +
-                "  }\n" +
-                "}\n" +
-                "message NestedOneofRecord {\n" +
-                "  int32 id = 1;\n" +
-                "  oneof outer {\n" +
-                "    InnerOneof nested = 2;\n" +
-                "    bool flatBool = 3;\n" +
-                "  }\n" +
-                "}\n";
-    }
 }

@@ -133,6 +133,76 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         }
     }
 
+    /**
+     * Protobuf {@code oneof} of scalars round-trips when the value converter is configured with
+     * {@code value.converter.flatten.unions=true}: each {@code oneof} member then surfaces as a
+     * top-level Connect field, plus an {@code <oneof>_0} discriminator the connector silently
+     * ignores (this is fine — the per-branch columns themselves carry the data, only the chosen
+     * branch is non-null per record).
+     *
+     * <p>This mirrors ClickHouse's flattening behaviour (see
+     * <a href="https://clickhouse.com/docs/integrations/kafka/clickhouse-kafka-connect-sink#protobuf-schema-support">ClickHouse Kafka Connect Sink Protobuf docs</a>).
+     * Without {@code flatten.unions}, Confluent's converter wraps the {@code oneof} members in a
+     * sub-Struct that the connector cannot ingest — see
+     * {@code ProtobufUnsupportedShapesIntegrationTest#oneofProtobufWithoutFlattenUnionsSilentlyDropsBranchData}.
+     */
+    @Test
+    void testOneofOfScalarsProtobufFlattensToColumns() throws Exception {
+        Map<String, String> override = new java.util.HashMap<>();
+        override.put("ingestion.type", "sql");
+        override.put("value.converter.flatten.unions", "true");
+        setupProtobufTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
+                oneofTableSchema(), oneofProtobufSchema(), override);
+
+        ProtobufSchema parsedSchema = new ProtobufSchema(oneofProtobufSchema().get());
+        Descriptor descriptor = parsedSchema.toDescriptor().getFile().findMessageTypeByName("OneofRecord");
+
+        List<DynamicMessage> records = List.of(
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 1)
+                        .setField(descriptor.findFieldByName("textValue"), "hello")
+                        .build(),
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 2)
+                        .setField(descriptor.findFieldByName("intValue"), 42)
+                        .build(),
+                DynamicMessage.newBuilder(descriptor)
+                        .setField(descriptor.findFieldByName("id"), 3)
+                        .setField(descriptor.findFieldByName("doubleValue"), 3.5)
+                        .build());
+
+        try (Producer<String, DynamicMessage> producer = initializeProtobufProducer()) {
+            for (DynamicMessage record : records) {
+                producer.send(new ProducerRecord<>(TOPIC_NAME,
+                        String.valueOf(record.getField(descriptor.findFieldByName("id"))), record)).get();
+            }
+            producer.flush();
+        }
+
+        waitForDataInFirebolt(TABLE_NAME, records.size());
+
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
+                "SELECT \"id\", \"textValue\", \"intValue\", \"doubleValue\" FROM \"" + TABLE_NAME + "\" ORDER BY \"id\"")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertEquals("hello", rs.getString("textValue"));
+            assertNull(rs.getObject("intValue"), "intValue must be SQL NULL when textValue is set");
+            assertNull(rs.getObject("doubleValue"), "doubleValue must be SQL NULL when textValue is set");
+
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertNull(rs.getString("textValue"), "textValue must be SQL NULL when intValue is set");
+            assertEquals(42, rs.getInt("intValue"));
+            assertNull(rs.getObject("doubleValue"), "doubleValue must be SQL NULL when intValue is set");
+
+            assertTrue(rs.next());
+            assertEquals(3, rs.getInt("id"));
+            assertNull(rs.getString("textValue"), "textValue must be SQL NULL when doubleValue is set");
+            assertNull(rs.getObject("intValue"), "intValue must be SQL NULL when doubleValue is set");
+            assertEquals(3.5, rs.getDouble("doubleValue"), 1e-9);
+        }
+    }
+
     @Test
     void testNestedArrayProtobufSerializationWithSqlIngestion() throws Exception {
         setupProtobufTestResources(
@@ -276,6 +346,32 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 "}\n";
     }
 
+    private Supplier<String> oneofTableSchema() {
+        // The schema mirrors what Confluent's flattened `oneof` lands in -- one nullable column
+        // per branch. Discriminator columns (e.g., `value_0`) are intentionally omitted; the
+        // connector silently drops them as unknown columns.
+        return () -> "CREATE TABLE \"%s\" (" +
+                "\"id\" INTEGER NOT NULL, " +
+                "\"textValue\" TEXT, " +
+                "\"intValue\" INTEGER, " +
+                "\"doubleValue\" DOUBLE PRECISION " +
+                ");";
+    }
+
+    private Supplier<String> oneofProtobufSchema() {
+        return () ->
+                "syntax = \"proto3\";\n" +
+                "package com.firebolt.kafka.connect.integration.protobuf;\n" +
+                "message OneofRecord {\n" +
+                "  int32 id = 1;\n" +
+                "  oneof value {\n" +
+                "    string textValue = 2;\n" +
+                "    int32 intValue = 3;\n" +
+                "    double doubleValue = 4;\n" +
+                "  }\n" +
+                "}\n";
+    }
+
     private Supplier<String> nestedArrayTableSchema() {
         return () -> "CREATE TABLE \"%s\" (" +
                 "\"id\" INTEGER NOT NULL, " +
@@ -373,12 +469,16 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         // test deterministic we set both Timestamp fields explicitly here. The dedicated
         // testOptionalProtobufFieldsCanBeAbsentForNullableColumns test exercises the absent-field
         // path via `optional` markers.
+        // Note the non-zero seconds: OffsetDateTime.toString() omits the seconds field when both
+        // seconds and nanos are zero, which the connector forwards literally to Firebolt
+        // (e.g. "2010-06-15T08:30Z"). Firebolt rejects that shape with "Unable to cast TEXT to
+        // timestamptz", so seconds must be non-zero for the SQL ingestion path to round-trip.
         records.add(DynamicMessage.newBuilder(descriptor)
                 .setField(descriptor.findFieldByName("colInteger"), 3)
                 .setField(descriptor.findFieldByName("colNumeric"), "0")
                 .setField(descriptor.findFieldByName("colDate"), "2000-01-01")
-                .setField(descriptor.findFieldByName("colTimestamp"), toProtobufTimestamp(LocalDateTime.of(2010, 6, 15, 8, 30, 0, 0)))
-                .setField(descriptor.findFieldByName("colTimestamptz"), toProtobufTimestamp(OffsetDateTime.of(2010, 6, 15, 8, 30, 0, 0, ZoneOffset.UTC)))
+                .setField(descriptor.findFieldByName("colTimestamp"), toProtobufTimestamp(LocalDateTime.of(2010, 6, 15, 8, 30, 30, 0)))
+                .setField(descriptor.findFieldByName("colTimestamptz"), toProtobufTimestamp(OffsetDateTime.of(2010, 6, 15, 8, 30, 30, 0, ZoneOffset.UTC)))
                 .build());
 
         // Record 4: geographic sample data
@@ -544,15 +644,17 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 List<Double> expectedDoubles = (List<Double>) rec.getField(descriptor.findFieldByName("colArrayDoublePrecision"));
                 verifyDoubleArray("colArrayDoublePrecision", expectedDoubles, rs.getString("colArrayDoublePrecision"), idx);
 
-                // DynamicMessage.getField() on repeated message fields returns List<DynamicMessage>
-                @SuppressWarnings("unchecked")
-                List<DynamicMessage> expectedTstzArr =
-                        (List<DynamicMessage>) rec.getField(descriptor.findFieldByName("colArrayTimestamptz"));
+                // DynamicMessage.getField() on a repeated message field returns a List whose runtime
+                // element type is either com.google.protobuf.Timestamp (when the value was added
+                // via a compiled type) or DynamicMessage (when it was added via a generic builder).
+                // Use List<?> to avoid the synthetic checkcast that the JVM injects for typed
+                // method references over typed Streams (see extractInstant docstring).
+                List<?> expectedTstzArr =
+                        (List<?>) rec.getField(descriptor.findFieldByName("colArrayTimestamptz"));
                 verifyTimestamptzArray("colArrayTimestamptz", expectedTstzArr, rs.getString("colArrayTimestamptz"), idx);
 
-                @SuppressWarnings("unchecked")
-                List<DynamicMessage> expectedTsArr =
-                        (List<DynamicMessage>) rec.getField(descriptor.findFieldByName("colArrayTimestamp"));
+                List<?> expectedTsArr =
+                        (List<?>) rec.getField(descriptor.findFieldByName("colArrayTimestamp"));
                 verifyTimestampArray("colArrayTimestamp", expectedTsArr, rs.getString("colArrayTimestamp"), idx);
 
                 idx++;
@@ -635,7 +737,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     }
 
     private void verifyTimestamptzArray(
-            String field, List<DynamicMessage> expected, String actualStr, int idx) {
+            String field, List<?> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
             assertNullOrEmptyArray(field, actualStr, idx);
             return;
@@ -650,13 +752,13 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                     return OffsetDateTime.parse(normalized).toInstant();
                 }).collect(Collectors.toList());
         List<Instant> expectedInstants = expected.stream()
-                .map(this::extractInstant)
+                .map(o -> extractInstant((Object) o))
                 .collect(Collectors.toList());
         assertEquals(expectedInstants, actualInstants, field + " mismatch at " + idx);
     }
 
     private void verifyTimestampArray(
-            String field, List<DynamicMessage> expected, String actualStr, int idx) {
+            String field, List<?> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
             assertNullOrEmptyArray(field, actualStr, idx);
             return;
@@ -667,7 +769,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 .map(s -> s == null ? null : LocalDateTime.parse(s.replace(" ", "T")))
                 .collect(Collectors.toList());
         List<LocalDateTime> expectedLdts = expected.stream()
-                .map(dm -> LocalDateTime.ofInstant(extractInstant(dm), ZoneOffset.UTC))
+                .map(dm -> LocalDateTime.ofInstant(extractInstant((Object) dm), ZoneOffset.UTC))
                 .collect(Collectors.toList());
         assertEquals(expectedLdts.size(), actualLdts.size(), field + " size mismatch at " + idx);
         for (int i = 0; i < expectedLdts.size(); i++) {
