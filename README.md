@@ -85,6 +85,51 @@ curl -X POST http://localhost:8083/connectors \
   }'
 ```
 
+### Working with message formats
+
+The connector can ingest schemaless JSON and schema-based messages that Kafka Connect
+converters turn into Connect records. Schema-based formats supported by the connector
+include JSON Schema, Avro, and Protobuf (`proto`).
+
+Configure the Kafka Connect `value.converter` for the format on your topic:
+
+| Message format | Value converter | Notes |
+|----------------|-----------------|-------|
+| Schemaless JSON | `org.apache.kafka.connect.json.JsonConverter` with `value.converter.schemas.enable=false` | Message fields are read from the JSON object directly. |
+| JSON with schemas | `io.confluent.connect.json.JsonSchemaConverter` | Requires Schema Registry. |
+| Avro | `io.confluent.connect.avro.AvroConverter` | Requires Schema Registry. |
+| Protobuf / proto | `io.confluent.connect.protobuf.ProtobufConverter` | Requires Schema Registry. |
+
+For schema-based formats, set the Schema Registry URL on the converter:
+
+```properties
+value.converter.schema.registry.url=http://schema-registry:8081
+```
+
+Protobuf works through Confluent's `ProtobufConverter`; no connector-specific proto
+compilation is required. Define proto fields with names that match the Firebolt table
+columns, for example:
+
+```proto
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+message OrderEvent {
+  int32 id = 1;
+  string amount = 2; // Use strings for high-precision NUMERIC values.
+  google.protobuf.Timestamp created_at = 3;
+  repeated string tags = 4;
+  optional string comment = 5;
+}
+```
+
+Proto3 scalar fields without `optional` have default values rather than nulls. Use
+`optional` when field presence matters, and model required fields by making the
+corresponding Firebolt column `NOT NULL` and ensuring producers always set the field.
+Use `google.protobuf.Timestamp` for Firebolt `TIMESTAMP` and `TIMESTAMPTZ`; repeated
+fields map to Firebolt arrays.
+
 ### Configuration Properties
 
 | Property | Required | Default | Description |
