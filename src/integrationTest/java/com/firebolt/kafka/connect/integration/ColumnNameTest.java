@@ -33,8 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.CONNECTOR)
 public class ColumnNameTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("column_name_table");
-    private static final String TOPIC_NAME = generateTopicName("column-name-topic");
+    private String TABLE_NAME = generateTableName("column_name_table");
+    private String TOPIC_NAME = generateTopicName("column-name-topic");
 
     private Producer<String, String> producer;
 

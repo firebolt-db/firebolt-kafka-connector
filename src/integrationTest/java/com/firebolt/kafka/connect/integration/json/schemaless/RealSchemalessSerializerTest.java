@@ -32,8 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class RealSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
-    private static final String TABLE_NAME = generateTableName("real_test_table");
-    private static final String TOPIC_NAME = generateTopicName("real-test-topic");
+    private String TABLE_NAME = generateTableName("real_test_table");
+    private String TOPIC_NAME = generateTopicName("real-test-topic");
 
     private Producer<String, String> producer;
 

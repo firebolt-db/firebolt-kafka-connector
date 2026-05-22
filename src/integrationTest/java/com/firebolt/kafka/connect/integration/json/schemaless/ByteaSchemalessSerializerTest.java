@@ -35,8 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
-    private static final String TABLE_NAME = generateTableName("bytea_test_table");
-    private static final String TOPIC_NAME = generateTopicName("bytea-test-topic");
+    private String TABLE_NAME = generateTableName("bytea_test_table");
+    private String TOPIC_NAME = generateTopicName("bytea-test-topic");
 
     private Producer<String, String> producer;
 

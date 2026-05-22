@@ -26,9 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.STRESS)
 public class LargePayloadTest extends SchemaBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("large_payload_test_table");
-    private static final String TOPIC_NAME = generateTopicName("large-record-test-topic");
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
+    private String TABLE_NAME = generateTableName("large_payload_test_table");
+    private String TOPIC_NAME = generateTopicName("large-record-test-topic");
+    private String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, SimpleRecord> producer;
 

@@ -40,8 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TOPIC_NAME = generateTopicName("timestamp-test-topic");
-    private static final String TABLE_NAME = generateTableName("timestamp_test_table");
+    private String TOPIC_NAME = generateTopicName("timestamp-test-topic");
+    private String TABLE_NAME = generateTableName("timestamp_test_table");
     private Producer<String, String> producer;
 
     @BeforeEach

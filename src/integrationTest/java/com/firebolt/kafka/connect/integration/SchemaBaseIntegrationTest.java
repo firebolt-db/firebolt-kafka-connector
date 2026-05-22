@@ -202,11 +202,13 @@ public class SchemaBaseIntegrationTest extends BaseIntegrationTest {
     }
 
     protected static String generateTableName(String name) {
-        return name + "_schema";
+        String uid = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return name + "_schema_" + uid;
     }
 
     protected static String generateTopicName(String name) {
-        return name + "-schema";
+        String uid = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return name + "-schema-" + uid;
     }
 
     /**

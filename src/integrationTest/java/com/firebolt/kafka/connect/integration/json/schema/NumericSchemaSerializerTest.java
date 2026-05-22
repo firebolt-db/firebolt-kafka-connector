@@ -33,9 +33,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
     
-    private static final String TABLE_NAME = generateTableName("numeric_test_table");
-    private static final String TOPIC_NAME = generateTopicName("numeric-test-topic");
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
+    private String TABLE_NAME = generateTableName("numeric_test_table");
+    private String TOPIC_NAME = generateTopicName("numeric-test-topic");
+    private String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, NumericTestRecord> producer;
 

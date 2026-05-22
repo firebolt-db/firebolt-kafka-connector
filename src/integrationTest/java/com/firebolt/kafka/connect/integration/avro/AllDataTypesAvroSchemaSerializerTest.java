@@ -41,9 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTest {
 
-    private static final String ALL_DATA_TYPES_TABLE_NAME = "all_data_types_test_table_avro";
-    private static final String ALL_DATA_TYPES_TOPIC_NAME = "all-data-types-test-topic-avro";
-    private static final String ALL_DATA_TYPES_SCHEMA_SUBJECT = ALL_DATA_TYPES_TOPIC_NAME + "-value";
+    private String ALL_DATA_TYPES_TABLE_NAME = generateTableName("all_data_types_test_table_avro");
+    private String ALL_DATA_TYPES_TOPIC_NAME = generateTopicName("all-data-types-test-topic-avro");
+    private String ALL_DATA_TYPES_SCHEMA_SUBJECT = ALL_DATA_TYPES_TOPIC_NAME + "-value";
     private static final int DECIMAL_SCALE = 9;
 
     @BeforeEach

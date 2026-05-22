@@ -34,11 +34,13 @@ public class SchemalessBaseIntegrationTest extends BaseIntegrationTest {
     }
 
     protected static String generateTableName(String name) {
-        return name + "_schemaless";
+        String uid = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return name + "_schemaless_" + uid;
     }
 
     protected static String generateTopicName(String name) {
-        return name + "-schemaless";
+        String uid = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return name + "-schemaless-" + uid;
     }
 
     /**

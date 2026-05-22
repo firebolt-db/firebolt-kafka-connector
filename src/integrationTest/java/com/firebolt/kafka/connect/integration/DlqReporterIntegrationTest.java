@@ -29,9 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.CONNECTOR)
 public class DlqReporterIntegrationTest extends SchemaBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("dlq_it_table");
-    private static final String TOPIC_NAME = generateTopicName("dlq-it-topic");
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
+    private String TABLE_NAME = generateTableName("dlq_it_table");
+    private String TOPIC_NAME = generateTopicName("dlq-it-topic");
+    private String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private String dlqTopicName;
     private Producer<String, SimpleStringRecord> producer;

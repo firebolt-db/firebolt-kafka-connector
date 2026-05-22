@@ -32,9 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class AvroBigIntSerializerTest extends AvroBaseIntegrationTest {
 
-    private static final String TABLE_NAME = "bigint_test_table_avro";
-    private static final String TOPIC_NAME = "bigint-test-topic-avro";
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
+    private String TABLE_NAME = generateTableName("bigint_test_table_avro");
+    private String TOPIC_NAME = generateTopicName("bigint-test-topic-avro");
+    private String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {

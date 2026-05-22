@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class JsonColumnValueSerializerTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("json_as_text_column");
-    private static final String TOPIC_NAME = generateTopicName("json-as-text-column");
+    private String TABLE_NAME = generateTableName("json_as_text_column");
+    private String TOPIC_NAME = generateTopicName("json-as-text-column");
 
     private Producer<String, String> producer;
 
