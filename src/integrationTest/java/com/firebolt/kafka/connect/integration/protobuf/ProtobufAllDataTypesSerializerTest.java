@@ -429,9 +429,14 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     // Array verification helpers
     // ---------------------------------------------------------------------------
 
+    /**
+     * Proto3 empty repeated fields default to [] and are stored as {} (empty array) in Firebolt,
+     * not NULL. Accept both null and empty-array when expected is empty.
+     */
     private void verifyStringArray(String field, List<String> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertNull(actualStr, field + " should be null at " + idx);
+            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
+                    field + " should be null or empty at " + idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -441,7 +446,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyIntArray(String field, List<Integer> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertNull(actualStr, field + " should be null at " + idx);
+            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
+                    field + " should be null or empty at " + idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -453,7 +459,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyFloatArray(String field, List<Float> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertNull(actualStr, field + " should be null at " + idx);
+            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
+                    field + " should be null or empty at " + idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -465,7 +472,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyDoubleArray(String field, List<Double> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertNull(actualStr, field + " should be null at " + idx);
+            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
+                    field + " should be null or empty at " + idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -477,7 +485,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
 
     private void verifyDecimalStringArray(String field, List<String> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertNull(actualStr, field + " should be null at " + idx);
+            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
+                    field + " should be null or empty at " + idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -497,7 +506,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     private void verifyTimestamptzArray(
             String field, List<com.google.protobuf.Timestamp> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertNull(actualStr, field + " should be null at " + idx);
+            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
+                    field + " should be null or empty at " + idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -518,7 +528,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     private void verifyTimestampArray(
             String field, List<com.google.protobuf.Timestamp> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
-            assertNull(actualStr, field + " should be null at " + idx);
+            assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
+                    field + " should be null or empty at " + idx);
             return;
         }
         assertNotNull(actualStr, field + " should not be null at " + idx);
@@ -546,10 +557,6 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
             }
         }
     }
-
-    // ---------------------------------------------------------------------------
-    // Protobuf timestamp helpers
-    // ---------------------------------------------------------------------------
 
     /** Builds a google.protobuf.Timestamp from a LocalDateTime (treated as UTC). */
     private com.google.protobuf.Timestamp toProtobufTimestamp(LocalDateTime ldt) {
