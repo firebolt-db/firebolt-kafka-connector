@@ -117,12 +117,20 @@ import "google/protobuf/timestamp.proto";
 
 message OrderEvent {
   int32 id = 1;
-  string amount = 2; // Use strings for high-precision NUMERIC values.
+  string amount = 2;
   google.protobuf.Timestamp created_at = 3;
   repeated string tags = 4;
   optional string comment = 5;
 }
 ```
+
+`amount` is a string here because `.proto` has no built-in arbitrary-precision
+decimal scalar. For Firebolt `NUMERIC` columns, this connector accepts a decimal
+literal string such as `"12345678901234567890.123456789"` and sends it to
+Firebolt without first converting it to `double` or `float`, which would lose
+precision. If your values fit safely in `int32`, `int64`, `float`, or `double`,
+those proto scalar types can also be mapped to `NUMERIC`, but string is the
+recommended representation for high-precision decimals.
 
 Proto3 scalar fields without `optional` have default values rather than nulls. Use
 `optional` when field presence matters, and model required fields by making the
