@@ -356,26 +356,23 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                     assertNull(actualDate, "colDate should be null at " + idx);
                 }
 
-                // TIMESTAMP: proto Timestamp → ProtobufConverter → Connect Timestamp (millis) → SQL Timestamp
-                com.google.protobuf.Timestamp expectedTs =
-                        (com.google.protobuf.Timestamp) rec.getField(descriptor.findFieldByName("colTimestamp"));
+                // TIMESTAMP: DynamicMessage.getField() on a message-type field returns DynamicMessage,
+                // not com.google.protobuf.Timestamp — use extractInstant() to decode seconds/nanos.
+                Instant expectedTsInstant = extractInstant(rec.getField(descriptor.findFieldByName("colTimestamp")));
                 java.sql.Timestamp actualTs = rs.getTimestamp("colTimestamp");
-                if (expectedTs != null && (expectedTs.getSeconds() != 0 || expectedTs.getNanos() != 0)) {
+                if (!Instant.EPOCH.equals(expectedTsInstant)) {
                     assertNotNull(actualTs, "colTimestamp should not be null at " + idx);
-                    long expectedMillis = expectedTs.getSeconds() * 1000L + expectedTs.getNanos() / 1_000_000L;
-                    assertEquals(expectedMillis, actualTs.getTime(), "colTimestamp mismatch at " + idx);
+                    assertEquals(expectedTsInstant.toEpochMilli(), actualTs.getTime(), "colTimestamp mismatch at " + idx);
                 } else {
                     assertNull(actualTs, "colTimestamp should be null at " + idx);
                 }
 
-                // TIMESTAMPTZ: same approach, compare as Instant
-                com.google.protobuf.Timestamp expectedTstz =
-                        (com.google.protobuf.Timestamp) rec.getField(descriptor.findFieldByName("colTimestamptz"));
+                // TIMESTAMPTZ: same approach
+                Instant expectedTstzInstant = extractInstant(rec.getField(descriptor.findFieldByName("colTimestamptz")));
                 java.sql.Timestamp actualTstz = rs.getTimestamp("colTimestamptz");
-                if (expectedTstz != null && (expectedTstz.getSeconds() != 0 || expectedTstz.getNanos() != 0)) {
+                if (!Instant.EPOCH.equals(expectedTstzInstant)) {
                     assertNotNull(actualTstz, "colTimestamptz should not be null at " + idx);
-                    Instant expectedInstant = Instant.ofEpochSecond(expectedTstz.getSeconds(), expectedTstz.getNanos());
-                    assertEquals(expectedInstant, actualTstz.toInstant(), "colTimestamptz mismatch at " + idx);
+                    assertEquals(expectedTstzInstant, actualTstz.toInstant(), "colTimestamptz mismatch at " + idx);
                 } else {
                     assertNull(actualTstz, "colTimestamptz should be null at " + idx);
                 }
@@ -411,12 +408,15 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 List<Double> expectedDoubles = (List<Double>) rec.getField(descriptor.findFieldByName("colArrayDoublePrecision"));
                 verifyDoubleArray("colArrayDoublePrecision", expectedDoubles, rs.getString("colArrayDoublePrecision"), idx);
 
-                List<com.google.protobuf.Timestamp> expectedTstzArr =
-                        (List<com.google.protobuf.Timestamp>) rec.getField(descriptor.findFieldByName("colArrayTimestamptz"));
+                // DynamicMessage.getField() on repeated message fields returns List<DynamicMessage>
+                @SuppressWarnings("unchecked")
+                List<DynamicMessage> expectedTstzArr =
+                        (List<DynamicMessage>) rec.getField(descriptor.findFieldByName("colArrayTimestamptz"));
                 verifyTimestamptzArray("colArrayTimestamptz", expectedTstzArr, rs.getString("colArrayTimestamptz"), idx);
 
-                List<com.google.protobuf.Timestamp> expectedTsArr =
-                        (List<com.google.protobuf.Timestamp>) rec.getField(descriptor.findFieldByName("colArrayTimestamp"));
+                @SuppressWarnings("unchecked")
+                List<DynamicMessage> expectedTsArr =
+                        (List<DynamicMessage>) rec.getField(descriptor.findFieldByName("colArrayTimestamp"));
                 verifyTimestampArray("colArrayTimestamp", expectedTsArr, rs.getString("colArrayTimestamp"), idx);
 
                 idx++;
@@ -504,7 +504,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     }
 
     private void verifyTimestamptzArray(
-            String field, List<com.google.protobuf.Timestamp> expected, String actualStr, int idx) {
+            String field, List<DynamicMessage> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
             assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
                     field + " should be null or empty at " + idx);
@@ -520,13 +520,13 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                     return OffsetDateTime.parse(normalized).toInstant();
                 }).collect(Collectors.toList());
         List<Instant> expectedInstants = expected.stream()
-                .map(ts -> Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos()))
+                .map(this::extractInstant)
                 .collect(Collectors.toList());
         assertEquals(expectedInstants, actualInstants, field + " mismatch at " + idx);
     }
 
     private void verifyTimestampArray(
-            String field, List<com.google.protobuf.Timestamp> expected, String actualStr, int idx) {
+            String field, List<DynamicMessage> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
             assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
                     field + " should be null or empty at " + idx);
@@ -538,8 +538,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 .map(s -> s == null ? null : LocalDateTime.parse(s.replace(" ", "T")))
                 .collect(Collectors.toList());
         List<LocalDateTime> expectedLdts = expected.stream()
-                .map(ts -> LocalDateTime.ofInstant(
-                        Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos()), ZoneOffset.UTC))
+                .map(dm -> LocalDateTime.ofInstant(extractInstant(dm), ZoneOffset.UTC))
                 .collect(Collectors.toList());
         assertEquals(expectedLdts.size(), actualLdts.size(), field + " size mismatch at " + idx);
         for (int i = 0; i < expectedLdts.size(); i++) {
@@ -556,6 +555,23 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 assertEquals(exp.getSecond(), act.getSecond(), field + " second mismatch at " + idx);
             }
         }
+    }
+
+    /**
+     * Extracts an Instant from a google.protobuf.Timestamp field value returned by DynamicMessage.
+     * DynamicMessage.getField() on a message-type field always returns DynamicMessage, never the
+     * compiled com.google.protobuf.Timestamp — even when the field was set with a compiled Timestamp.
+     */
+    private Instant extractInstant(Object timestampMsg) {
+        if (timestampMsg instanceof DynamicMessage) {
+            DynamicMessage dm = (DynamicMessage) timestampMsg;
+            long seconds = (long) dm.getField(dm.getDescriptorForType().findFieldByName("seconds"));
+            int nanos = (int) dm.getField(dm.getDescriptorForType().findFieldByName("nanos"));
+            return Instant.ofEpochSecond(seconds, nanos);
+        }
+        // Fallback for compiled Timestamp (should not occur with DynamicMessage, but kept for safety)
+        com.google.protobuf.Timestamp ts = (com.google.protobuf.Timestamp) timestampMsg;
+        return Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos());
     }
 
     /** Builds a google.protobuf.Timestamp from a LocalDateTime (treated as UTC). */
