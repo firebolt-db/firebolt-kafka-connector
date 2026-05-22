@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "TestRecord",
+  "namespace": "com.firebolt.kafka.connect.e2e",
+  "fields": [
+    {"name": "id", "type": "long"},
+    {"name": "name", "type": "string"},
+    {"name": "value", "type": "double"},
+    {"name": "timestamp", "type": "string"}
+  ]
+}
