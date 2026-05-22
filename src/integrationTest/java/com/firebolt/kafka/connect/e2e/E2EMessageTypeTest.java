@@ -27,11 +27,18 @@ public class E2EMessageTypeTest {
 
     /**
      * CI-default matrix: JSON only (4 cells).
+     * For fast local iteration, pin to one cell with
+     * {@code -De2e.singleCell=at_least_once-sql} (delivery-ingestion).
      */
     static Stream<Arguments> ciConfigMatrix() {
+        String singleCell = System.getProperty("e2e.singleCell");
         List<Arguments> configs = new ArrayList<>();
         for (DeliveryMode deliveryMode : DeliveryMode.values()) {
             for (IngestionType ingestionType : IngestionType.values()) {
+                if (singleCell != null
+                        && !singleCell.equals(deliveryMode.getValue() + "-" + ingestionType.getValue())) {
+                    continue;
+                }
                 E2ETestConfig config = E2ETestConfig.builder()
                         .messageType(E2EMessageType.JSON)
                         .deliveryMode(deliveryMode)

@@ -24,13 +24,24 @@ public class FireboltValidator {
     }
 
     /**
-     * Asserts the table contains exactly the expected number of rows.
+     * Asserts the table row count matches the produced count under the
+     * given delivery semantics:
+     *  - EXACTLY_ONCE: count == produced (no duplicates).
+     *  - AT_LEAST_ONCE: count >= produced (duplicates allowed, no data loss).
      */
-    public void validateRecordCount(String tableName, int expectedCount) throws SQLException {
+    public void validateRecordCount(String tableName, int produced, DeliveryMode deliveryMode)
+            throws SQLException {
         int actual = fireboltClient.countRows(tableName);
-        log.info("Table '{}' row count: expected={}, actual={}", tableName, expectedCount, actual);
-        assertEquals(expectedCount, actual,
-                "Row count mismatch in table '" + tableName + "'");
+        log.info("Table '{}' row count: produced={}, actual={}, mode={}",
+                tableName, produced, actual, deliveryMode);
+        if (deliveryMode == DeliveryMode.EXACTLY_ONCE) {
+            assertEquals(produced, actual,
+                    "Exactly-once row count mismatch in table '" + tableName + "'");
+        } else {
+            assertTrue(actual >= produced,
+                    "At-least-once row count below produced in table '" + tableName
+                            + "': produced=" + produced + ", actual=" + actual);
+        }
     }
 
     /**

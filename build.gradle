@@ -328,11 +328,13 @@ tasks.named('integrationTest', Test) {
     // Pass all system properties to the test JVM
     systemProperties System.properties
 
-    // Stream test output so CI and local runs show live progress
     testLogging {
-        events 'started', 'passed', 'failed', 'skipped', 'standard_out', 'standard_error'
-        showStandardStreams = true
+        events 'started', 'passed', 'failed', 'skipped'
+        showStandardStreams = false
         exceptionFormat = 'full'
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
     }
     
     // Test result summary

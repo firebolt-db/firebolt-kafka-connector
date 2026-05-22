@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
     <Appenders>
+        <!-- Console: WARN+ only so CI output stays clean. Full detail is in the log file artifact. -->
         <Console name="Console" target="SYSTEM_OUT">
+            <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY"/>
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
-        
+
+        <!-- File: all INFO+ for artifact-based debugging -->
         <File name="IntegrationTestLog" fileName="logs/integrationTest.log">
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </File>
@@ -22,7 +25,13 @@
             <AppenderRef ref="Console"/>
             <AppenderRef ref="IntegrationTestLog"/>
         </Logger>
-        
+
+        <!-- Firebolt JDBC driver: silence per-statement INFO; keep WARN/ERROR -->
+        <Logger name="com.firebolt.jdbc" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="IntegrationTestLog"/>
+        </Logger>
+
         <!-- Kafka client loggers -->
         <Logger name="org.apache.kafka" level="WARN" additivity="false">
             <AppenderRef ref="Console"/>

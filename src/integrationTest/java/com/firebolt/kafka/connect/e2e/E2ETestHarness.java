@@ -69,7 +69,7 @@ public class E2ETestHarness {
         String topic = config.resolvedTopicName();
         String table = config.resolvedTableName();
 
-        log.info("Setting up E2E test: {}", config.label());
+        log.warn("[E2E] Setup: {} | topic={}", config.label(), topic);
 
         // 1. Create Kafka topic
         createKafkaTopic(topic);
@@ -86,7 +86,7 @@ public class E2ETestHarness {
         this.producer = MessageProducerFactory.create(
                 config.getMessageType(), bootstrapServers, schemaRegistryUrl);
 
-        log.info("E2E setup complete: topic={}, table={}, connector={}",
+        log.warn("[E2E] Setup complete: topic={}, table={}, connector={}",
                 topic, table, connectorName(config));
     }
 
@@ -151,15 +151,17 @@ public class E2ETestHarness {
         totalProduced = produced;
 
         double totalSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
-        log.info("[PRODUCE] Done: {} records to '{}' in {}s ({} rec/s)",
+        log.warn("[PRODUCE] Done: {} records to '{}' in {}s ({} rec/s)",
                 produced, topic, String.format("%.1f", totalSec),
                 (int) (produced / totalSec));
     }
 
     /**
      * Stalls if the producer has run too far ahead of Firebolt ingestion.
+     * Skips the countRows query entirely when produced is safely below the limit.
      */
     private void waitForBackpressure(String table, int produced) {
+        if (produced <= MAX_PRODUCER_LEAD_ROWS) return;
         try {
             int ingested = fireboltClient.countRows(table);
             int lead = produced - ingested;
@@ -189,7 +191,7 @@ public class E2ETestHarness {
         String table = config.resolvedTableName();
         int expected = totalProduced;
         long startNanos = System.nanoTime();
-        log.info("[INGEST] Waiting for {} rows in table '{}' (timeout={})...",
+        log.warn("[INGEST] Waiting for {} rows in table '{}' (timeout={})...",
                 expected, table, config.getIngestionTimeout());
 
         await()
@@ -211,15 +213,18 @@ public class E2ETestHarness {
                 });
 
         double totalSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
-        log.info("[INGEST] Done: {} rows landed in {}s",
+        log.warn("[INGEST] Done: {} rows landed in {}s",
                 expected, String.format("%.1f", totalSec));
     }
 
     /**
      * Validates that all produced records landed in Firebolt.
+     * Enforces exact equality for exactly-once and "no data loss"
+     * (count >= produced) for at-least-once.
      */
     public void validateRecordCount() throws SQLException {
-        validator.validateRecordCount(config.resolvedTableName(), totalProduced);
+        validator.validateRecordCount(
+                config.resolvedTableName(), totalProduced, config.getDeliveryMode());
     }
 
     /**
@@ -241,7 +246,7 @@ public class E2ETestHarness {
         String topic = config.resolvedTopicName();
         String table = config.resolvedTableName();
 
-        log.info("Cleaning up E2E test: connector={}, topic={}, table={}",
+        log.warn("[E2E] Cleanup: connector={}, topic={}, table={}",
                 connName, topic, table);
 
         // Close producer
@@ -281,7 +286,7 @@ public class E2ETestHarness {
             }
         }
 
-        log.info("E2E cleanup complete");
+        log.warn("[E2E] Cleanup complete");
     }
 
     // --- Infrastructure helpers ---
@@ -315,6 +320,28 @@ public class E2ETestHarness {
                 tableName);
         fireboltClient.createTable(ddl);
         log.info("Created Firebolt table '{}'", tableName);
+        awaitTableVisible(tableName);
+    }
+
+    /**
+     * Polls until the freshly-created table is visible via SELECT.
+     * Firebolt-core surfaces new tables to JDBC metadata asynchronously,
+     * and the connector's table-existence validator races against that
+     * propagation; this guard prevents flaky deploys.
+     */
+    private void awaitTableVisible(String tableName) {
+        await()
+                .atMost(Duration.ofSeconds(60))
+                .pollInterval(Duration.ofSeconds(1))
+                .ignoreExceptions()
+                .until(() -> {
+                    try {
+                        fireboltClient.countRows(tableName);
+                        return true;
+                    } catch (SQLException e) {
+                        return false;
+                    }
+                });
     }
 
     private void deployConnector(E2ETestConfig config) throws IOException {
@@ -409,8 +436,6 @@ public class E2ETestHarness {
     }
 
     private static String connectorName(E2ETestConfig config) {
-        return "e2e-" + config.getMessageType().getValue()
-                + "-" + config.getDeliveryMode().getValue()
-                + "-" + config.getIngestionType().getValue();
+        return config.resolvedTopicName();
     }
 }
