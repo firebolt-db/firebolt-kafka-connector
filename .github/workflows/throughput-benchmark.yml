@@ -53,6 +53,12 @@ jobs:
     - name: Make gradlew executable
       run: chmod +x ./gradlew
 
+    - name: Build project
+      run: ./gradlew build --no-daemon
+
+    - name: Deploy to Kafka Connect
+      run: ./gradlew deployToKafkaConnect --no-daemon
+
     - name: Setup firebolt core permissions
       run: |
         WHO="$(docker run --rm --entrypoint whoami ${{ vars.FIREBOLT_CORE_IMAGE }})"
@@ -68,12 +74,6 @@ jobs:
         sleep 30
         timeout 60 bash -c 'until curl -sf http://localhost:8083/connectors; do sleep 2; done'
         echo "Kafka Connect is ready!"
-
-    - name: Build project
-      run: ./gradlew build --no-daemon
-
-    - name: Deploy to Kafka Connect
-      run: ./gradlew deployToKafkaConnect --no-daemon
 
     - name: Run benchmark (30s produce window, JSON / at_least_once / sql)
       run: |
