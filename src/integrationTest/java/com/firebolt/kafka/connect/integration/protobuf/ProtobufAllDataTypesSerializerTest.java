@@ -134,6 +134,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     //   BOOLEAN  -> bool   (Connect BOOLEAN)
     //   BYTEA    -> bytes  (Connect BYTES)
     //   ARRAY    -> repeated fields (Connect ARRAY)
+    //   TODO: Add nested array coverage when schema array converters can infer
+    //         nested Firebolt element types; proto models this via wrapper messages.
     // ---------------------------------------------------------------------------
 
     private Supplier<String> protobufSchema() {
@@ -408,12 +410,15 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
                 List<Double> expectedDoubles = (List<Double>) rec.getField(descriptor.findFieldByName("colArrayDoublePrecision"));
                 verifyDoubleArray("colArrayDoublePrecision", expectedDoubles, rs.getString("colArrayDoublePrecision"), idx);
 
-                List<?> expectedTstzArr =
-                        (List<?>) rec.getField(descriptor.findFieldByName("colArrayTimestamptz"));
+                // DynamicMessage.getField() on repeated message fields returns List<DynamicMessage>
+                @SuppressWarnings("unchecked")
+                List<DynamicMessage> expectedTstzArr =
+                        (List<DynamicMessage>) rec.getField(descriptor.findFieldByName("colArrayTimestamptz"));
                 verifyTimestamptzArray("colArrayTimestamptz", expectedTstzArr, rs.getString("colArrayTimestamptz"), idx);
 
-                List<?> expectedTsArr =
-                        (List<?>) rec.getField(descriptor.findFieldByName("colArrayTimestamp"));
+                @SuppressWarnings("unchecked")
+                List<DynamicMessage> expectedTsArr =
+                        (List<DynamicMessage>) rec.getField(descriptor.findFieldByName("colArrayTimestamp"));
                 verifyTimestampArray("colArrayTimestamp", expectedTsArr, rs.getString("colArrayTimestamp"), idx);
 
                 idx++;
@@ -501,7 +506,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     }
 
     private void verifyTimestamptzArray(
-            String field, List<?> expected, String actualStr, int idx) {
+            String field, List<DynamicMessage> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
             assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
                     field + " should be null or empty at " + idx);
@@ -523,7 +528,7 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
     }
 
     private void verifyTimestampArray(
-            String field, List<?> expected, String actualStr, int idx) {
+            String field, List<DynamicMessage> expected, String actualStr, int idx) {
         if (expected == null || expected.isEmpty()) {
             assertTrue(actualStr == null || parsePostgreSQLArray(actualStr).isEmpty(),
                     field + " should be null or empty at " + idx);
@@ -559,8 +564,8 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
      * DynamicMessage.getField().
      *
      * The runtime type depends on whether the field was explicitly set:
-     *   SET   -> com.google.protobuf.Timestamp  (compiled well-known type)
-     *   UNSET -> com.google.protobuf.DynamicMessage  (proto3 default empty message)
+     *   SET   → com.google.protobuf.Timestamp  (compiled well-known type)
+     *   UNSET → com.google.protobuf.DynamicMessage  (proto3 default empty message)
      *
      * Both cases must be handled; assuming either type exclusively causes a ClassCastException
      * on the other path.
@@ -569,9 +574,6 @@ public class ProtobufAllDataTypesSerializerTest extends ProtobufBaseIntegrationT
         if (timestampMsg instanceof com.google.protobuf.Timestamp) {
             com.google.protobuf.Timestamp ts = (com.google.protobuf.Timestamp) timestampMsg;
             return Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos());
-        }
-        if (timestampMsg == null) {
-            return Instant.EPOCH;
         }
         // UNSET proto3 Timestamp field: DynamicMessage with seconds=0, nanos=0 (epoch)
         DynamicMessage dm = (DynamicMessage) timestampMsg;
