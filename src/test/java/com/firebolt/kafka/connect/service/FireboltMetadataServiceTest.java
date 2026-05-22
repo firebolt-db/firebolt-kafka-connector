@@ -313,6 +313,25 @@ class FireboltMetadataServiceTest {
         // Confirm the write actually executed.
         verify(updatePs).addBatch();
         verify(updatePs).executeBatch();
+
+        // Round-trip: read back via getLastOffsets to confirm the write landed correctly.
+        // The SELECT must also use parameterized binding (topic as a bound parameter, not interpolated).
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet selectRs = mock(ResultSet.class);
+        when(mockConnection.prepareStatement(startsWith(
+                "SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in")))
+                .thenReturn(selectPs);
+        when(selectPs.executeQuery()).thenReturn(selectRs);
+        when(selectRs.next()).thenReturn(true, false);
+        when(selectRs.getInt("topic_partition")).thenReturn(0);
+        when(selectRs.getLong("partition_offset")).thenReturn(1L);
+
+        Map<Integer, Long> recovered = metadataService.getLastOffsets(maliciousTopic, Set.of(0));
+
+        // The parameterized SELECT returns the persisted offset — the hostile topic name did not
+        // escape the parameter and corrupt the query.
+        assertEquals(1L, recovered.get(0), "Offset must survive the round-trip with a malicious topic name");
+        verify(selectPs).setString(1, maliciousTopic);
     }
 
     @Test
@@ -334,6 +353,24 @@ class FireboltMetadataServiceTest {
         verify(updatePs).setInt(3, 1);
         verify(updatePs).addBatch();
         verify(updatePs).executeBatch();
+
+        // Round-trip: read back via getLastOffsets to confirm the write landed correctly.
+        // Embedded quotes in the topic name must be harmless when the SELECT also uses parameterization.
+        PreparedStatement selectPs = mock(PreparedStatement.class);
+        ResultSet selectRs = mock(ResultSet.class);
+        when(mockConnection.prepareStatement(startsWith(
+                "SELECT topic, topic_partition, partition_offset FROM \"KafkaSinkConnectorMetadata\" WHERE topic = ? AND topic_partition in")))
+                .thenReturn(selectPs);
+        when(selectPs.executeQuery()).thenReturn(selectRs);
+        when(selectRs.next()).thenReturn(true, false);
+        when(selectRs.getInt("topic_partition")).thenReturn(1);
+        when(selectRs.getLong("partition_offset")).thenReturn(5L);
+
+        Map<Integer, Long> recovered = metadataService.getLastOffsets(quotedTopic, Set.of(1));
+
+        // Embedded quotes in the topic name did not corrupt the SELECT query.
+        assertEquals(5L, recovered.get(1), "Offset must survive the round-trip with a quoted topic name");
+        verify(selectPs).setString(1, quotedTopic);
     }
 }
 
