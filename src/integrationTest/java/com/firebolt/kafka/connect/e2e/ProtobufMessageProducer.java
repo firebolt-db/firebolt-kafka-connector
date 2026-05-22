@@ -3,7 +3,6 @@ package com.firebolt.kafka.connect.e2e;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DescriptorProtos;
-import com.google.protobuf.Timestamp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -68,11 +67,6 @@ public class ProtobufMessageProducer implements MessageProducer {
     }
 
     private DynamicMessage toProtobuf(E2ETestRecord record) {
-        Timestamp ts = Timestamp.newBuilder()
-                .setSeconds(record.getTimestamp().getEpochSecond())
-                .setNanos(record.getTimestamp().getNano())
-                .build();
-
         return DynamicMessage.newBuilder(messageDescriptor)
                 .setField(messageDescriptor.findFieldByName("id"), record.getId())
                 .setField(messageDescriptor.findFieldByName("name"), record.getName())

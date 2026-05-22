@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.e2e;
 import com.firebolt.kafka.connect.clients.FireboltClient;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import lombok.extern.slf4j.Slf4j;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,13 +57,19 @@ public class FireboltValidator {
         String expectedSql = String.format(
                 "SELECT checksum(x) FROM generate_series(1, %d) r(x)", n);
 
-        ResultSet actualRs = fireboltClient.executeQuery(actualSql);
-        assertTrue(actualRs.next(), "No checksum result from table");
-        long actualChecksum = actualRs.getLong(1);
+        long actualChecksum;
+        try (ResultSet actualRs = fireboltClient.executeQuery(actualSql);
+             Statement actualStmt = actualRs.getStatement()) {
+            assertTrue(actualRs.next(), "No checksum result from table");
+            actualChecksum = actualRs.getLong(1);
+        }
 
-        ResultSet expectedRs = fireboltClient.executeQuery(expectedSql);
-        assertTrue(expectedRs.next(), "No checksum result from generate_series");
-        long expectedChecksum = expectedRs.getLong(1);
+        long expectedChecksum;
+        try (ResultSet expectedRs = fireboltClient.executeQuery(expectedSql);
+             Statement expectedStmt = expectedRs.getStatement()) {
+            assertTrue(expectedRs.next(), "No checksum result from generate_series");
+            expectedChecksum = expectedRs.getLong(1);
+        }
 
         log.info("Checksum validation: table={}, column={}, n={}, expected={}, actual={}",
                 tableName, column, n, expectedChecksum, actualChecksum);
@@ -76,10 +83,12 @@ public class FireboltValidator {
     private void validateRecordExists(String tableName, long id) throws SQLException {
         String sql = String.format(
                 "SELECT \"id\", \"name\" FROM \"%s\" WHERE \"id\" = %d", tableName, id);
-        ResultSet rs = fireboltClient.executeQuery(sql);
-        assertTrue(rs.next(), "Record id=" + id + " not found in table '" + tableName + "'");
-        String name = rs.getString("name");
-        assertTrue(name.startsWith("record-" + id),
-                "Record id=" + id + " has unexpected name: " + name);
+        try (ResultSet rs = fireboltClient.executeQuery(sql);
+             Statement stmt = rs.getStatement()) {
+            assertTrue(rs.next(), "Record id=" + id + " not found in table '" + tableName + "'");
+            String name = rs.getString("name");
+            assertTrue(name.startsWith("record-" + id),
+                    "Record id=" + id + " has unexpected name: " + name);
+        }
     }
 }
