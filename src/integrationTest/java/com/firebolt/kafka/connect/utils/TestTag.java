@@ -16,4 +16,6 @@ public class TestTag {
     public static final String STRESS = "stress";
 
     public static final String CUSTOMER = "customer";
+
+    public static final String E2E = "e2e";
 }

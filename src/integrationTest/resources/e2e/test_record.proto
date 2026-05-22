@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package com.firebolt.kafka.connect.e2e;
+
+message TestRecord {
+  int64  id        = 1;
+  string name      = 2;
+  double value     = 3;
+  string timestamp = 4;
+}
