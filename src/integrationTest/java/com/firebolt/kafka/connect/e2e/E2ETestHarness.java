@@ -231,8 +231,12 @@ public class E2ETestHarness {
 
     /**
      * Tears down the test: removes connector, drops topic/table, closes clients.
+     * Safe to call even when setup() was never invoked (e.g. skipped tests).
      */
     public void cleanup() {
+        if (config == null) {
+            return;
+        }
         String connName = connectorName(config);
         String topic = config.resolvedTopicName();
         String table = config.resolvedTableName();

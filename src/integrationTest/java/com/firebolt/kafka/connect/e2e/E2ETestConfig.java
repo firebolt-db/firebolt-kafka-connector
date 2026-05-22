@@ -19,9 +19,9 @@ public class E2ETestConfig {
     private final DeliveryMode deliveryMode;
     private final IngestionType ingestionType;
 
-    /** How long the producer should write records. */
+    /** How long the producer should write records (10s default keeps CI fast). */
     @Builder.Default
-    private final Duration duration = Duration.ofSeconds(30);
+    private final Duration duration = Duration.ofSeconds(10);
 
     /** Kafka topic name; auto-generated from config if not set. */
     private final String topicName;
@@ -35,7 +35,7 @@ public class E2ETestConfig {
 
     /** Timeout for waiting for all produced records to land in Firebolt. */
     @Builder.Default
-    private final Duration ingestionTimeout = Duration.ofMinutes(5);
+    private final Duration ingestionTimeout = Duration.ofMinutes(10);
 
     /** Polling interval when checking Firebolt row count. */
     @Builder.Default

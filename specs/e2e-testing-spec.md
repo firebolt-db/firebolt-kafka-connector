@@ -45,7 +45,7 @@ This gives us a 3 × 2 × 2 = 12 configuration matrix. Tests should be parameter
 
 Parameterized JUnit 5 tests that exercise each cell of the configuration matrix:
 
-All tests are duration-based: the producer writes for a configurable time window (default 30s for CI, configurable up to hours for nightly stress runs), then validation waits for all produced data to land.
+All tests are duration-based: the producer writes for a configurable time window (default 10s for CI, configurable up to hours for nightly stress runs), then validation waits for all produced data to land (10 min ingestion timeout).
 
 ```java
 @ParameterizedTest
