@@ -102,22 +102,30 @@ public class E2ETestHarness {
         return totalProduced;
     }
 
+    /** Log production progress every N batches. */
+    private static final int PROGRESS_LOG_INTERVAL_BATCHES = 10;
+
     /**
      * Produces records for the configured duration, then flushes.
      * Records are streamed in batches of {@code PRODUCE_BATCH_SIZE} with
      * backpressure: stalls when the producer leads ingestion by more than
      * {@code MAX_PRODUCER_LEAD_ROWS} rows.
+     *
+     * Logs throughput every {@code PROGRESS_LOG_INTERVAL_BATCHES} batches
+     * so CI output shows live progress.
      */
     public void produceForDuration() {
         String topic = config.resolvedTopicName();
         String table = config.resolvedTableName();
         Duration targetDuration = config.getDuration();
-        log.info("Producing to topic '{}' as {} for {} (batch={}, maxLead={})",
+        log.info("[PRODUCE] Starting: topic='{}', format={}, duration={}, batch={}, maxLead={}",
                 topic, config.getMessageType(), targetDuration,
                 PRODUCE_BATCH_SIZE, MAX_PRODUCER_LEAD_ROWS);
 
-        long deadlineNanos = System.nanoTime() + targetDuration.toNanos();
+        long startNanos = System.nanoTime();
+        long deadlineNanos = startNanos + targetDuration.toNanos();
         int produced = 0;
+        int batchesSinceLog = 0;
         while (System.nanoTime() < deadlineNanos) {
             List<E2ETestRecord> batch = new ArrayList<>(PRODUCE_BATCH_SIZE);
             for (int i = 0; i < PRODUCE_BATCH_SIZE; i++) {
@@ -125,13 +133,27 @@ public class E2ETestHarness {
             }
             producer.produce(topic, batch);
             produced += PRODUCE_BATCH_SIZE;
+            batchesSinceLog++;
+
+            if (batchesSinceLog >= PROGRESS_LOG_INTERVAL_BATCHES) {
+                double elapsedSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+                double remainingSec = Math.max(0, (deadlineNanos - System.nanoTime()) / 1_000_000_000.0);
+                log.info("[PRODUCE] {} records sent ({} rec/s) — {}s elapsed, {}s remaining",
+                        produced, (int) (produced / elapsedSec),
+                        String.format("%.1f", elapsedSec),
+                        String.format("%.1f", remainingSec));
+                batchesSinceLog = 0;
+            }
 
             waitForBackpressure(table, produced);
         }
         producer.flush();
         totalProduced = produced;
 
-        log.info("Produced {} records to topic '{}' in {}", produced, topic, targetDuration);
+        double totalSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+        log.info("[PRODUCE] Done: {} records to '{}' in {}s ({} rec/s)",
+                produced, topic, String.format("%.1f", totalSec),
+                (int) (produced / totalSec));
     }
 
     /**
@@ -161,11 +183,14 @@ public class E2ETestHarness {
     /**
      * Polls Firebolt row count until all produced records have landed.
      * Must be called after {@link #produceForDuration()}.
+     * Logs progress on every poll so CI shows live ingestion status.
      */
     public void waitForIngestion() {
         String table = config.resolvedTableName();
         int expected = totalProduced;
-        log.info("Waiting for {} produced rows in Firebolt table '{}'...", expected, table);
+        long startNanos = System.nanoTime();
+        log.info("[INGEST] Waiting for {} rows in table '{}' (timeout={})...",
+                expected, table, config.getIngestionTimeout());
 
         await()
                 .atMost(config.getIngestionTimeout())
@@ -173,15 +198,21 @@ public class E2ETestHarness {
                 .until(() -> {
                     try {
                         int count = fireboltClient.countRows(table);
-                        log.debug("Current row count in '{}': {}/{}", table, count, expected);
+                        double elapsedSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+                        int pct = expected > 0 ? (int) (100L * count / expected) : 100;
+                        log.info("[INGEST] {}/{} rows ({}%) — {}s elapsed",
+                                count, expected, pct,
+                                String.format("%.1f", elapsedSec));
                         return count >= expected;
                     } catch (SQLException e) {
-                        log.debug("Error polling Firebolt: {}", e.getMessage());
+                        log.warn("[INGEST] Poll failed: {}", e.getMessage());
                         return false;
                     }
                 });
 
-        log.info("Ingestion complete: table '{}' has >= {} rows", table, expected);
+        double totalSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+        log.info("[INGEST] Done: {} rows landed in {}s",
+                expected, String.format("%.1f", totalSec));
     }
 
     /**
