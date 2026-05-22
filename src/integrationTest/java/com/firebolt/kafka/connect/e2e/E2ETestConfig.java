@@ -7,7 +7,9 @@ import lombok.Getter;
 /**
  * Configuration for a single E2E test scenario.
  * Defines the message format, delivery semantics, ingestion mode,
- * and test parameters for one cell in the config matrix.
+ * and timing parameters. All tests are duration-based: the producer
+ * writes for a fixed window, then validation waits for all produced
+ * data to land in Firebolt.
  */
 @Getter
 @Builder
@@ -17,12 +19,9 @@ public class E2ETestConfig {
     private final DeliveryMode deliveryMode;
     private final IngestionType ingestionType;
 
-    /** Number of records to produce for correctness tests. */
+    /** How long the producer should write records. */
     @Builder.Default
-    private final int recordCount = 10_000;
-
-    /** Duration for throughput benchmarks; null for correctness tests. */
-    private final Duration duration;
+    private final Duration duration = Duration.ofSeconds(30);
 
     /** Kafka topic name; auto-generated from config if not set. */
     private final String topicName;
@@ -30,11 +29,11 @@ public class E2ETestConfig {
     /** Firebolt target table name; auto-generated from config if not set. */
     private final String tableName;
 
-    /** Average record size in bytes for throughput tests (pads the name field). */
+    /** Average record size in bytes (pads the name field). */
     @Builder.Default
     private final int recordSizeBytes = 256;
 
-    /** Timeout for waiting for all records to land in Firebolt. */
+    /** Timeout for waiting for all produced records to land in Firebolt. */
     @Builder.Default
     private final Duration ingestionTimeout = Duration.ofMinutes(5);
 
@@ -61,7 +60,6 @@ public class E2ETestConfig {
         if (tableName != null && !tableName.isEmpty()) {
             return tableName;
         }
-        // Firebolt tables use underscores, not hyphens
         return "e2e_" + messageType.getValue()
                 + "_" + deliveryMode.getValue()
                 + "_" + ingestionType.getValue();

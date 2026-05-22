@@ -51,7 +51,7 @@ public class E2EMessageTypeTest {
     void testIngestion(E2ETestConfig config) throws Exception {
         log.info("=== E2E Test: {} ===", config.label());
         harness.setup(config);
-        harness.produceRecords(config.getRecordCount());
+        harness.produceForDuration();
         harness.waitForIngestion();
         harness.validateRecordCount();
         harness.validateDataIntegrity();

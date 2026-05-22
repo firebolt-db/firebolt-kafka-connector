@@ -52,10 +52,11 @@ public class FireboltValidator {
      * Used by chaos tests (PR 3), but built here for reuse.
      */
     public void validateChecksum(String tableName, String column, int n) throws SQLException {
+        // Explicit BIGINT cast ensures consistent 8-byte checksumming
         String actualSql = String.format(
-                "SELECT checksum(\"%s\") FROM \"%s\"", column, tableName);
+                "SELECT checksum(\"%s\"::BIGINT) FROM \"%s\"", column, tableName);
         String expectedSql = String.format(
-                "SELECT checksum(x) FROM generate_series(1, %d) r(x)", n);
+                "SELECT checksum(x::BIGINT) FROM generate_series(1, %d) r(x)", n);
 
         long actualChecksum;
         try (ResultSet actualRs = fireboltClient.executeQuery(actualSql);

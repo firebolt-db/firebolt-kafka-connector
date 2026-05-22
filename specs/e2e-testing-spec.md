@@ -36,7 +36,7 @@ This gives us a 3 × 2 × 2 = 12 configuration matrix. Tests should be parameter
 
 **Key Classes:**
 
-- `E2ETestConfig` — configuration POJO for a test scenario (message type, delivery mode, ingestion type, duration, record count, etc.)
+- `E2ETestConfig` — configuration POJO for a test scenario (message type, delivery mode, ingestion type, duration, etc.)
 - `E2ETestHarness` — orchestrates: setup Kafka topic, deploy connector config, produce messages, wait for ingestion, validate results
 - `MessageProducer` — generic producer that serializes test records in the configured format (JSON/Avro/Protobuf)
 - `FireboltValidator` — connects to Firebolt via JDBC, validates record counts, checksums, and schema correctness
@@ -45,12 +45,14 @@ This gives us a 3 × 2 × 2 = 12 configuration matrix. Tests should be parameter
 
 Parameterized JUnit 5 tests that exercise each cell of the configuration matrix:
 
+All tests are duration-based: the producer writes for a configurable time window (default 30s for CI, configurable up to hours for nightly stress runs), then validation waits for all produced data to land.
+
 ```java
 @ParameterizedTest
 @MethodSource("configMatrix")
 void testIngestion(E2ETestConfig config) {
     harness.setup(config);
-    harness.produceRecords(config.recordCount());
+    harness.produceForDuration();
     harness.waitForIngestion();
     harness.validateRecordCount();
     harness.validateDataIntegrity();
@@ -61,8 +63,8 @@ Each test:
 
 1. Creates a Kafka topic
 2. Deploys the connector with the appropriate config
-3. Produces N records in the specified format
-4. Waits for ingestion to complete (poll Firebolt row count with timeout)
+3. Produces records for the configured duration with backpressure
+4. Waits for all produced records to land in Firebolt (polls row count with timeout)
 5. Validates: correct record count, data integrity (spot-check values), schema correctness
 
 ### 3. Throughput Benchmarking

@@ -90,12 +90,12 @@ public class E2ETestHarness {
                 topic, table, connectorName(config));
     }
 
-    /** Max records the producer can lead ingestion by before stalling. */
+    /** Max rows the producer can lead ingestion by before stalling. */
     private static final int MAX_PRODUCER_LEAD_ROWS = 10_000_000;
     /** Batch size for streaming record production. */
     private static final int PRODUCE_BATCH_SIZE = 1_000;
 
-    /** Total records produced so far (visible to tests). */
+    /** Total records produced (set after production completes). */
     private volatile int totalProduced;
 
     public int getTotalProduced() {
@@ -103,37 +103,35 @@ public class E2ETestHarness {
     }
 
     /**
-     * Produces records in streaming batches with backpressure.
-     * Never materialises more than {@code PRODUCE_BATCH_SIZE} records at a time.
-     * Stalls when the producer leads ingestion by more than
+     * Produces records for the configured duration, then flushes.
+     * Records are streamed in batches of {@code PRODUCE_BATCH_SIZE} with
+     * backpressure: stalls when the producer leads ingestion by more than
      * {@code MAX_PRODUCER_LEAD_ROWS} rows.
      */
-    public void produceRecords(int count) {
+    public void produceForDuration() {
         String topic = config.resolvedTopicName();
         String table = config.resolvedTableName();
-        log.info("Producing {} records to topic '{}' as {} (batch={}, maxLead={})",
-                count, topic, config.getMessageType(),
+        Duration targetDuration = config.getDuration();
+        log.info("Producing to topic '{}' as {} for {} (batch={}, maxLead={})",
+                topic, config.getMessageType(), targetDuration,
                 PRODUCE_BATCH_SIZE, MAX_PRODUCER_LEAD_ROWS);
 
+        long deadlineNanos = System.nanoTime() + targetDuration.toNanos();
         int produced = 0;
-        while (produced < count) {
-            int batchEnd = Math.min(produced + PRODUCE_BATCH_SIZE, count);
-            List<E2ETestRecord> batch = new ArrayList<>(batchEnd - produced);
-            for (int i = produced + 1; i <= batchEnd; i++) {
-                batch.add(E2ETestRecord.forSequenceId(i, config.getRecordSizeBytes()));
+        while (System.nanoTime() < deadlineNanos) {
+            List<E2ETestRecord> batch = new ArrayList<>(PRODUCE_BATCH_SIZE);
+            for (int i = 0; i < PRODUCE_BATCH_SIZE; i++) {
+                batch.add(E2ETestRecord.forSequenceId(produced + i + 1, config.getRecordSizeBytes()));
             }
             producer.produce(topic, batch);
-            produced = batchEnd;
-            totalProduced = produced;
+            produced += PRODUCE_BATCH_SIZE;
 
-            // Backpressure: stall if we're too far ahead of ingestion
-            if (produced < count) {
-                waitForBackpressure(table, produced);
-            }
+            waitForBackpressure(table, produced);
         }
         producer.flush();
+        totalProduced = produced;
 
-        log.info("Produced {} records to topic '{}'", count, topic);
+        log.info("Produced {} records to topic '{}' in {}", produced, topic, targetDuration);
     }
 
     /**
@@ -161,12 +159,13 @@ public class E2ETestHarness {
     }
 
     /**
-     * Polls Firebolt row count until expected count is reached or timeout.
+     * Polls Firebolt row count until all produced records have landed.
+     * Must be called after {@link #produceForDuration()}.
      */
     public void waitForIngestion() {
         String table = config.resolvedTableName();
-        int expected = config.getRecordCount();
-        log.info("Waiting for {} rows in Firebolt table '{}'...", expected, table);
+        int expected = totalProduced;
+        log.info("Waiting for {} produced rows in Firebolt table '{}'...", expected, table);
 
         await()
                 .atMost(config.getIngestionTimeout())
@@ -186,17 +185,17 @@ public class E2ETestHarness {
     }
 
     /**
-     * Validates that the expected number of records landed in Firebolt.
+     * Validates that all produced records landed in Firebolt.
      */
     public void validateRecordCount() throws SQLException {
-        validator.validateRecordCount(config.resolvedTableName(), config.getRecordCount());
+        validator.validateRecordCount(config.resolvedTableName(), totalProduced);
     }
 
     /**
      * Spot-checks data integrity in Firebolt.
      */
     public void validateDataIntegrity() throws SQLException {
-        validator.validateDataIntegrity(config.resolvedTableName(), config.getRecordCount());
+        validator.validateDataIntegrity(config.resolvedTableName(), totalProduced);
     }
 
     /**
