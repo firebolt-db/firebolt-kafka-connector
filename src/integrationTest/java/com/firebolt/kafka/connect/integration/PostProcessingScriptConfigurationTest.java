@@ -32,10 +32,10 @@ import static org.junit.jupiter.api.Assertions.fail;
 @Tag(TestTag.CONNECTOR)
 public class PostProcessingScriptConfigurationTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("post_processing_table");
-    private static final String TOPIC_NAME = generateTopicName("post-processing-topic");
+    private String TABLE_NAME = generateTableName("post_processing_table");
+    private String TOPIC_NAME = generateTopicName("post-processing-topic");
 
-    private static final String TARGET_TABLE_NAME = generateTableName("target_table_post_processing");
+    private String TARGET_TABLE_NAME = generateTableName("target_table_post_processing");
 
     private Producer<String, String> producer;
 

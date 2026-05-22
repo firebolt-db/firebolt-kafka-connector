@@ -42,8 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Slf4j
 @Tag(TestTag.CUSTOMER)
 public class Customer1IntegrationTest extends SchemalessBaseIntegrationTest {
-    private static final String TABLE_NAME = "customer1_test_table_schemaless";
-    private static final String TOPIC_NAME = "customer1-test-topic-schemaless";
+    private String TABLE_NAME = generateTableName("customer1_test_table_schemaless");
+    private String TOPIC_NAME = generateTopicName("customer1-test-topic-schemaless");
 
     private Producer<String, String> producer;
 

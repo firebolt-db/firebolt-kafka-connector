@@ -36,9 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.SERIALIZATION)
 public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
 
-    private static final String TABLE_NAME = "numeric_test_table_avro";
-    private static final String TOPIC_NAME = "numeric-test-topic-avro";
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
+    private String TABLE_NAME = generateTableName("numeric_test_table_avro");
+    private String TOPIC_NAME = generateTopicName("numeric-test-topic-avro");
+    private String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
     private static final int SCALE = 9;
 
     @BeforeEach

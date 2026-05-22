@@ -38,8 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag(TestTag.CONNECTOR)
 public class OptimizationRemoveNullColumnsIntegrationTest extends SchemalessBaseIntegrationTest {
 
-    private static final String TABLE_NAME = generateTableName("optimization_remove_null_columns_table");
-    private static final String TOPIC_NAME = generateTopicName("optimization-remove-null-columns-topic");
+    private String TABLE_NAME = generateTableName("optimization_remove_null_columns_table");
+    private String TOPIC_NAME = generateTopicName("optimization-remove-null-columns-topic");
 
     private Producer<String, String> producer;
 

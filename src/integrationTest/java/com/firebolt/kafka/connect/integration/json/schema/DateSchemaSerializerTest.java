@@ -39,9 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
     private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
-    private static final String TOPIC_NAME = generateTopicName("date-test-topic");
-    private static final String TABLE_NAME = generateTableName("date_test_table");
-    private static final String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
+    private String TOPIC_NAME = generateTopicName("date-test-topic");
+    private String TABLE_NAME = generateTableName("date_test_table");
+    private String SCHEMA_SUBJECT = TOPIC_NAME + "-value";
 
     private Producer<String, Object> producer;
 

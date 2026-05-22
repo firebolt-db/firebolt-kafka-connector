@@ -38,8 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DateSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
-    private static final String TOPIC_NAME = generateTopicName("date-test-topic");
-    private static final String TABLE_NAME = generateTableName("date_test_table");
+    private String TOPIC_NAME = generateTopicName("date-test-topic");
+    private String TABLE_NAME = generateTableName("date_test_table");
     private Producer<String, String> producer;
 
     @BeforeEach

@@ -418,6 +418,18 @@ public abstract class BaseIntegrationTest {
         this.testConnectorName = connectorType + "-connector-" + testId;
     }
 
+    /** Generates a unique table name to prevent cross-invocation collisions. */
+    protected static String generateTableName(String name) {
+        String uid = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return name + "_" + uid;
+    }
+
+    /** Generates a unique topic name to prevent cross-invocation collisions. */
+    protected static String generateTopicName(String name) {
+        String uid = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return name + "-" + uid;
+    }
+
     protected static String getJdbcConnectionUrl() {
         String systemPropertyUrl = System.getProperty("jdbc.connection.url");
         if (systemPropertyUrl != null && !systemPropertyUrl.trim().isEmpty()) {
