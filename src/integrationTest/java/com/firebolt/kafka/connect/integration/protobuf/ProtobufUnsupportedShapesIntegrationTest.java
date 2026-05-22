@@ -445,13 +445,26 @@ public class ProtobufUnsupportedShapesIntegrationTest extends ProtobufBaseIntegr
                 ConsumerRecords<String, byte[]> polled = dlqConsumer.poll(Duration.ofSeconds(5));
                 dlqMessages += polled.count();
             }
+            assertTrue(dlqMessages >= 1,
+                    "Expected at least one record in DLQ for the unsupported Protobuf shape, got " + dlqMessages);
 
-            assertEquals(0, fireboltDefaultDbClient.countRows(TABLE_NAME),
+            // Continue polling row counts for a few seconds to make sure no late insert sneaks in
+            // after the DLQ already received the failure (a slow sink could otherwise let the
+            // assertion pass before the row actually lands). Mirrors the awaitility pattern used
+            // elsewhere in the suite.
+            long rowDeadline = System.currentTimeMillis() + Duration.ofSeconds(10).toMillis();
+            long lastCount = 0L;
+            while (System.currentTimeMillis() < rowDeadline) {
+                lastCount = fireboltDefaultDbClient.countRows(TABLE_NAME);
+                if (lastCount > 0L) {
+                    break;
+                }
+                Thread.sleep(1000L);
+            }
+            assertEquals(0L, lastCount,
                     "Unsupported Protobuf shape must not land in Firebolt -- if rows appear here, " +
                             "support for the shape has likely landed and this test should be flipped " +
                             "to a positive ingestion assertion.");
-            assertTrue(dlqMessages >= 1,
-                    "Expected at least one record in DLQ for the unsupported Protobuf shape, got " + dlqMessages);
         }
     }
 
