@@ -111,6 +111,7 @@ dependencies {
     compileOnly("io.confluent:kafka-protobuf-serializer:${confluentVersion}") {
         exclude group: 'org.apache.kafka', module: 'kafka-clients'
         exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }

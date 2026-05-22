@@ -14,6 +14,8 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -153,7 +155,9 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
         List<Object> elements = (List) schemaKafkaMessageColumnValue.getValue();
 
        if (schemaKafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
-           return connection.createArrayOf(TIMESTAMPTZ_ARRAY_TYPE_NAME, elements.stream().map(objectValue -> TimestampUtil.asOffsetDateTime((Long) objectValue)).toArray());
+           // ProtobufConverter maps google.protobuf.Timestamp elements to java.util.Date;
+           // Avro / JSON Schema send Long (millis). Handle both.
+           return connection.createArrayOf(TIMESTAMPTZ_ARRAY_TYPE_NAME, elements.stream().map(this::asOffsetDateTime).toArray());
        } else if (schemaKafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
            return connection.createArrayOf("string", elements.stream().map(this::asStringTimestamptz).toArray());
        }
@@ -174,6 +178,16 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
 
 
         throw new ColumnConversionFailedException("","", "failed to convert string as timestamp");
+    }
+
+
+    /** Converts a timestamptz array element (Long millis or java.util.Date) to OffsetDateTime. */
+    private OffsetDateTime asOffsetDateTime(Object element) {
+        if (element == null) return null;
+        if (element instanceof java.util.Date) {
+            return ((java.util.Date) element).toInstant().atOffset(ZoneOffset.UTC);
+        }
+        return TimestampUtil.asOffsetDateTime((Long) element);
     }
 
     private Object asStringTimestamptz(Object arrayElement) {
