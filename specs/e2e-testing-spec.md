@@ -69,7 +69,7 @@ Each test:
 
 **Approach:**
 
-- Produce records continuously for a configurable duration (default: 2 minutes)
+- Produce records continuously for a configurable duration (default: 2 minutes; configurable via `E2ETestConfig.duration` for long-running nightly jobs, e.g. 45 min–1 hour)
 - Track: total records produced, total records ingested, bytes produced, elapsed time
 - Calculate: records/sec, MB/sec, end-to-end latency (producer timestamp to Firebolt availability)
 

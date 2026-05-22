@@ -90,22 +90,74 @@ public class E2ETestHarness {
                 topic, table, connectorName(config));
     }
 
+    /** Max records the producer can lead ingestion by before stalling. */
+    private static final int MAX_PRODUCER_LEAD_ROWS = 10_000_000;
+    /** Batch size for streaming record production. */
+    private static final int PRODUCE_BATCH_SIZE = 1_000;
+
+    /** Total records produced so far (visible to tests). */
+    private volatile int totalProduced;
+
+    public int getTotalProduced() {
+        return totalProduced;
+    }
+
     /**
-     * Produces the specified number of sequential test records.
+     * Produces records in streaming batches with backpressure.
+     * Never materialises more than {@code PRODUCE_BATCH_SIZE} records at a time.
+     * Stalls when the producer leads ingestion by more than
+     * {@code MAX_PRODUCER_LEAD_ROWS} rows.
      */
     public void produceRecords(int count) {
         String topic = config.resolvedTopicName();
-        log.info("Producing {} records to topic '{}' as {}",
-                count, topic, config.getMessageType());
+        String table = config.resolvedTableName();
+        log.info("Producing {} records to topic '{}' as {} (batch={}, maxLead={})",
+                count, topic, config.getMessageType(),
+                PRODUCE_BATCH_SIZE, MAX_PRODUCER_LEAD_ROWS);
 
-        List<E2ETestRecord> records = new ArrayList<>(count);
-        for (int i = 1; i <= count; i++) {
-            records.add(E2ETestRecord.forSequenceId(i, config.getRecordSizeBytes()));
+        int produced = 0;
+        while (produced < count) {
+            int batchEnd = Math.min(produced + PRODUCE_BATCH_SIZE, count);
+            List<E2ETestRecord> batch = new ArrayList<>(batchEnd - produced);
+            for (int i = produced + 1; i <= batchEnd; i++) {
+                batch.add(E2ETestRecord.forSequenceId(i, config.getRecordSizeBytes()));
+            }
+            producer.produce(topic, batch);
+            produced = batchEnd;
+            totalProduced = produced;
+
+            // Backpressure: stall if we're too far ahead of ingestion
+            if (produced < count) {
+                waitForBackpressure(table, produced);
+            }
         }
-        producer.produce(topic, records);
         producer.flush();
 
         log.info("Produced {} records to topic '{}'", count, topic);
+    }
+
+    /**
+     * Stalls if the producer has run too far ahead of Firebolt ingestion.
+     */
+    private void waitForBackpressure(String table, int produced) {
+        try {
+            int ingested = fireboltClient.countRows(table);
+            int lead = produced - ingested;
+            if (lead > MAX_PRODUCER_LEAD_ROWS) {
+                log.info("Backpressure: produced={}, ingested={}, lead={} > {} — stalling",
+                        produced, ingested, lead, MAX_PRODUCER_LEAD_ROWS);
+                await()
+                        .atMost(Duration.ofMinutes(5))
+                        .pollInterval(Duration.ofSeconds(2))
+                        .until(() -> {
+                            int current = fireboltClient.countRows(table);
+                            return (produced - current) <= MAX_PRODUCER_LEAD_ROWS / 2;
+                        });
+                log.info("Backpressure released, resuming production");
+            }
+        } catch (SQLException e) {
+            log.debug("Backpressure check failed (non-fatal): {}", e.getMessage());
+        }
     }
 
     /**

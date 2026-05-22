@@ -19,7 +19,7 @@ public class E2ETestConfig {
 
     /** Number of records to produce for correctness tests. */
     @Builder.Default
-    private final int recordCount = 100;
+    private final int recordCount = 10_000;
 
     /** Duration for throughput benchmarks; null for correctness tests. */
     private final Duration duration;

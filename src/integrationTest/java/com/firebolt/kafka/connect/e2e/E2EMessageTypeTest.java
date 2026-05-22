@@ -38,7 +38,6 @@ public class E2EMessageTypeTest {
                             .messageType(messageType)
                             .deliveryMode(deliveryMode)
                             .ingestionType(ingestionType)
-                            .recordCount(100)
                             .build();
                     configs.add(Arguments.of(config));
                 }

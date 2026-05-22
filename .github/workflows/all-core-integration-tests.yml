@@ -19,6 +19,7 @@ on:
           - 'lifecycle'
           - 'stress'
           - 'customer'
+          - 'e2e'
 
 jobs:
   integration-tests:
@@ -109,6 +110,15 @@ jobs:
             shard_total: 1
           - kafka_connect_version: '4.0'
             suite: customer
+            shard_index: 1
+            shard_total: 1
+          # E2E — single-shard per KC version
+          - kafka_connect_version: '3.9.1'
+            suite: e2e
+            shard_index: 1
+            shard_total: 1
+          - kafka_connect_version: '4.0'
+            suite: e2e
             shard_index: 1
             shard_total: 1
     uses: ./.github/workflows/core-integration-tests.yml
