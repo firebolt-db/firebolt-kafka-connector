@@ -26,6 +26,8 @@ ext {
     avroVersion = '1.12.1'
     mockitoVersion = '5.21.0'
     awaitilityVersion = '4.3.0'
+    protobufVersion = '3.25.5'
+    githubApiVersion = '1.326'
     commonsLang3Version = '3.20.0'
     commonsTextVersion = '1.15.0'
     parquetVersion = '1.17.0'
@@ -474,6 +476,23 @@ dependencies {
     integrationTestImplementation "org.apache.logging.log4j:log4j-core:${log4jVersion}"
     integrationTestImplementation "org.apache.logging.log4j:log4j-api:${log4jVersion}"
     integrationTestImplementation "org.apache.logging.log4j:log4j-slf4j2-impl:${log4jVersion}"
+
+    // Protobuf support for E2E tests
+    integrationTestImplementation "com.google.protobuf:protobuf-java:${protobufVersion}"
+    integrationTestImplementation("io.confluent:kafka-connect-protobuf-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    integrationTestImplementation("io.confluent:kafka-protobuf-serializer:${confluentVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+
+    // GitHub API client for PR reporting (used in PR 2)
+    integrationTestImplementation "org.kohsuke:github-api:${githubApiVersion}"
 }
 
 // Create a fat JAR that includes all runtime dependencies
