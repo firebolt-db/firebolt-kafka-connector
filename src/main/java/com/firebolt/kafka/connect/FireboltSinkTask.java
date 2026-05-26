@@ -21,6 +21,9 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import com.firebolt.kafka.connect.schema.ConnectToFireboltTypeMapper;
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
@@ -48,6 +51,9 @@ public class FireboltSinkTask extends SinkTask {
     private FireboltDbService fireboltDbService;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
+    private boolean autoEvolveEnabled;
+
+    private static final int DDL_MAX_RETRIES = 3;
 
     @Override
     public String version() {
@@ -79,6 +85,7 @@ public class FireboltSinkTask extends SinkTask {
             this.assignedTopicPartitions = new HashMap<>();
 
             this.errorToleranceAll = this.sinkConfig.isErrorToleranceAll();
+            this.autoEvolveEnabled = this.sinkConfig.isAutoEvolveEnabled();
             createAndSetErrorReporter();
 
             // Initialize services
@@ -148,6 +155,8 @@ public class FireboltSinkTask extends SinkTask {
 
         log.info("Received {} records for processing", records.size());
         try {
+            applySchemaEvolution(records);
+
             // Delegate to the appropriate service
             fireboltSinkService.processRecord(records, tableSchemas);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
@@ -252,6 +261,109 @@ public class FireboltSinkTask extends SinkTask {
             log.error("The following tables were not found in firebolt: {}", tablesNotFoundInFirebolt);
             throw new RuntimeException("The following tables were not found in Firebolt:" + tablesNotFoundInFirebolt.stream().collect(Collectors.joining(",")));
         }
+    }
+
+    /**
+     * Compares each batch record's Kafka Connect schema against the cached Firebolt TableSchema
+     * and issues ALTER TABLE ADD COLUMN IF NOT EXISTS for any field that is absent.
+     * Runs only when {@code auto.evolve=true} and only for schema-bearing records.
+     * After DDL the schema cache is refreshed so the current batch already populates the new columns.
+     */
+    private void applySchemaEvolution(Collection<SinkRecord> records) {
+        if (!autoEvolveEnabled) {
+            return;
+        }
+
+        // Collect the first schema-bearing record per topic. Within a single put() call all
+        // records from the same topic/partition should carry the same schema version.
+        Map<String, Schema> topicSchemas = new HashMap<>();
+        for (SinkRecord record : records) {
+            if (record.valueSchema() != null && !topicSchemas.containsKey(record.topic())) {
+                topicSchemas.put(record.topic(), record.valueSchema());
+            }
+        }
+        if (topicSchemas.isEmpty()) {
+            return; // schemaless batch — nothing to evolve
+        }
+
+        for (Map.Entry<String, Schema> entry : topicSchemas.entrySet()) {
+            String tableName = topicToTableMapping.getOrDefault(entry.getKey(), entry.getKey());
+            TableSchema tableSchema = tableSchemas.get(tableName);
+            if (tableSchema != null) {
+                addMissingColumns(tableName, entry.getValue(), tableSchema);
+            }
+        }
+    }
+
+    private void addMissingColumns(String tableName, Schema recordSchema, TableSchema tableSchema) {
+        Set<String> existingColumns = tableSchema.getColumns().stream()
+                .map(col -> col.getName().toLowerCase())
+                .collect(Collectors.toSet());
+
+        JdbcConfig jdbcConfig = sinkConfig.getJdbcConfig();
+        boolean evolved = false;
+
+        for (Field field : recordSchema.fields()) {
+            if (existingColumns.contains(field.name().toLowerCase())) {
+                continue;
+            }
+            String fireboltType = ConnectToFireboltTypeMapper.toFireboltType(field.schema());
+            if (fireboltType == null) {
+                log.warn("auto.evolve: cannot map Kafka Connect type {} for field '{}' on table '{}' — skipping",
+                        field.schema().type(), field.name(), tableName);
+                continue;
+            }
+            String ddl = "ALTER TABLE \"" + tableName + "\" ADD COLUMN IF NOT EXISTS \""
+                    + field.name() + "\" " + fireboltType + " NULL";
+            log.info("auto.evolve: {}", ddl);
+            try {
+                executeWithRetry(jdbcConfig, ddl);
+                evolved = true;
+            } catch (Exception e) {
+                log.warn("auto.evolve: DDL failed after {} attempts for column '{}' on table '{}': {}",
+                        DDL_MAX_RETRIES, field.name(), tableName, e.getMessage());
+            }
+        }
+
+        if (evolved) {
+            try {
+                Map<String, TableSchema> fresh = fireboltDbService.discoverTableSchemas(jdbcConfig, Set.of(tableName));
+                TableSchema freshSchema = fresh.get(tableName);
+                if (freshSchema != null) {
+                    tableSchema.replaceColumns(freshSchema.getColumns());
+                }
+            } catch (Exception e) {
+                log.warn("auto.evolve: schema refresh after DDL failed for table '{}': {}", tableName, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Executes a DDL statement with up to {@value #DDL_MAX_RETRIES} attempts and linear back-off.
+     * This makes concurrent tasks that race to ADD the same column (which the second one may see
+     * as a transient error) resilient without failing the batch.
+     */
+    private void executeWithRetry(JdbcConfig jdbcConfig, String ddl) throws Exception {
+        Exception lastException = null;
+        for (int attempt = 1; attempt <= DDL_MAX_RETRIES; attempt++) {
+            try {
+                fireboltDbService.executeUpdate(jdbcConfig, ddl);
+                return;
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt < DDL_MAX_RETRIES) {
+                    log.warn("auto.evolve: DDL attempt {}/{} failed, retrying in {}ms: {}",
+                            attempt, DDL_MAX_RETRIES, attempt * 1000L, e.getMessage());
+                    try {
+                        Thread.sleep(attempt * 1000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("auto.evolve: DDL interrupted", ie);
+                    }
+                }
+            }
+        }
+        throw lastException;
     }
 
     private void handleError(Exception batchException, Collection<SinkRecord> records) {

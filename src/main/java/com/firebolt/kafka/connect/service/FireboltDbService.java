@@ -261,6 +261,20 @@ public class FireboltDbService {
     }
 
     /**
+     * Executes a DDL statement (e.g. ALTER TABLE ADD COLUMN) against Firebolt.
+     *
+     * @param jdbcConfig the JDBC connection configuration
+     * @param sql        the DDL statement to execute
+     * @throws SQLException if the statement fails
+     */
+    public void executeUpdate(JdbcConfig jdbcConfig, String sql) throws SQLException {
+        try (Connection connection = getConnection(jdbcConfig);
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate(sql);
+        }
+    }
+
+    /**
      * Creates a new connection to the Firebolt database.
      *
      * @param jdbcConfig the JDBC connection configuration

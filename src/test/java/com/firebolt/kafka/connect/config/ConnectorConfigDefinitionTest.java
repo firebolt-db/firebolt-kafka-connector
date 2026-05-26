@@ -78,7 +78,7 @@ class ConnectorConfigDefinitionTest {
         @Test
         void shouldHaveCorrectNumberOfConfigProperties() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
-            assertEquals(8, configDef.names().size());
+            assertEquals(9, configDef.names().size());
         }
 
         @Test
