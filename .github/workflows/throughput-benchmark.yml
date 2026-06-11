@@ -75,12 +75,12 @@ jobs:
         timeout 60 bash -c 'until curl -sf http://localhost:8083/connectors; do sleep 2; done'
         echo "Kafka Connect is ready!"
 
-    - name: Run benchmark (30s produce window, JSON / at_least_once / sql)
+    - name: Run benchmark (10s produce window, JSON / {at_least_once,exactly_once} / sql)
       run: |
         ./gradlew integrationTest \
           -Djunit.jupiter.includeTags=e2e \
-          -De2e.singleCell=at_least_once-sql \
-          -De2e.duration=PT30S \
+          -De2e.singleIngestion=sql \
+          -De2e.duration=PT10S \
           -De2e.ingestionTimeout=PT10M \
           -De2e.benchmark=true \
           --no-daemon \
@@ -97,7 +97,7 @@ jobs:
       if: always()
       with:
         name: benchmark-results-${{ inputs.head_sha || github.event.pull_request.head.sha || github.sha }}
-        path: build/reports/benchmark/results.json
+        path: build/reports/benchmark/
 
     - name: Post PR comment
       # Post when triggered via workflow_call with a pr_number, or directly on a pull_request event.
@@ -111,9 +111,17 @@ jobs:
         script: |
           const fs = require('fs');
 
-          const results = JSON.parse(fs.readFileSync('build/reports/benchmark/results.json', 'utf8'));
+          const CELLS = ['at_least_once-sql', 'exactly_once-sql'];
+          const results = {};
+          for (const cell of CELLS) {
+            try {
+              results[cell] = JSON.parse(fs.readFileSync(`build/reports/benchmark/results-${cell}.json`, 'utf8'));
+            } catch (e) {
+              console.log(`No results for ${cell}`);
+            }
+          }
 
-          let baseline = null;
+          let baseline = {};
           try {
             baseline = JSON.parse(fs.readFileSync('specs/benchmarks/baseline.json', 'utf8'));
           } catch (e) {
@@ -129,30 +137,45 @@ jobs:
             return `${sign}${pct}%${icon}`;
           }
 
-          const sha = results.commit_sha.slice(0, 7);
+          const CELL_LABELS = { 'at_least_once-sql': 'AT_LEAST_ONCE', 'exactly_once-sql': 'EXACTLY_ONCE' };
+          const anySha = (results['at_least_once-sql'] || results['exactly_once-sql'] || {}).commit_sha || 'unknown';
+          const sha = anySha.slice(0, 7);
+          const hasBaseline = Object.keys(baseline).length > 0;
+          const bsha = hasBaseline ? (baseline['at_least_once-sql'] || Object.values(baseline)[0] || {}).commit_sha?.slice(0, 7) : null;
+
           let table;
-          if (baseline) {
-            const bsha = baseline.commit_sha.slice(0, 7);
-            table = `| Metric | This PR (\`${sha}\`) | Baseline (main @ \`${bsha}\`) | Delta |\n`;
-            table += `|--------|------|------|-------|\n`;
-            table += `| Produce rate | ${fmt(results.produce_rate_records_per_sec)} rec/s | ${fmt(baseline.produce_rate_records_per_sec)} rec/s | ${delta(results.produce_rate_records_per_sec, baseline.produce_rate_records_per_sec)} |\n`;
-            table += `| Produce throughput | ${results.produce_throughput_mb_per_sec} MB/s | ${baseline.produce_throughput_mb_per_sec} MB/s | ${delta(results.produce_throughput_mb_per_sec, baseline.produce_throughput_mb_per_sec)} |\n`;
-            table += `| Ingest rate | ${fmt(results.ingest_rate_records_per_sec)} rec/s | ${fmt(baseline.ingest_rate_records_per_sec)} rec/s | ${delta(results.ingest_rate_records_per_sec, baseline.ingest_rate_records_per_sec)} |\n`;
-            table += `| Total records | ${fmt(results.total_records_produced)} | ${fmt(baseline.total_records_produced)} | — |\n`;
+          if (hasBaseline && bsha) {
+            table = `| Delivery | Produce rate | Throughput | Ingest rate | vs Baseline |\n`;
+            table += `|----------|-------------|------------|-------------|-------------|\n`;
           } else {
-            table = `| Metric | This PR (\`${sha}\`) |\n`;
-            table += `|--------|------|\n`;
-            table += `| Produce rate | ${fmt(results.produce_rate_records_per_sec)} rec/s |\n`;
-            table += `| Produce throughput | ${results.produce_throughput_mb_per_sec} MB/s |\n`;
-            table += `| Ingest rate | ${fmt(results.ingest_rate_records_per_sec)} rec/s |\n`;
-            table += `| Total records | ${fmt(results.total_records_produced)} |\n`;
+            table = `| Delivery | Produce rate | Throughput | Ingest rate | Records |\n`;
+            table += `|----------|-------------|------------|-------------|--------|\n`;
           }
+
+          for (const cell of CELLS) {
+            const r = results[cell];
+            if (!r) continue;
+            const label = CELL_LABELS[cell];
+            const b = baseline[cell];
+            if (hasBaseline && bsha) {
+              const d = delta(r.produce_rate_records_per_sec, b?.produce_rate_records_per_sec);
+              table += `| ${label} | ${fmt(r.produce_rate_records_per_sec)} rec/s | ${r.produce_throughput_mb_per_sec} MB/s | ${fmt(r.ingest_rate_records_per_sec)} rec/s | ${d} |\n`;
+            } else {
+              table += `| ${label} | ${fmt(r.produce_rate_records_per_sec)} rec/s | ${r.produce_throughput_mb_per_sec} MB/s | ${fmt(r.ingest_rate_records_per_sec)} rec/s | ${fmt(r.total_records_produced)} |\n`;
+            }
+          }
+
+          const durationSec = (results['at_least_once-sql'] || results['exactly_once-sql'] || {}).duration_seconds || 10;
+          const recordSize = (results['at_least_once-sql'] || results['exactly_once-sql'] || {}).record_size_bytes || 256;
+          const baselineNote = hasBaseline && bsha ? ` · baseline: main @ \`${bsha}\`` : '';
 
           const body = [
             '## Throughput Benchmark Results',
             '',
+            hasBaseline && bsha ? `_This PR: \`${sha}\`${baselineNote}_` : `_This PR: \`${sha}\`_`,
+            '',
             table,
-            `_JSON / AT_LEAST_ONCE / SQL · ${results.duration_seconds}s produce window · ${results.record_size_bytes}B records_`,
+            `_JSON / SQL · ${durationSec}s produce window · ${recordSize}B records_`,
           ].join('\n');
 
           const MARKER = '## Throughput Benchmark Results';
@@ -193,7 +216,13 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         mkdir -p specs/benchmarks
-        cp build/reports/benchmark/results.json specs/benchmarks/baseline.json
+        # Merge per-cell result files into a single baseline JSON object keyed by cell name.
+        baseline="{}"
+        for f in build/reports/benchmark/results-*.json; do
+          cell=$(basename "$f" .json); cell="${cell#results-}"
+          baseline=$(jq --arg k "$cell" --slurpfile v "$f" '. + {($k): $v[0]}' <<<"$baseline")
+        done
+        echo "$baseline" > specs/benchmarks/baseline.json
         git add specs/benchmarks/baseline.json
         git diff --staged --quiet && echo "Baseline unchanged" && exit 0
         git commit -m "chore: update benchmark baseline [skip ci]"

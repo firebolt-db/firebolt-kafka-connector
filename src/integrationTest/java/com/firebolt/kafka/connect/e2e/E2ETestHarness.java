@@ -264,9 +264,10 @@ public class E2ETestHarness {
 
             java.io.File outputDir = new java.io.File("build/reports/benchmark");
             outputDir.mkdirs();
+            String cellLabel = config.getDeliveryMode().getValue() + "-" + config.getIngestionType().getValue();
             new com.fasterxml.jackson.databind.ObjectMapper()
                     .writerWithDefaultPrettyPrinter()
-                    .writeValue(new java.io.File(outputDir, "results.json"), result);
+                    .writeValue(new java.io.File(outputDir, "results-" + cellLabel + ".json"), result);
 
             log.warn("[BENCHMARK] produce={}rec/s ({}MB/s), ingest={}rec/s",
                     produceRate, String.format("%.1f", throughputMb), ingestRate);
