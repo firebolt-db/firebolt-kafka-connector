@@ -98,7 +98,7 @@ jobs:
         echo "confluent_path=build/confluent/firebolt-db-firebolt-kafka-connect-${VERSION}.zip" >> $GITHUB_OUTPUT
               
     - name: Upload test results
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()
       with:
         name: test-results-${{ matrix.java }}
@@ -109,7 +109,7 @@ jobs:
         
     - name: Upload uber JAR artifact
       if: ${{ inputs.buildArtifacts }}
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ steps.artifact_names.outputs.uber_name }}
         path: ${{ steps.artifact_names.outputs.uber_path }}
@@ -117,7 +117,7 @@ jobs:
 
     - name: Upload sources JAR artifact
       if: ${{ inputs.buildArtifacts }}
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ steps.artifact_names.outputs.sources_name }}
         path: ${{ steps.artifact_names.outputs.sources_path }}
@@ -129,14 +129,14 @@ jobs:
 
     - name: Upload Confluent Hub archive
       if: ${{ inputs.buildConfluentArchive }}
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ steps.artifact_names.outputs.confluent_name }}
         path: ${{ steps.artifact_names.outputs.confluent_path }}
         if-no-files-found: error
           
     - name: Upload build reports
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()
       with:
         name: build-reports-${{ matrix.java }}
