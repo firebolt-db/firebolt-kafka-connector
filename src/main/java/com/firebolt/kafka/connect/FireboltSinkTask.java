@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
-import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
+import com.firebolt.kafka.connect.ingestion.parquet.RecordConversionException;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;
@@ -281,7 +280,7 @@ public class FireboltSinkTask extends SinkTask {
             return false;
         }
 
-        if (throwable instanceof RecordConversionException || throwable instanceof RecordConversionFailedException) {
+        if (throwable instanceof RecordConversionException) {
             return false;
         }
 

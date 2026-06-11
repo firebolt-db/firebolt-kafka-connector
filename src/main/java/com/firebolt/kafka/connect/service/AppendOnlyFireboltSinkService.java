@@ -1,14 +1,8 @@
 package com.firebolt.kafka.connect.service;
 
-import com.firebolt.kafka.connect.AbstractFireboltRecord;
-import com.firebolt.kafka.connect.FireboltRecord;
-import com.firebolt.kafka.connect.IngestionService;
-import com.firebolt.kafka.connect.IngestionServiceProvider;
 import com.firebolt.kafka.connect.SinkConfig;
 import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.TableWriter;
-import com.firebolt.kafka.connect.convert.RecordConverterFactory;
-import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.sql.Connection;
@@ -24,7 +18,6 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -38,7 +31,6 @@ import com.firebolt.kafka.connect.reporter.ErrorReporter;
 public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
     private SinkConfig config;
-    private RecordConverterFactory recordConverterFactory;
     private FireboltDbService fireboltDbService;
     private FireboltMetadataService fireboltMetadataService;
 
@@ -51,14 +43,13 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     private TableWriterProvider tableWriterProvider;
 
     AppendOnlyFireboltSinkService(SinkConfig sinkConfig, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll) {
-        this(sinkConfig, new FireboltDbService(), new RecordConverterFactory(sinkConfig), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll, new TableWriterProvider());
+        this(sinkConfig, new FireboltDbService(), new HashMap<>(), topicPartitions, errorReporter, errorToleranceAll, new TableWriterProvider());
     }
 
     @VisibleForTesting
-    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, RecordConverterFactory recordConverterFactory, Map<String, TableWriter> tableWriterMap, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll, TableWriterProvider tableWriterProvider) {
+    AppendOnlyFireboltSinkService(SinkConfig sinkConfig, FireboltDbService fireboltDbService, Map<String, TableWriter> tableWriterMap, Map<String, Set<Integer>> topicPartitions, ErrorReporter errorReporter, boolean errorToleranceAll, TableWriterProvider tableWriterProvider) {
         this.config = sinkConfig;
         this.fireboltDbService = fireboltDbService;
-        this.recordConverterFactory = recordConverterFactory;
         this.tableWriterMap = tableWriterMap;
         this.assignedTopicPartitions = topicPartitions;
         this.errorReporter = errorReporter;
@@ -100,8 +91,8 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
             TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> createTableWriter(topic, tableSchema));
 
-            List<AbstractFireboltRecord> fireboltRecords = processRecordsForTopic(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
-            tableWriter.insertRecords(fireboltRecords);
+            List<SinkRecord> unprocessedRecords = filterProcessedRecords(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
+            tableWriter.insertRecords(unprocessedRecords);
         }
     }
 
@@ -145,22 +136,6 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
         log.info("AppendOnlyFireboltSinkService closed");
     }
 
-    @SneakyThrows
-    private Optional<AbstractFireboltRecord> processIndividualRecord(SinkRecord record) {
-        try {
-            // Convert the record to a format suitable for Firebolt
-            return Optional.of(recordConverterFactory.convert(record));
-        } catch (RecordConversionException e) {
-            log.error("Error converting record: topic={}, partition={}, offset={}",
-                    record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
-            if (errorToleranceAll) {
-                errorReporter.report(record, e);
-                return Optional.empty();
-            }
-            throw e;
-        }
-    }
-
     /**
      * Groups records by topic since the records for all topics will be processed by the same writer
      *
@@ -177,12 +152,12 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     }
 
     /**
-     * Processes records for a specific topic combination.
+     * Drops records whose offsets were already ingested (exactly-once replay protection).
      *
      * @param topic the topic identifier
      * @param records the list of records for this topic/partition
      */
-    private List<AbstractFireboltRecord> processRecordsForTopic(String topic, List<SinkRecord> records, Map<Integer, Long> topicProcessedOffsets) {
+    private List<SinkRecord> filterProcessedRecords(String topic, List<SinkRecord> records, Map<Integer, Long> topicProcessedOffsets) {
         log.debug("Processing {} records for topic: {}", records.size(), topic);
 
         if (records == null || records.isEmpty()) {
@@ -191,9 +166,6 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
 
         return records.stream()
                 .filter(sinkRecord -> !topicProcessedOffsets.containsKey(sinkRecord.originalKafkaPartition()) || sinkRecord.originalKafkaOffset() > topicProcessedOffsets.get(sinkRecord.originalKafkaPartition())) // do not process records that have already been processed
-                .map(this::processIndividualRecord)
-                .filter(Optional::isPresent)  // when the sink record cannot be processed it will be retuned as empty, so only keep the ones that were successfully processed
-                .map(Optional::get)
                 .collect(Collectors.toList());
     }
 }

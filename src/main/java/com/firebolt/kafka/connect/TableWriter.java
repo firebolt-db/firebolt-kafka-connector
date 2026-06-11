@@ -1,18 +1,14 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.firebolt.kafka.connect.service.FireboltMetadataService;
-import com.google.common.annotations.VisibleForTesting;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
  * A class that knows how to insert into a Firebolt table . It will use prepared statements to do the inserts.
@@ -41,17 +37,17 @@ public class TableWriter {
         this.ingestionService = ingestionService;
     }
 
-    public void insertRecords(List<AbstractFireboltRecord> fireboltRecords) throws SQLException {
-        log.debug("Processing {} records for table: {}", fireboltRecords.size(), tableSchema.getTableName());
+    public void insertRecords(List<SinkRecord> records) throws SQLException {
+        log.debug("Processing {} records for table: {}", records.size(), tableSchema.getTableName());
 
-        if (CollectionUtils.isEmpty(fireboltRecords)) {
+        if (CollectionUtils.isEmpty(records)) {
             return;
         }
 
-        ingestionService.addRecords(fireboltRecords);
+        ingestionService.addRecords(records);
 
         // update the processed offsets in Kafka node
-        updateProcessedOffsets(fireboltRecords);
+        updateProcessedOffsets(records);
     }
 
     public Map<Integer, Long> getProcessedPartitionOffsets() {
@@ -68,13 +64,13 @@ public class TableWriter {
         }
     }
 
-    private void updateProcessedOffsets(List<AbstractFireboltRecord> fireboltRecords) {
+    private void updateProcessedOffsets(List<SinkRecord> records) {
         // Compute the new high-water marks without touching processedPartitionOffsets yet.
         Map<Integer, Long> updatedOffsets = new HashMap<>(processedPartitionOffsets);
-        fireboltRecords.forEach(fireboltRecord -> {
-            Integer partition = fireboltRecord.getPartition();
-            Long offset = fireboltRecord.getOffset();
-            if (updatedOffsets.get(partition) < offset) {
+        records.forEach(record -> {
+            Integer partition = record.originalKafkaPartition();
+            long offset = record.originalKafkaOffset();
+            if (updatedOffsets.getOrDefault(partition, -1L) < offset) {
                 updatedOffsets.put(partition, offset);
             }
         });

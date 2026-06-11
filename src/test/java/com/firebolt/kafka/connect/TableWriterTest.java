@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -38,21 +39,6 @@ public class TableWriterTest {
     private TableSchema mockTableSchema;
 
     @Mock
-    private TableSchema.Column mockColumn1;
-
-    @Mock
-    private TableSchema.Column mockColumn2;
-
-    @Mock
-    private FireboltRecord mockFireboltRecord1;
-
-    @Mock
-    private FireboltRecord mockFireboltRecord2;
-
-    @Mock
-    private FireboltRecord mockFireboltRecord3;
-
-    @Mock
     private IngestionService mockIngestionService;
 
     @Mock
@@ -65,7 +51,6 @@ public class TableWriterTest {
         MockitoAnnotations.openMocks(this);
 
         when(mockTableSchema.getTableName()).thenReturn(TABLE_NAME);
-        when(mockTableSchema.getColumns()).thenReturn(List.of(mockColumn1, mockColumn2));
 
         Map<Integer, Long> lastPartitionOffset = new HashMap<>();
         lastPartitionOffset.put(PARTITION_0,  -1L);
@@ -91,16 +76,10 @@ public class TableWriterTest {
 
     @Test
     void shouldInsertRecordsSuccessfully() throws SQLException {
-        when(mockFireboltRecord1.getPartition()).thenReturn(0);
-        when(mockFireboltRecord1.getOffset()).thenReturn(100L);
-
-        when(mockFireboltRecord2.getPartition()).thenReturn(1);
-        when(mockFireboltRecord2.getOffset()).thenReturn(200L);
-
-        when(mockFireboltRecord3.getPartition()).thenReturn(2);
-        when(mockFireboltRecord3.getOffset()).thenReturn(300L);
-
-        List<AbstractFireboltRecord> records = List.of(mockFireboltRecord1, mockFireboltRecord2, mockFireboltRecord3);
+        List<SinkRecord> records = List.of(
+                buildRecord(0, 100L),
+                buildRecord(1, 200L),
+                buildRecord(2, 300L));
         doNothing().when(mockIngestionService).addRecords(records);
         assertDoesNotThrow(() -> tableWriter.insertRecords(records));
 
@@ -113,16 +92,10 @@ public class TableWriterTest {
 
     @Test
     void shouldInsertRecordsSuccessfullyWhenAllRecordsBelongToOnePartition() throws SQLException {
-        when(mockFireboltRecord1.getPartition()).thenReturn(0);
-        when(mockFireboltRecord1.getOffset()).thenReturn(100L);
-
-        when(mockFireboltRecord2.getPartition()).thenReturn(0);
-        when(mockFireboltRecord2.getOffset()).thenReturn(101L);
-
-        when(mockFireboltRecord3.getPartition()).thenReturn(0);
-        when(mockFireboltRecord3.getOffset()).thenReturn(102L);
-
-        List<AbstractFireboltRecord> records = List.of(mockFireboltRecord1, mockFireboltRecord2, mockFireboltRecord3);
+        List<SinkRecord> records = List.of(
+                buildRecord(0, 100L),
+                buildRecord(0, 101L),
+                buildRecord(0, 102L));
         doNothing().when(mockIngestionService).addRecords(records);
         assertDoesNotThrow(() -> tableWriter.insertRecords(records));
 
@@ -136,7 +109,7 @@ public class TableWriterTest {
 
     @Test
     void shouldHandleEmptyRecordsList() throws Exception {
-        List<AbstractFireboltRecord> emptyRecords = Collections.emptyList();
+        List<SinkRecord> emptyRecords = Collections.emptyList();
         assertDoesNotThrow(() -> tableWriter.insertRecords(emptyRecords));
 
         verify(mockIngestionService, never()).addRecords(any());
@@ -145,7 +118,7 @@ public class TableWriterTest {
     @Test
     void shouldThrowSQLExceptionWhenIngestionFails() throws SQLException {
         doThrow(SQLException.class).when(mockIngestionService).addRecords(anyList());
-        assertThrows(SQLException.class, () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+        assertThrows(SQLException.class, () -> tableWriter.insertRecords(List.of(buildRecord(0, 100L))));
         // Exactly-once invariant: offsets must NOT be persisted when ingestion fails —
         // persisting them would cause records to be skipped on restart even though they were never written.
         verify(mockFireboltMetadataService, never()).updateOffsets(any(), any());
@@ -178,12 +151,9 @@ public class TableWriterTest {
     void shouldPersistOffsetsViaMetadataServiceAfterSuccessfulBatch() throws SQLException {
         // Exactly-once: after inserting records, updateOffsets must be called so restarts
         // don't reprocess already-committed records.
-        when(mockFireboltRecord1.getPartition()).thenReturn(0);
-        when(mockFireboltRecord1.getOffset()).thenReturn(42L);
-        when(mockFireboltRecord2.getPartition()).thenReturn(1);
-        when(mockFireboltRecord2.getOffset()).thenReturn(99L);
-
-        List<AbstractFireboltRecord> records = List.of(mockFireboltRecord1, mockFireboltRecord2);
+        List<SinkRecord> records = List.of(
+                buildRecord(0, 42L),
+                buildRecord(1, 99L));
         doNothing().when(mockIngestionService).addRecords(records);
 
         tableWriter.insertRecords(records);
@@ -196,13 +166,11 @@ public class TableWriterTest {
     void shouldNotAdvanceLocalOffsetsWhenPersistenceFails() throws SQLException {
         // Persist-before-local-update invariant: if the DB write throws, the in-memory offset
         // map must stay at its old value so the next batch retries persisting those offsets.
-        when(mockFireboltRecord1.getPartition()).thenReturn(0);
-        when(mockFireboltRecord1.getOffset()).thenReturn(50L);
         doThrow(new RuntimeException("DB unavailable"))
                 .when(mockFireboltMetadataService).updateOffsets(any(), any());
 
         assertThrows(RuntimeException.class,
-                () -> tableWriter.insertRecords(List.of(mockFireboltRecord1)));
+                () -> tableWriter.insertRecords(List.of(buildRecord(0, 50L))));
 
         // Local state must not have advanced — offset stays at -1, not 50.
         assertEquals(-1L, tableWriter.getProcessedPartitionOffsets().get(PARTITION_0));
@@ -215,11 +183,15 @@ public class TableWriterTest {
                 mockTableSchema, null, TOPIC_NAME,
                 new HashMap<>(Map.of(0, -1L)), mockIngestionService);
 
-        when(mockFireboltRecord1.getPartition()).thenReturn(0);
-        when(mockFireboltRecord1.getOffset()).thenReturn(10L);
         doNothing().when(mockIngestionService).addRecords(anyList());
 
-        assertDoesNotThrow(() -> writerWithoutMetadata.insertRecords(List.of(mockFireboltRecord1)));
+        assertDoesNotThrow(() -> writerWithoutMetadata.insertRecords(List.of(buildRecord(0, 10L))));
+    }
+
+    private static SinkRecord buildRecord(int partition, long offset) {
+        // The 7-arg constructor makes originalKafkaPartition()/originalKafkaOffset()
+        // return the given partition/offset.
+        return new SinkRecord(TOPIC_NAME, partition, null, null, null, null, offset);
     }
 
 }

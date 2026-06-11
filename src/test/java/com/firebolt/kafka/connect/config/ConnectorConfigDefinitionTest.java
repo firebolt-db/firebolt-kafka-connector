@@ -115,7 +115,7 @@ class ConnectorConfigDefinitionTest {
                 configDef.configKeys().get(ConnectorConfigDefinition.FIREBOLT_CLIENT_SECRET_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH,
                 configDef.configKeys().get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG).importance);
-            assertEquals(ConfigDef.Importance.HIGH,
+            assertEquals(ConfigDef.Importance.LOW,
                 configDef.configKeys().get(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG).importance);
             assertEquals(ConfigDef.Importance.HIGH, 
                 configDef.configKeys().get(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG).importance);
@@ -229,13 +229,13 @@ class ConnectorConfigDefinitionTest {
 
         @Test
         void shouldAcceptValidIngestionTypeValues() {
-            Map<String, String> configSql = createValidConfig();
-            configSql.put(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG, "sql");
-            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(configSql));
-
-            Map<String, String> configBinary = createValidConfig();
-            configBinary.put(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG, "binary");
-            assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(configBinary));
+            // 'sql' and 'binary' are deprecated and ignored but still accepted for
+            // backwards compatibility with existing connector configs.
+            for (String ingestionType : java.util.List.of("sql", "binary", "parquet")) {
+                Map<String, String> config = createValidConfig();
+                config.put(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG, ingestionType);
+                assertDoesNotThrow(() -> ConnectorConfigDefinition.CONFIG_DEF.validate(config));
+            }
         }
 
         @Test
@@ -270,10 +270,10 @@ class ConnectorConfigDefinitionTest {
         }
 
         @Test
-        void shouldDefaultIngestionTypeToSqlWhenNotProvided() {
+        void shouldDefaultIngestionTypeToParquetWhenNotProvided() {
             ConfigDef configDef = ConnectorConfigDefinition.CONFIG_DEF;
             Object defaultValue = configDef.configKeys().get(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG).defaultValue;
-            assertEquals("sql", defaultValue);
+            assertEquals("parquet", defaultValue);
         }
     }
 

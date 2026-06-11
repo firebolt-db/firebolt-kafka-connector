@@ -2,7 +2,7 @@ package com.firebolt.kafka.connect.integration.json.schemaless;
 
 import com.firebolt.kafka.connect.utils.TestTag;
 
-import com.firebolt.kafka.connect.datatype.converter.FireboltTimestamptzConverter;
+import com.firebolt.kafka.connect.utils.FireboltTimestamptzConverter;
 import com.firebolt.kafka.connect.integration.SchemalessBaseIntegrationTest;
 import com.firebolt.kafka.connect.integration.json.datatype.TimestamptzTestRecord;
 import java.sql.Array;

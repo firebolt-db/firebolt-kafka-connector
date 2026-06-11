@@ -115,6 +115,14 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
+
+    // Connect Schema <-> Avro conversion (Apache 2.0 licensed, unlike most of schema-registry).
+    // Bundled: not provided by vanilla Kafka Connect runtimes.
+    implementation("io.confluent:kafka-connect-avro-data:${confluentVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
     
     // Firebolt JDBC Driver - bundle this, exclude any Kafka and logging dependencies
     implementation("io.firebolt:firebolt-jdbc:${fireboltJdbcVersion}") {

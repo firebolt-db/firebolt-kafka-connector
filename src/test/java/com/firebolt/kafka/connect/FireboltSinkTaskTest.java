@@ -37,7 +37,7 @@ import org.apache.kafka.connect.sink.ErrantRecordReporter;
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import org.apache.kafka.connect.errors.RetriableException;
-import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
+import com.firebolt.kafka.connect.ingestion.parquet.RecordConversionException;
 
 public class FireboltSinkTaskTest {
 
@@ -372,18 +372,12 @@ public class FireboltSinkTaskTest {
         startAndOpenTask();
 
         // Mock service to throw a non-retriable conversion exception
-        RecordConversionFailedException conversionFailed = RecordConversionFailedException.builder()
-                .message("conversion failed")
-                .tableName("test_table")
-                .topicName("test_topic")
-                .kafkaPartition(0)
-                .kafkaOffset(100L)
-                .build();
+        RecordConversionException conversionFailed = new RecordConversionException("conversion failed");
         doThrow(conversionFailed).when(mockSinkService).processRecord(any(), any());
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> fireboltSinkTask.put(testRecords));
         assertTrue(exception.getMessage().contains("Number of records that failed: 1"));
-        assertInstanceOf(RecordConversionFailedException.class, exception.getCause());
+        assertInstanceOf(RecordConversionException.class, exception.getCause());
     }
 
     @Test
