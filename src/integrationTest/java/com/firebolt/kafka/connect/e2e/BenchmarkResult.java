@@ -40,6 +40,9 @@ public class BenchmarkResult {
     @JsonProperty("ingest_rate_records_per_sec")
     private long ingestRateRecordsPerSec;
 
+    @JsonProperty("ingest_throughput_mb_per_sec")
+    private double ingestThroughputMbPerSec;
+
     @JsonProperty("record_size_bytes")
     private int recordSizeBytes;
 }

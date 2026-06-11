@@ -144,11 +144,11 @@ jobs:
 
           let table;
           if (hasBaseline && bsha) {
-            table = `| Delivery | Produce rate | Throughput | Ingest rate | vs Baseline |\n`;
-            table += `|----------|-------------|------------|-------------|-------------|\n`;
+            table = `| Delivery | Ingest rate | Ingest throughput | vs Baseline |\n`;
+            table += `|----------|-------------|-------------------|-------------|\n`;
           } else {
-            table = `| Delivery | Produce rate | Throughput | Ingest rate | Records |\n`;
-            table += `|----------|-------------|------------|-------------|--------|\n`;
+            table = `| Delivery | Ingest rate | Ingest throughput | Records |\n`;
+            table += `|----------|-------------|-------------------|--------|\n`;
           }
 
           for (const cell of CELLS) {
@@ -157,10 +157,10 @@ jobs:
             const label = CELL_LABELS[cell];
             const b = baseline[cell];
             if (hasBaseline && bsha) {
-              const d = delta(r.produce_rate_records_per_sec, b?.produce_rate_records_per_sec);
-              table += `| ${label} | ${fmt(r.produce_rate_records_per_sec)} rec/s | ${r.produce_throughput_mb_per_sec} MB/s | ${fmt(r.ingest_rate_records_per_sec)} rec/s | ${d} |\n`;
+              const d = delta(r.ingest_rate_records_per_sec, b?.ingest_rate_records_per_sec);
+              table += `| ${label} | ${fmt(r.ingest_rate_records_per_sec)} rec/s | ${r.ingest_throughput_mb_per_sec} MB/s | ${d} |\n`;
             } else {
-              table += `| ${label} | ${fmt(r.produce_rate_records_per_sec)} rec/s | ${r.produce_throughput_mb_per_sec} MB/s | ${fmt(r.ingest_rate_records_per_sec)} rec/s | ${fmt(r.total_records_produced)} |\n`;
+              table += `| ${label} | ${fmt(r.ingest_rate_records_per_sec)} rec/s | ${r.ingest_throughput_mb_per_sec} MB/s | ${fmt(r.total_records_produced)} |\n`;
             }
           }
 

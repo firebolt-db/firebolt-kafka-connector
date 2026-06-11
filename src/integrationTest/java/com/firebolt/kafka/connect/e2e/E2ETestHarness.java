@@ -244,11 +244,14 @@ public class E2ETestHarness {
         try {
             long produceRate = produceDurationSeconds > 0
                     ? (long) (totalProduced / produceDurationSeconds) : 0;
-            double throughputMb = produceDurationSeconds > 0
+            double produceThroughputMb = produceDurationSeconds > 0
                     ? (totalProduced * (double) config.getRecordSizeBytes()) / (1024.0 * 1024.0 * produceDurationSeconds)
                     : 0;
             long ingestRate = ingestDurationSeconds > 0
                     ? (long) (totalProduced / ingestDurationSeconds) : 0;
+            double ingestThroughputMb = ingestDurationSeconds > 0
+                    ? (totalProduced * (double) config.getRecordSizeBytes()) / (1024.0 * 1024.0 * ingestDurationSeconds)
+                    : 0;
 
             BenchmarkResult result = BenchmarkResult.builder()
                     .commitSha(System.getenv().getOrDefault("GITHUB_SHA", "local"))
@@ -256,9 +259,10 @@ public class E2ETestHarness {
                     .durationSeconds(round1(produceDurationSeconds))
                     .totalRecordsProduced(totalProduced)
                     .produceRateRecordsPerSec(produceRate)
-                    .produceThroughputMbPerSec(round1(throughputMb))
+                    .produceThroughputMbPerSec(round1(produceThroughputMb))
                     .ingestDurationSeconds(round1(ingestDurationSeconds))
                     .ingestRateRecordsPerSec(ingestRate)
+                    .ingestThroughputMbPerSec(round1(ingestThroughputMb))
                     .recordSizeBytes(config.getRecordSizeBytes())
                     .build();
 
@@ -269,8 +273,9 @@ public class E2ETestHarness {
                     .writerWithDefaultPrettyPrinter()
                     .writeValue(new java.io.File(outputDir, "results-" + cellLabel + ".json"), result);
 
-            log.warn("[BENCHMARK] produce={}rec/s ({}MB/s), ingest={}rec/s",
-                    produceRate, String.format("%.1f", throughputMb), ingestRate);
+            log.warn("[BENCHMARK] produce={}rec/s ({}MB/s), ingest={}rec/s ({}MB/s)",
+                    produceRate, String.format("%.1f", produceThroughputMb),
+                    ingestRate, String.format("%.1f", ingestThroughputMb));
         } catch (Exception e) {
             throw new RuntimeException("[BENCHMARK] Failed to write results.json", e);
         }
