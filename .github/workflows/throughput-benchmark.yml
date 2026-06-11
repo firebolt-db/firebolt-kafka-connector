@@ -37,6 +37,13 @@ jobs:
       with:
         ref: ${{ inputs.head_sha || github.event.pull_request.head.sha || github.sha }}
 
+    - name: Fetch baseline from main
+      run: |
+        git fetch origin main --depth=1
+        mkdir -p specs/benchmarks
+        git show origin/main:specs/benchmarks/baseline.json > specs/benchmarks/baseline.json 2>/dev/null \
+          || echo "No baseline on main yet — first run"
+
     - name: Set up JDK 11
       uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
       with:
@@ -214,8 +221,9 @@ jobs:
         git add specs/benchmarks/baseline.json
         git diff --staged --quiet && echo "Baseline unchanged" && exit 0
         git commit -m "chore: update benchmark baseline [skip ci]"
-        git pull --rebase
-        git push
+        git fetch origin main
+        git rebase origin/main
+        git push origin HEAD:main
 
     - name: Stop Docker services
       if: always()
