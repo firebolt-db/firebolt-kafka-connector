@@ -15,11 +15,6 @@ on:
         required: false
         type: string
         default: ''
-  # Standalone triggers: useful for manual re-runs after merge.
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -39,6 +34,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        ref: ${{ inputs.head_sha || github.event.pull_request.head.sha || github.sha }}
 
     - name: Set up JDK 11
       uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
@@ -100,12 +97,7 @@ jobs:
         path: build/reports/benchmark/
 
     - name: Post PR comment
-      # Post when triggered via workflow_call with a pr_number, or directly on a pull_request event.
-      if: >
-        success() && (
-          (github.event_name == 'workflow_call' && inputs.pr_number != 0) ||
-          github.event_name == 'pull_request'
-        )
+      if: success() && inputs.pr_number != 0
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
       with:
         script: |
@@ -207,11 +199,7 @@ jobs:
           }
 
     - name: Update baseline (main only)
-      if: >
-        success() && (
-          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          (github.event_name == 'workflow_call' && inputs.pr_number == 0)
-        )
+      if: success() && inputs.pr_number == 0 && github.ref == 'refs/heads/main'
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
