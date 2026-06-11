@@ -110,6 +110,9 @@ public class E2ETestHarness {
         return totalProduced;
     }
 
+    private volatile double produceDurationSeconds;
+    private volatile double ingestDurationSeconds;
+
     /** Log production progress every N batches. */
     private static final int PROGRESS_LOG_INTERVAL_BATCHES = 10;
 
@@ -162,10 +165,10 @@ public class E2ETestHarness {
             log.warn("[PRODUCE] {} sends failed; adjusting expected count to {}", failed, totalProduced);
         }
 
-        double totalSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+        produceDurationSeconds = (System.nanoTime() - startNanos) / 1_000_000_000.0;
         log.warn("[PRODUCE] Done: {} records to '{}' in {}s ({} rec/s)",
-                produced, topic, String.format("%.1f", totalSec),
-                (int) (produced / totalSec));
+                produced, topic, String.format("%.1f", produceDurationSeconds),
+                (int) (produced / produceDurationSeconds));
     }
 
     /**
@@ -224,9 +227,62 @@ public class E2ETestHarness {
                     }
                 });
 
-        double totalSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+        ingestDurationSeconds = (System.nanoTime() - startNanos) / 1_000_000_000.0;
         log.warn("[INGEST] Done: {} rows landed in {}s",
-                expected, String.format("%.1f", totalSec));
+                expected, String.format("%.1f", ingestDurationSeconds));
+    }
+
+    /**
+     * Writes benchmark metrics to {@code build/reports/benchmark/results.json}.
+     * Only active when {@code -De2e.benchmark=true}; call this after all validations
+     * so that metrics are only persisted when the test fully passes.
+     */
+    public void writeBenchmarkResult() {
+        if (!Boolean.getBoolean("e2e.benchmark")) {
+            return;
+        }
+        try {
+            long produceRate = produceDurationSeconds > 0
+                    ? (long) (totalProduced / produceDurationSeconds) : 0;
+            double produceThroughputMb = produceDurationSeconds > 0
+                    ? (totalProduced * (double) config.getRecordSizeBytes()) / (1024.0 * 1024.0 * produceDurationSeconds)
+                    : 0;
+            long ingestRate = ingestDurationSeconds > 0
+                    ? (long) (totalProduced / ingestDurationSeconds) : 0;
+            double ingestThroughputMb = ingestDurationSeconds > 0
+                    ? (totalProduced * (double) config.getRecordSizeBytes()) / (1024.0 * 1024.0 * ingestDurationSeconds)
+                    : 0;
+
+            BenchmarkResult result = BenchmarkResult.builder()
+                    .commitSha(System.getenv().getOrDefault("GITHUB_SHA", "local"))
+                    .timestamp(java.time.Instant.now().toString())
+                    .durationSeconds(round1(produceDurationSeconds))
+                    .totalRecordsProduced(totalProduced)
+                    .produceRateRecordsPerSec(produceRate)
+                    .produceThroughputMbPerSec(round1(produceThroughputMb))
+                    .ingestDurationSeconds(round1(ingestDurationSeconds))
+                    .ingestRateRecordsPerSec(ingestRate)
+                    .ingestThroughputMbPerSec(round1(ingestThroughputMb))
+                    .recordSizeBytes(config.getRecordSizeBytes())
+                    .build();
+
+            java.io.File outputDir = new java.io.File("build/reports/benchmark");
+            outputDir.mkdirs();
+            String cellLabel = config.getDeliveryMode().getValue() + "-" + config.getIngestionType().getValue();
+            new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValue(new java.io.File(outputDir, "results-" + cellLabel + ".json"), result);
+
+            log.warn("[BENCHMARK] produce={}rec/s ({}MB/s), ingest={}rec/s ({}MB/s)",
+                    produceRate, String.format("%.1f", produceThroughputMb),
+                    ingestRate, String.format("%.1f", ingestThroughputMb));
+        } catch (Exception e) {
+            throw new RuntimeException("[BENCHMARK] Failed to write results.json", e);
+        }
+    }
+
+    private static double round1(double v) {
+        return Math.round(v * 10.0) / 10.0;
     }
 
     /**

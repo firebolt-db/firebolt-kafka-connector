@@ -128,16 +128,31 @@ jobs:
       shard_index: ${{ matrix.shard_index }}
       shard_total: ${{ matrix.shard_total }}
 
+  benchmark:
+    name: Throughput Benchmark
+    uses: ./.github/workflows/throughput-benchmark.yml
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      pr_number: ${{ github.event.pull_request.number || 0 }}
+      head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+    secrets: inherit
+
   all-integration-tests-passed:
     name: All Integration Tests Passed
     runs-on: ubuntu-latest
-    needs: integration-tests
+    needs: [integration-tests, benchmark]
     if: always()
     steps:
       - name: Check all matrix jobs succeeded
         run: |
           if [ "${{ needs.integration-tests.result }}" != "success" ]; then
             echo "One or more integration test jobs failed or were cancelled."
+            exit 1
+          fi
+          if [ "${{ needs.benchmark.result }}" != "success" ]; then
+            echo "Benchmark job failed or was cancelled."
             exit 1
           fi
           echo "All integration test jobs passed."
