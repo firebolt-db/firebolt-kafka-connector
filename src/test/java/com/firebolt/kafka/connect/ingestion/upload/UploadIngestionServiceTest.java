@@ -220,6 +220,34 @@ class UploadIngestionServiceTest {
     }
 
     @Test
+    void isolatesPoisonRecordViaSplitRetryWhenTolerant() throws Exception {
+        // full batch [0,2) fails; [0,1) succeeds; [1,2) (one record) fails -> DLQ that record.
+        when(statement.execute(anyString(), anyMap()))
+                .thenThrow(new SQLException("batch rejected"))
+                .thenReturn(true)
+                .thenThrow(new SQLException("poison record"));
+
+        service(true).addRecords(List.of(
+                record(null, Map.of("id", 1), 0L),
+                record(null, Map.of("id", 2), 1L)));
+
+        verify(statement, times(3)).execute(anyString(), anyMap());
+        verify(errorReporter, times(1)).report(any(SinkRecord.class), any(Exception.class));
+    }
+
+    @Test
+    void doesNotSplitOrDlqWhenNotTolerant() throws Exception {
+        when(statement.execute(anyString(), anyMap())).thenThrow(new SQLException("boom"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(SQLException.class, () -> service(false).addRecords(List.of(
+                record(null, Map.of("id", 1), 0L),
+                record(null, Map.of("id", 2), 1L))));
+
+        verify(statement, times(1)).execute(anyString(), anyMap());
+        verify(errorReporter, never()).report(any(SinkRecord.class), any(Exception.class));
+    }
+
+    @Test
     void multiGroupBatchRollsBackOnFailure() throws Exception {
         when(connection.getAutoCommit()).thenReturn(true);
         when(statement.execute(anyString(), anyMap())).thenReturn(true).thenThrow(new SQLException("boom"));

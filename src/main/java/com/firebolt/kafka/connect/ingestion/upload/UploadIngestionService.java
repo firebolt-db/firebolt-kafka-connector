@@ -101,7 +101,9 @@ public class UploadIngestionService implements IngestionService {
         // in one transaction so a later failure can't leave earlier groups committed while Kafka
         // offsets are not advanced — which would duplicate those rows on retry. If a decorator
         // (post-processing) already owns the transaction (autoCommit already false), defer to it.
-        boolean manageTransaction = groups.size() > 1 && connection.getAutoCommit();
+        // With error tolerance on, we instead let groups commit independently so split-and-retry can
+        // land the good records and DLQ the bad ones (partial commit is the desired behavior there).
+        boolean manageTransaction = groups.size() > 1 && connection.getAutoCommit() && !errorToleranceAll;
         if (manageTransaction) {
             connection.setAutoCommit(false);
         }
@@ -155,6 +157,7 @@ public class UploadIngestionService implements IngestionService {
             return;
         }
 
+        List<SinkRecord> convertible = new ArrayList<>(records.size());
         List<GenericRecord> avroRecords = new ArrayList<>(records.size());
         for (SinkRecord record : records) {
             try {
@@ -162,44 +165,61 @@ public class UploadIngestionService implements IngestionService {
                     throw new RecordConversionException("Record has a schema but its value is not a struct: " + record.value().getClass().getName());
                 }
                 avroRecords.add((GenericRecord) avroData.fromConnectData(connectSchema, record.value()));
+                convertible.add(record);
             } catch (RuntimeException e) {
                 handleBadRecord(record, e instanceof RecordConversionException ? e
                         : new RecordConversionException("Failed to convert record to Parquet representation", e));
             }
         }
-        if (avroRecords.isEmpty()) {
+        if (convertible.isEmpty()) {
             return;
         }
 
         List<String> fields = avroSchema.getFields().stream()
                 .map(org.apache.avro.Schema.Field::name).collect(Collectors.toList());
-        uploadAndInsert("read_parquet", writeParquet(avroSchema, avroRecords), fields, literalColumns);
+        uploadWithIsolation("read_parquet", convertible, literalColumns,
+                (from, to) -> new Payload(writeParquet(avroSchema, avroRecords.subList(from, to)), fields),
+                0, convertible.size());
     }
 
     /** Schemaless JSON records -> NDJSON -> read_json. */
     private void ingestJson(List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
-        ByteArrayOutputStream ndjson = new ByteArrayOutputStream();
-        Set<String> fields = new LinkedHashSet<>();
-        boolean any = false;
+        List<SinkRecord> convertible = new ArrayList<>(records.size());
+        List<byte[]> lines = new ArrayList<>(records.size());
+        List<Set<String>> keysPerRecord = new ArrayList<>(records.size());
         for (SinkRecord record : records) {
             if (!(record.value() instanceof Map)) {
                 handleBadRecord(record, new RecordConversionException("Schemaless record value is not a JSON object: " + record.value().getClass().getName()));
                 continue;
             }
             try {
-                ndjson.write(objectMapper.writeValueAsBytes(record.value()));
-                ndjson.write('\n');
+                lines.add(objectMapper.writeValueAsBytes(record.value()));
             } catch (Exception e) {
                 handleBadRecord(record, new RecordConversionException("Failed to serialize record to JSON", e));
                 continue;
             }
-            ((Map<?, ?>) record.value()).keySet().forEach(key -> fields.add(String.valueOf(key)));
-            any = true;
+            Set<String> keys = new LinkedHashSet<>();
+            ((Map<?, ?>) record.value()).keySet().forEach(key -> keys.add(String.valueOf(key)));
+            keysPerRecord.add(keys);
+            convertible.add(record);
         }
-        if (!any) {
+        if (convertible.isEmpty()) {
             return;
         }
-        uploadAndInsert("read_json", ndjson.toByteArray(), new ArrayList<>(fields), literalColumns);
+        uploadWithIsolation("read_json", convertible, literalColumns, (from, to) -> {
+            ByteArrayOutputStream ndjson = new ByteArrayOutputStream();
+            Set<String> fields = new LinkedHashSet<>();
+            try {
+                for (int i = from; i < to; i++) {
+                    ndjson.write(lines.get(i));
+                    ndjson.write('\n');
+                    fields.addAll(keysPerRecord.get(i));
+                }
+            } catch (java.io.IOException e) {
+                throw new SQLException("Failed to assemble NDJSON batch", e);
+            }
+            return new Payload(ndjson.toByteArray(), new ArrayList<>(fields));
+        }, 0, convertible.size());
     }
 
     /** AvroData maps an optional struct schema to a [null, record] union; the writer needs the record branch. */
@@ -233,12 +253,46 @@ public class UploadIngestionService implements IngestionService {
     }
 
     /**
-     * Builds {@code INSERT INTO t (<fields>) SELECT <fields> FROM <tvf>('upload://batch')} from the
-     * record's own field names and runs it. Identifiers are quoted on both sides, so a field is
-     * matched to the column whose name equals it exactly (case-sensitive) — the field name is the
-     * column name. {@code literalColumns} (e.g. a batch id) are appended as constants.
+     * Executes the INSERT for records[from, to). On failure, when error tolerance is enabled, splits
+     * the range and retries each half, isolating an offending record to the DLQ at size 1. This keeps
+     * a single bad record (or an oversized upload) from failing the whole batch; without tolerance the
+     * failure propagates and the task fails.
      */
-    private void uploadAndInsert(String tvf, byte[] payload, List<String> fields, Map<String, String> literalColumns) throws SQLException {
+    private void uploadWithIsolation(String tvf, List<SinkRecord> records, Map<String, String> literalColumns,
+                                     RangeAssembler assembler, int from, int to) throws SQLException {
+        Payload payload = assembler.assemble(from, to);
+        String sql = buildInsertSql(tvf, payload.fields, literalColumns);
+        if (sql == null) {
+            return;
+        }
+        try {
+            log.debug("Ingesting {} record(s), {} bytes via {}", to - from, payload.bytes.length, tvf);
+            execute(sql, payload.bytes);
+        } catch (SQLException e) {
+            if (!errorToleranceAll || to - from <= 1) {
+                if (errorToleranceAll && to - from == 1) {
+                    log.warn("Record at partition {} offset {} rejected by Firebolt; sending to the dead letter queue",
+                            records.get(from).kafkaPartition(), records.get(from).kafkaOffset(), e);
+                    errorReporter.report(records.get(from), e);
+                    return;
+                }
+                throw e;
+            }
+            // Split and retry to isolate the offending record(s).
+            int mid = (from + to) >>> 1;
+            uploadWithIsolation(tvf, records, literalColumns, assembler, from, mid);
+            uploadWithIsolation(tvf, records, literalColumns, assembler, mid, to);
+        }
+    }
+
+    /**
+     * Builds {@code INSERT INTO t (<fields>) SELECT <fields> FROM <tvf>('upload://batch')} from the
+     * record's own field names. Identifiers are quoted on both sides, so a field is matched to the
+     * column whose name equals it exactly (case-sensitive) — the field name is the column name.
+     * {@code literalColumns} (e.g. a batch id) are appended as constants. Returns null when there is
+     * nothing to insert (e.g. all records in range were empty objects).
+     */
+    private String buildInsertSql(String tvf, List<String> fields, Map<String, String> literalColumns) {
         List<String> insertColumns = new ArrayList<>();
         List<String> selectExpressions = new ArrayList<>();
 
@@ -257,16 +311,28 @@ public class UploadIngestionService implements IngestionService {
         });
 
         if (insertColumns.isEmpty()) {
-            // Every record in this group was an empty object (no fields) and no literal columns
-            // apply — there is nothing to insert. Skip, but say so rather than silently dropping.
             log.warn("Skipping upload to {}: records have no fields to ingest", tableName);
-            return;
+            return null;
         }
 
-        String sql = String.format(INSERT_SQL_TEMPLATE, tableName,
+        return String.format(INSERT_SQL_TEMPLATE, tableName,
                 String.join(", ", insertColumns), String.join(", ", selectExpressions), tvf, MULTIPART_NAME);
-        log.debug("Ingesting {} bytes via {}: {}", payload.length, tvf, sql);
-        execute(sql, payload);
+    }
+
+    /** Assembles the upload payload + field list for a sub-range of the batch (used by split-and-retry). */
+    @FunctionalInterface
+    private interface RangeAssembler {
+        Payload assemble(int from, int to) throws SQLException;
+    }
+
+    private static final class Payload {
+        final byte[] bytes;
+        final List<String> fields;
+
+        Payload(byte[] bytes, List<String> fields) {
+            this.bytes = bytes;
+            this.fields = fields;
+        }
     }
 
     private void handleBadRecord(SinkRecord record, RuntimeException cause) {
