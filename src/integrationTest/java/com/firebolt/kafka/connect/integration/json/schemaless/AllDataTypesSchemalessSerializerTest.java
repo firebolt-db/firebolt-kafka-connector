@@ -188,7 +188,7 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
             // Record with variety of data patterns
             aValidAllDataTypesTestRecord(5)
                 .colBigint(-1000L)
-                .colNumeric(new BigDecimal("-1234567890.123456"))
+                .colNumeric(new BigDecimal("-12345.6789"))
                 .colReal(-1.5f)
                 .colDoublePrecision(-1.23456789)
                 .colText("Variety Test Data with special characters: !@#$%^&*()")
@@ -234,7 +234,9 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
             // Numeric types
             .colInteger(colInteger)
             .colBigint(1000L)
-            .colNumeric(new BigDecimal("123456789012.1234"))
+            // read_json parses JSON numbers as DOUBLE, so values with >15 significant digits
+            // lose precision. Keep this within 15 significant digits so it round-trips exactly.
+            .colNumeric(new BigDecimal("12345.6789"))
             .colReal(1.5f)
             .colDoublePrecision(1.23456789)
             

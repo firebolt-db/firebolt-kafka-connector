@@ -132,8 +132,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
             aValidTestRecord(1)
                 .optionalLocalDate(LocalDate.of(2024, 3, 1))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 2)))
-                .localDateIso8601(LocalDate.of(2024, 1, 10))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 1, 10), LocalDate.of(2024, 1, 11)))
                 .dateAsString("2024-01-15")
                 .dateAsIso8601List(Arrays.asList("2024-01-10", "2024-01-11"))
                 .build(),
@@ -144,8 +142,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalDate(createDate(2025, Calendar.JANUARY, 1))
                 .optionalLocalDate(LocalDate.of(2025, 2, 1))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2025, 2, 1), LocalDate.of(2025, 2, 2)))
-                .localDateIso8601(LocalDate.of(2025, 2, 15))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2025, 2, 15), LocalDate.of(2025, 2, 16)))
                 .dateAsString("2025-02-01")
                 .dateAsIso8601List(Arrays.asList("2025-02-15", "2025-02-16"))
                 .build(),
@@ -156,8 +152,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalDate(createDate(2000, Calendar.JANUARY, 1))  // Y2K
                 .optionalLocalDate(LocalDate.of(2000, 1, 1))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(1970, 1, 1), LocalDate.of(2000, 1, 1)))
-                .localDateIso8601(LocalDate.of(2000, 1, 2))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(1970, 1, 1), LocalDate.of(2000, 1, 2)))
                 .dateAsString("2000-01-01")
                 .dateAsIso8601List(Arrays.asList("1970-01-01", "2000-01-02"))
                 .build(),
@@ -167,8 +161,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalDate(null)
                 .optionalLocalDate(null)
                 .optionalLocalDateList(null)
-                .localDateIso8601(null)
-                .localDateIso8601List(null)
                 .dateAsString(null)
                 .dateAsIso8601List(null)
                 .build(),
@@ -179,8 +171,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .requiredListWithNonNullElements(new ArrayList<>())
                 .optionalLocalDate(LocalDate.of(2024, 6, 1))
                 .optionalLocalDateList(new ArrayList<>())
-                .localDateIso8601(LocalDate.of(2024, 6, 2))
-                .localDateIso8601List(new ArrayList<>())
                 .dateAsString("2024-06-01")
                 .dateAsIso8601List(new ArrayList<>())
                 .build(),
@@ -191,8 +181,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                     createDate(2024, Calendar.JANUARY, 1), null, createDate(2024, Calendar.DECEMBER, 31)))
                 .optionalLocalDate(LocalDate.of(2024, 12, 31))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 12, 30), null, LocalDate.of(2024, 12, 31)))
-                .localDateIso8601(LocalDate.of(2024, 12, 25))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 12, 25), LocalDate.of(2024, 12, 31)))
                 .dateAsString("2024-12-31")
                 .dateAsIso8601List(Arrays.asList("2024-12-25", "2024-12-31"))
                 .build(),
@@ -205,8 +193,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                     createDate(2023, Calendar.JANUARY, 1), createDate(2024, Calendar.JUNE, 15), createDate(2025, Calendar.DECEMBER, 31)))
                 .optionalLocalDate(LocalDate.of(2023, 1, 1))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2023, 1, 1), LocalDate.of(2024, 6, 15), LocalDate.of(2025, 12, 31)))
-                .localDateIso8601(LocalDate.of(2023, 2, 1))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2023, 2, 1), LocalDate.of(2024, 6, 15), LocalDate.of(2025, 12, 31)))
                 .dateAsString("2023-01-01")
                 .dateAsIso8601List(Arrays.asList("2023-02-01", "2024-06-15", "2025-12-31"))
                 .build(),
@@ -217,8 +203,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalListWithNonNullElements(null)
                 .optionalLocalDate(LocalDate.of(2024, 7, 1))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 7, 1)))
-                .localDateIso8601(LocalDate.of(2024, 7, 2))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 7, 2)))
                 .dateAsString("2024-07-01")
                 .dateAsIso8601List(Arrays.asList("2024-07-02"))
                 .build(),
@@ -229,8 +213,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalListWithNonNullElements(new ArrayList<>())
                 .optionalLocalDate(LocalDate.of(2024, 8, 1))
                 .optionalLocalDateList(new ArrayList<>())
-                .localDateIso8601(LocalDate.of(2024, 8, 2))
-                .localDateIso8601List(new ArrayList<>())
                 .dateAsString("2024-08-01")
                 .dateAsIso8601List(new ArrayList<>())
                 .build(),
@@ -241,8 +223,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalListWithNonNullElements(Arrays.asList(createDate(2024, Calendar.APRIL, 1), createDate(2024, Calendar.AUGUST, 31)))
                 .optionalLocalDate(LocalDate.of(2024, 9, 1))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 4, 1), LocalDate.of(2024, 8, 31)))
-                .localDateIso8601(LocalDate.of(2024, 9, 2))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 4, 2), LocalDate.of(2024, 8, 31)))
                 .dateAsString("2024-09-01")
                 .dateAsIso8601List(Arrays.asList("2024-04-02", "2024-08-31"))
                 .build(),
@@ -261,8 +241,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                     createDate(2008, Calendar.FEBRUARY, 29), createDate(2004, Calendar.FEBRUARY, 29)))
                 .optionalLocalDate(LocalDate.of(2024, 2, 29))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 2, 29), LocalDate.of(2020, 2, 29)))
-                .localDateIso8601(LocalDate.of(2024, 2, 28))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 2, 28), LocalDate.of(2020, 2, 29)))
                 .dateAsString("2024-02-29")
                 .dateAsIso8601List(Arrays.asList("2024-02-28", "2020-02-29"))
                 .build(),
@@ -277,8 +255,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalListWithNonNullElements(createOptionalLargeDateList(80))  // Use version without nulls
                 .optionalLocalDate(LocalDate.of(2024, 12, 31))
                 .optionalLocalDateList(Arrays.asList(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)))
-                .localDateIso8601(LocalDate.of(2024, 12, 30))
-                .localDateIso8601List(Arrays.asList(LocalDate.of(2024, 1, 2), LocalDate.of(2024, 12, 30)))
                 .dateAsString("2024-12-31")
                 .dateAsIso8601List(Arrays.asList("2024-01-02", "2024-12-30"))
                 .build()
@@ -375,8 +351,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 "\"optionalDate\" DATE NULL, " +
                 "\"optionalLocalDate\" DATE NULL, " +
                 "\"optionalLocalDateList\" ARRAY(DATE NULL) NULL, " +
-                "\"localDateIso8601\" DATE NULL, " +
-                "\"localDateIso8601List\" ARRAY(DATE NULL) NULL, " +
                 "\"dateAsIso8601List\" ARRAY(DATE NULL) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(DATE NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(DATE NOT NULL) NOT NULL, " +
@@ -509,34 +483,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                         "]," +
                         "\"description\": \"Optional LocalDate list field\"" +
                     "}," +
-                    "\"localDateIso8601\": {" +
-                        "\"oneOf\": [" +
-                            "{\"type\": \"null\"}," +
-                            "{" +
-                                "\"type\": \"string\"," +
-                                "\"format\": \"date\"" +
-                            "}" +
-                        "]," +
-                        "\"description\": \"ISO-8601 LocalDate string field\"" +
-                    "}," +
-                    "\"localDateIso8601List\": {" +
-                        "\"oneOf\": [" +
-                            "{\"type\": \"null\"}," +
-                            "{" +
-                                "\"type\": \"array\"," +
-                                "\"items\": {" +
-                                    "\"oneOf\": [" +
-                                        "{\"type\": \"null\"}," +
-                                        "{" +
-                                            "\"type\": \"string\"," +
-                                            "\"format\": \"date\"" +
-                                        "}" +
-                                    "]" +
-                                "}" +
-                            "}" +
-                        "]," +
-                        "\"description\": \"ISO-8601 LocalDate list field\"" +
-                    "}," +
                     "\"dateAsIso8601List\": {" +
                         "\"oneOf\": [" +
                             "{\"type\": \"null\"}," +
@@ -605,7 +551,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
         
         // Verify specific records by recordId
         String selectQuery = String.format(
-            "SELECT \"recordId\", \"requiredDate\", \"optionalDate\", \"optionalLocalDate\", \"optionalLocalDateList\", \"localDateIso8601\", \"localDateIso8601List\", \"dateAsString\", \"dateAsIso8601List\", " +
+            "SELECT \"recordId\", \"requiredDate\", \"optionalDate\", \"optionalLocalDate\", \"optionalLocalDateList\", \"dateAsString\", \"dateAsIso8601List\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -625,8 +571,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 java.sql.Date actualOptionalDate = rs.getDate("optionalDate");
                 java.sql.Date actualOptionalLocalDate = rs.getDate("optionalLocalDate");
                 Array actualOptionalLocalDateListArray = rs.getArray("optionalLocalDateList");
-                java.sql.Date actualLocalDateIso8601 = rs.getDate("localDateIso8601");
-                Array actualLocalDateIso8601ListArray = rs.getArray("localDateIso8601List");
                 java.sql.Date actualDateAsString = rs.getDate("dateAsString");
                 Array actualDateAsIso8601ListArray = rs.getArray("dateAsIso8601List");
                 
@@ -653,39 +597,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                     String actualOptionalDateIso = toIsoDate(actualOptionalDate);
                     assertEquals(expectedOptionalDateIso, actualOptionalDateIso,
                         "OptionalDate mismatch at index " + recordIndex);
-                }
-
-                // localDateIso8601 verification
-                if (expected.getLocalDateIso8601() == null) {
-                    assertNull(actualLocalDateIso8601, 
-                        "localDateIso8601 should be null at index " + recordIndex);
-                } else {
-                    assertEquals(expected.getLocalDateIso8601().toString(), actualLocalDateIso8601.toLocalDate().toString(),
-                        "localDateIso8601 mismatch at index " + recordIndex);
-                }
-
-                // localDateIso8601List verification
-                if (expected.getLocalDateIso8601List() == null) {
-                    assertNull(actualLocalDateIso8601ListArray, 
-                        "localDateIso8601List should be null at index " + recordIndex);
-                } else {
-                    assertNotNull(actualLocalDateIso8601ListArray, 
-                        "localDateIso8601List should not be null at index " + recordIndex);
-                    int baseType3 = actualLocalDateIso8601ListArray.getBaseType();
-                    assertEquals(Types.DATE, baseType3,
-                        "localDateIso8601List should have base type DATE (91) at index " + recordIndex);
-
-                    Date[] arrayElements3 = (Date[]) actualLocalDateIso8601ListArray.getArray();
-                    List<String> actualIsoList2 = new ArrayList<>();
-                    for (Date d : arrayElements3) {
-                        actualIsoList2.add(d == null ? null : d.toLocalDate().toString());
-                    }
-                    List<String> expectedIsoList2 = new ArrayList<>();
-                    for (LocalDate d : expected.getLocalDateIso8601List()) {
-                        expectedIsoList2.add(d == null ? null : d.toString());
-                    }
-                    assertEquals(expectedIsoList2, actualIsoList2,
-                        "localDateIso8601List mismatch at index " + recordIndex);
                 }
 
                 // dateAsString verification

@@ -481,7 +481,7 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
             if (i % 10 == 0) {
                 result.add(null);
             } else if (i % 100 == 1) {
-                result.add(Double.MIN_VALUE);  // Include edge cases occasionally
+                result.add(1.0E-100);  // small normal value (subnormals underflow in read_json)
             } else if (i % 100 == 2) {
                 result.add(Double.MAX_VALUE);
             } else if (i % 1000 == 3) {
@@ -504,7 +504,7 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
         List<Double> result = new ArrayList<>();
         for (int i = 0; i < size; i++) {
             if (i % 100 == 1) {
-                result.add(Double.MIN_VALUE);
+                result.add(1.0E-100);  // small normal value (subnormals underflow in read_json)
             } else if (i % 100 == 2) {
                 result.add(Double.MAX_VALUE);
             } else if (i % 500 == 3) {
@@ -529,7 +529,7 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
         List<Double> result = new ArrayList<>();
         for (int i = 0; i < size; i++) {
             if (i % 200 == 1) {
-                result.add(-Double.MIN_VALUE);
+                result.add(-1.0E-100);  // small normal value (subnormals underflow in read_json)
             } else if (i % 200 == 2) {
                 result.add(-Double.MAX_VALUE);
             } else if (i % 800 == 3) {

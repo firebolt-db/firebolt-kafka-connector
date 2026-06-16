@@ -12,6 +12,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -39,6 +42,16 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
     private String TOPIC_NAME = generateTopicName("timestamp-test-topic");
     private String TABLE_NAME = generateTableName("timestamp_test_table");
     private Producer<String, String> producer;
+
+    /**
+     * Formatter that ALWAYS emits seconds (and any fractional seconds, if present).
+     * LocalDateTime.toString() drops the ":ss" component when seconds and nanos are zero
+     * (e.g. "2024-01-01T12:00"), and Firebolt rejects a TIMESTAMP text without seconds.
+     */
+    private static final DateTimeFormatter ISO_TIMESTAMP_WITH_SECONDS = new DateTimeFormatterBuilder()
+            .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
+            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+            .toFormatter();
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -383,7 +396,7 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
         if (value == null) {
             node.putNull(field);
         } else {
-            node.put(field, truncateToMilliseconds(value).toString());
+            node.put(field, truncateToMilliseconds(value).format(ISO_TIMESTAMP_WITH_SECONDS));
         }
     }
 
@@ -397,7 +410,7 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
             if (value == null) {
                 array.addNull();
             } else {
-                array.add(truncateToMilliseconds(value).toString());
+                array.add(truncateToMilliseconds(value).format(ISO_TIMESTAMP_WITH_SECONDS));
             }
         }
     }
@@ -406,7 +419,7 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
         if (value == null) {
             node.putNull(field);
         } else {
-            node.put(field, value.toString());
+            node.put(field, value.format(ISO_TIMESTAMP_WITH_SECONDS));
         }
     }
 
@@ -420,7 +433,7 @@ public class TimestampSchemalessSerializerTest extends SchemalessBaseIntegration
             if (value == null) {
                 array.addNull();
             } else {
-                array.add(value.toString());
+                array.add(value.format(ISO_TIMESTAMP_WITH_SECONDS));
             }
         }
     }

@@ -106,10 +106,12 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalNumeric(null)
                 .build(),
 
-            // Record with zero values
+            // Record with zero values. NB: Confluent AvroData requires the Connect Decimal's
+            // BigDecimal scale to match the schema scale (9), so use scale-9 zeros rather than
+            // BigDecimal.ZERO (scale 0), which throws "Decimal value has mismatching scale".
             aValidTestRecord(5)
-                .requiredNumeric(BigDecimal.ZERO)
-                .optionalNumeric(BigDecimal.ZERO)
+                .requiredNumeric(new BigDecimal("0.000000000"))
+                .optionalNumeric(new BigDecimal("0.000000000"))
                 .build(),
 
             // Record with large numbers (within NUMERIC(38,9) limits)
