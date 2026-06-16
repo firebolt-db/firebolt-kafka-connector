@@ -59,8 +59,8 @@ on:
 
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
-  # OSS Firebolt engine artefact (replaces Firebolt Core). Overridable via the
-  # FIREBOLT_ENGINE_IMAGE repo variable; falls back to a pinned, validated tag.
+  # OSS Firebolt engine artefact. Overridable via the FIREBOLT_ENGINE_IMAGE repo
+  # variable; falls back to a pinned, validated tag.
   FIREBOLT_ENGINE_IMAGE: ${{ vars.FIREBOLT_ENGINE_IMAGE || 'ghcr.io/firebolt-db/engine:release-5.0.1-0.20260615205019.4f5c69172cd3' }}
 
 jobs:
@@ -177,15 +177,15 @@ jobs:
         echo "COMPOSE_FILE=$COMPOSE_FILE" >> $GITHUB_ENV
         echo "Using docker-compose file: $COMPOSE_FILE"
 
-    - name: Setup firebolt engine permissions
+    - name: Setup firebolt engine data directory permissions
       run: |
-        WHO="$(docker run --rm --entrypoint whoami "$FIREBOLT_ENGINE_IMAGE")"
-        # The engine runs as the non-root 'firebolt' user (uid:gid 3473) and writes its
-        # data into the /firebolt-core/volume bind mount, so the host dir must be owned by it.
-        if [ "$WHO" = "firebolt" ]; then
-          mkdir -p "$COMPOSE_FILE_DIR/firebolt-core"
-          sudo chown 3473:3473 "$COMPOSE_FILE_DIR/firebolt-core"
-        fi
+        # The engine runs as a non-root user and writes into the /firebolt-core/volume
+        # bind mount, so the host dir must be owned by the image's uid:gid. Read it from
+        # the image rather than hardcoding (a root image yields 0:0, a harmless no-op).
+        ENGINE_UID="$(docker run --rm --entrypoint id "$FIREBOLT_ENGINE_IMAGE" -u)"
+        ENGINE_GID="$(docker run --rm --entrypoint id "$FIREBOLT_ENGINE_IMAGE" -g)"
+        mkdir -p "$COMPOSE_FILE_DIR/firebolt-core"
+        sudo chown "$ENGINE_UID:$ENGINE_GID" "$COMPOSE_FILE_DIR/firebolt-core"
 
     - name: Start Docker services
       run: |
