@@ -1,56 +1,57 @@
-# Passthrough ingestion — type-conversion decisions to work through
+# Passthrough ingestion — remaining CI failures are engine assignment-cast gaps
 
-The connector is **state-free**: it ships records as-is and ingests them with a plain
-`INSERT INTO t (<record fields>) SELECT <record fields> FROM read_parquet|read_json('upload://batch')`
-— no table-schema lookup, no casts. So the supported conversions are exactly Firebolt's
-**assignment casts**, and the connector adds nothing.
+The connector is **state-free** and does **no** data parsing: it ships each record as-is
+(`INSERT INTO t (<record fields>) SELECT <record fields> FROM read_parquet|read_json('upload://batch')`)
+and relies entirely on Firebolt's **assignment casts**. After fixing every connector-side
+issue, the remaining red CI is, with very few exceptions, conversions Firebolt does not
+perform on assignment. The connector cannot fix these without re-introducing the per-type
+coercion we deleted; they are engine decisions.
 
-This is the corrected list after running the full integration suite against assignment
-behavior (an earlier version was based on *explicit* `CAST` errors and was wrong — e.g. it
-mis-flagged double→real, which assignment handles fine).
+## Connector-side — DONE (green in CI)
+- State-free, record-driven projection; exact-name column matching.
+- KC 4.0 dependency conflict fixed by **shading** bundled `io.confluent.*` (was
+  `NoSuchMethodError` on the runtime's Avro/JsonSchema converters).
+- **Split-and-retry**: on upload failure with error tolerance on, the batch is split to
+  isolate the offending record to the DLQ.
+- Multi-group atomic transaction; Bugbot review items; obsolete optimization test removed.
+- All non-serialization suites pass on KC 3.9.1 and 4.0 (connector, lifecycle, stress,
+  e2e, customer) plus the throughput benchmark.
 
-## Status
+## Remaining failures — all need engine work (not connector)
 
-**Fixed (connector-attributable) — green in CI:** the KC 4.0 dependency conflict
-(excluded `kafka-schema-serializer` from the bundle), mixed-case column matching
-(`ColumnNameTest`, `MultipleTopicsSerializerTest`), and the obsolete null-column-removal
-optimization (deleted). All non-serialization suites pass: connector, lifecycle, stress,
-e2e, customer, plus the throughput benchmark.
+### 1. `text → numeric / boolean / bytea / double / real / integer / bigint` (dominant)
+The serializer tests pervasively use `*FromString` / `*AsString` columns
+(`bigDecimalFromString`, `booleanFromString`, `doubleFromString`, `byteaAsString`, …): the
+JSON/record field is a **string** and the column is the numeric/boolean/bytea type. Firebolt
+rejects `text → <type>` on assignment (`text can't be assigned to column ... of the type ...`).
+These are standard Postgres assignment casts. This even fails the `willNotStopProcessing…`
+tests, because their *valid* records are also string-encoded — every record hits the gap, so
+split-and-retry DLQs them all and nothing lands.
+**Engine fix:** support `text → numeric/boolean/bytea/double/real/int` as assignment casts.
 
-**Remaining (all serialization shards) — blocked on your decisions below.** Every failure
-is a conversion Firebolt does not perform on assignment. They are *not* connector bugs and
-won't be "fixed" in the connector without either engine changes or rewriting the tests to a
-narrower contract — your call.
+### 2. `bigint → timestamp / timestamptz` (+ `array(bigint) → array(timestamp)`)
+`read_parquet` honors the Parquet **DATE** logical type (date tests pass) but **not** the
+**timestamp/timestamptz** logical types — they come back as `bigint`, which won't assign to a
+`TIMESTAMP` column. Also affects schemaless epoch-number timestamps.
+**Engine fix:** `read_parquet` should surface Parquet timestamp logical types as TIMESTAMP
+(and/or support `bigint → timestamp` epoch assignment).
 
-## Assignment-cast gaps (verified on the engine, by frequency)
+### 3. JSON-Schema `Date` → "Date can only be used with an underlying int type"
+The `kafka-connect-json-schema-converter` produces a Connect `Date` logical type whose base
+isn't INT32, which `AvroData` rejects. Affects `DateSchemaSerializerTest` `LocalDate` fields.
+**Options:** engine/converter alignment, or treat as unsupported (use ISO-string dates, which
+work).
 
-| Conversion | Where it shows up |
-|---|---|
-| `bigint → timestamptz` / `timestamp` / `date` | epoch numbers (Connect Date/Timestamp logical types, JSON-Schema epoch fields) |
-| `array(bigint) → array(timestamp)` / `array(date)` | array variants of the above |
-| `text → boolean` | boolean sent as a JSON string (`"true"`) |
-| `text → bytea` | bytea sent as a string (base64/hex) |
-| `text → numeric(p,s)` | numeric sent as a string |
-| `struct → json` | nested object → `JSON` column (Postgres has no such cast; uses `to_jsonb`) |
-| `numeric(p,s) → numeric(p',s')` (widening) | a value of smaller precision into a wider column — almost certainly an engine bug |
+### 4. `struct → json` (single test: `AvroJsonSerializerTest.testAvroJsonAsNestedRecordSerialization`)
+A nested record into a `JSON` column. `read_*` surfaces a STRUCT; Firebolt has no
+`struct → json` assignment cast (Postgres uses `to_jsonb`). Nested → `STRUCT` columns work.
 
-ISO-8601 timestamp/date **strings**, `double→real`, `double→numeric`, `text→json`
-(JSON-as-a-string), and all native types already assign cleanly — no action needed.
+## To get CI green
+Two honest paths, both yours to choose:
+- **(recommended) Fix the engine** assignment casts in #1/#2 (and converter alignment for #3).
+  The tests then pass for real and the connector ingests these types as users expect.
+- **Disable the affected tests** (`@Disabled` with a tracking reason) to make CI green now.
+  This is fake-green: it documents the gaps but the connector still can't ingest those types.
 
-For each gap, the decision is the same shape: **(a) make it an assignment cast in the
-engine** (the Postgres-consistent ones — text→boolean, text→bytea, numeric widening — look
-like engine bugs/gaps), or **(b) declare it unsupported** and require the producer to send a
-representation that assigns (ISO strings for time, native JSON booleans, `STRUCT` columns for
-nested data).
-
-## Separate issue — per-record error isolation
-The `willNotStopProcessing…InvalidValues` tests send a few malformed values (`'abc'`→numeric,
-non-ISO date) and expect the bad records DLQ'd and the rest ingested. A single batched
-`INSERT … SELECT … read_xxx` fails the **whole batch** on one bad value. Decision: accept
-batch-level DLQ; add split-and-retry to isolate the poison record; or pre-validate.
-
-## Test alignment (after the above is decided)
-A few tests also need updating to the state-free contract regardless: they mismatch JSON
-field case vs column case (`ColumnNameTest` already aligned; `AllDataTypes*SerializerTest`
-still references e.g. `colArrayDate` with non-matching case). These only become green once the
-conversion gaps above are resolved, so they're deferred until then.
+Gutting the tests to send only native types would hide that Firebolt should support these
+(Postgres-standard) casts, so I have not done it unilaterally.
