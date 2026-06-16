@@ -13,7 +13,7 @@ public class IngestionServiceProvider {
 
     public IngestionService get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, SinkConfig sinkConfig) {
         IngestionService ingestionService =
-                new UploadIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableSchema);
+                new UploadIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableSchema.getTableName());
 
         Optional<String> postProcessingScript = sinkConfig.getPostProcessingScript(tableSchema.getTableName());
         return postProcessingScript == null || postProcessingScript.isEmpty() ? ingestionService

@@ -1,8 +1,6 @@
 package com.firebolt.kafka.connect.ingestion.upload;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -15,7 +13,6 @@ import static org.mockito.Mockito.when;
 
 import com.firebolt.jdbc.connection.FireboltConnection;
 import com.firebolt.jdbc.statement.preparedstatement.FireboltParquetStatement;
-import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -23,7 +20,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,9 +57,9 @@ class UploadIngestionServiceTest {
         when(fireboltConnection.createParquetStatement()).thenReturn(statement);
     }
 
-    private UploadIngestionService service(TableSchema tableSchema, boolean errorToleranceAll) {
+    private UploadIngestionService service(boolean errorToleranceAll) {
         errorReporter = mock(ErrorReporter.class);
-        return new UploadIngestionService(connection, errorReporter, errorToleranceAll, tableSchema);
+        return new UploadIngestionService(connection, errorReporter, errorToleranceAll, "t");
     }
 
     private SinkRecord record(Schema valueSchema, Object value, long offset) {
@@ -90,17 +86,12 @@ class UploadIngestionServiceTest {
                 .put("tags", List.of("a", "b"))
                 .put("address", new Struct(addressSchema).put("city", "tlv"));
 
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("id", "bigint", Types.BIGINT, false);
-        tableSchema.addColumn("amount", "numeric(38,2)", Types.NUMERIC, true);
-        tableSchema.addColumn("created_at", "timestamp", Types.TIMESTAMP, true);
-        tableSchema.addColumn("tags", "array(text)", Types.ARRAY, true);
-        tableSchema.addColumn("address", "text", Types.VARCHAR, true);
-
-        service(tableSchema, false).addRecords(List.of(record(valueSchema, value, 1L)));
+        service(false).addRecords(List.of(record(valueSchema, value, 1L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"id\", \"amount\", \"created_at\", \"tags\", \"address\") "
+        // insert columns come from the record's own fields (unquoted simple identifiers fold to
+        // lower case); select identifiers are quoted to match what read_parquet inferred.
+        assertEquals("INSERT INTO \"t\" (id, amount, created_at, tags, address) "
                 + "SELECT \"id\", \"amount\", \"created_at\", \"tags\", \"address\" "
                 + "FROM read_parquet('upload://batch')", upload.sql);
         List<GenericRecord> rows = readParquet(upload.payload);
@@ -114,11 +105,8 @@ class UploadIngestionServiceTest {
         Schema v1 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA).build();
         Schema v2 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA)
                 .field("b", Schema.OPTIONAL_STRING_SCHEMA).build();
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("a", "bigint", Types.BIGINT, false);
-        tableSchema.addColumn("b", "text", Types.VARCHAR, true);
 
-        service(tableSchema, false).addRecords(List.of(
+        service(false).addRecords(List.of(
                 record(v1, new Struct(v1).put("a", 1L), 0L),
                 record(v2, new Struct(v2).put("a", 2L).put("b", "x"), 1L),
                 record(v1, new Struct(v1).put("a", 3L), 2L)));
@@ -138,17 +126,11 @@ class UploadIngestionServiceTest {
         second.put("id", 2);
         second.put("name", "bob");
 
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("id", "bigint", Types.BIGINT, false);
-        tableSchema.addColumn("name", "text", Types.VARCHAR, true);
-        tableSchema.addColumn("nested", "struct(k text)", Types.STRUCT, true);
-
-        service(tableSchema, false).addRecords(List.of(record(null, first, 0L), record(null, second, 1L)));
+        service(false).addRecords(List.of(record(null, first, 0L), record(null, second, 1L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"id\", \"name\", \"nested\") "
-                + "SELECT \"id\", \"name\", \"nested\" "
-                + "FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" (id, name, nested) "
+                + "SELECT \"id\", \"name\", \"nested\" FROM read_json('upload://batch')", upload.sql);
         // payload is newline-delimited JSON, one object per record
         String[] lines = new String(upload.payload, StandardCharsets.UTF_8).split("\n");
         assertEquals(2, lines.length);
@@ -158,34 +140,28 @@ class UploadIngestionServiceTest {
     }
 
     @Test
-    void loneJsonColumnStoresWholeDocumentViaParseAsJson() throws Exception {
+    void projectsEveryRecordFieldByItsOwnName() throws Exception {
+        // No table lookup: all fields are projected. The table is the contract — a field that is not
+        // a column makes Firebolt reject the batch (not exercised here; the statement is mocked).
         Map<String, Object> value = new LinkedHashMap<>();
-        value.put("k", "v");
-        value.put("n", 3);
+        value.put("UserId", 1);
+        value.put("extra", "x");
 
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("doc", "JSON", Types.OTHER, true);
-
-        service(tableSchema, false).addRecords(List.of(record(null, value, 0L)));
+        service(false).addRecords(List.of(record(null, value, 0L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"doc\") SELECT * FROM read_json('upload://batch', PARSE_AS_JSON => TRUE)", upload.sql);
-        assertTrue(new String(upload.payload, StandardCharsets.UTF_8).contains("\"k\":\"v\""));
+        assertEquals("INSERT INTO \"t\" (UserId, extra) SELECT \"UserId\", \"extra\" FROM read_json('upload://batch')", upload.sql);
     }
 
     @Test
-    void schemalessProjectionDropsUnknownFieldsAndMatchesCaseInsensitively() throws Exception {
+    void nonSimpleFieldNamesAreQuotedOnTheInsertSide() throws Exception {
         Map<String, Object> value = new LinkedHashMap<>();
-        value.put("UserId", 1);
-        value.put("extra", "dropped");
+        value.put("user-id", 1);
 
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("userid", "bigint", Types.BIGINT, false);
-
-        service(tableSchema, false).addRecords(List.of(record(null, value, 0L)));
+        service(false).addRecords(List.of(record(null, value, 0L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"userid\") SELECT \"UserId\" FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" (\"user-id\") SELECT \"user-id\" FROM read_json('upload://batch')", upload.sql);
     }
 
     // ---- shared behavior ----
@@ -193,10 +169,8 @@ class UploadIngestionServiceTest {
     @Test
     void mixedSchemaAndSchemalessBatchUploadsBothFlows() throws Exception {
         Schema valueSchema = SchemaBuilder.struct().name("Event").field("id", Schema.INT64_SCHEMA).build();
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("id", "bigint", Types.BIGINT, false);
 
-        service(tableSchema, false).addRecords(List.of(
+        service(false).addRecords(List.of(
                 record(valueSchema, new Struct(valueSchema).put("id", 1L), 0L),
                 record(null, Map.of("id", 2), 1L)));
 
@@ -207,57 +181,38 @@ class UploadIngestionServiceTest {
     }
 
     @Test
-    void appendsLiteralColumnsWhenTableHasThem() throws Exception {
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("id", "bigint", Types.BIGINT, false);
-        tableSchema.addColumn("batch_id", "text", Types.VARCHAR, true);
-
-        service(tableSchema, false).addRecords(
+    void appendsLiteralColumns() throws Exception {
+        service(false).addRecords(
                 List.of(record(null, Map.of("id", 1), 0L)),
-                Map.of("batch_id", "my-batch", "not_a_column", "ignored"));
+                Map.of("batch_id", "my-batch"));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"id\", \"batch_id\") SELECT \"id\", 'my-batch' FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" (id, batch_id) SELECT \"id\", 'my-batch' FROM read_json('upload://batch')", upload.sql);
     }
 
     @Test
     void skipsTombstonesAndUploadsNothingForEmptyBatch() throws Exception {
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("id", "bigint", Types.BIGINT, false);
-        service(tableSchema, false).addRecords(List.of(record(null, null, 0L)));
+        service(false).addRecords(List.of(record(null, null, 0L)));
         verify(statement, never()).execute(anyString(), anyMap());
-    }
-
-    @Test
-    void failsWhenNoFieldsMatchAnyColumn() {
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("other", "bigint", Types.BIGINT, false);
-        assertThrows(SQLException.class, () -> service(tableSchema, false)
-                .addRecords(List.of(record(null, Map.of("id", 1), 0L))));
     }
 
     @Test
     void reportsBadRecordsToDlqWhenTolerant() throws Exception {
         Schema valueSchema = SchemaBuilder.struct().name("Event").field("id", Schema.INT64_SCHEMA).build();
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("id", "bigint", Types.BIGINT, false);
 
         // schema'd record whose value isn't a Struct, and a schemaless value that isn't a Map
-        service(tableSchema, true).addRecords(List.of(
+        service(true).addRecords(List.of(
                 record(valueSchema, "not a struct", 0L),
                 record(null, "not a map", 1L),
                 record(null, Map.of("id", 9), 2L)));
 
         verify(errorReporter, times(2)).report(any(SinkRecord.class), any(Exception.class));
-        // the one good record still ingests
         verify(statement, times(1)).execute(anyString(), anyMap());
     }
 
     @Test
     void throwsOnBadRecordWhenNotTolerant() {
-        TableSchema tableSchema = new TableSchema("t");
-        tableSchema.addColumn("id", "bigint", Types.BIGINT, false);
-        assertThrows(RecordConversionException.class, () -> service(tableSchema, false)
+        org.junit.jupiter.api.Assertions.assertThrows(RecordConversionException.class, () -> service(false)
                 .addRecords(List.of(record(null, "not a map", 0L))));
         verify(errorReporter, never()).report(any(SinkRecord.class), any(Exception.class));
     }
