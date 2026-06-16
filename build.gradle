@@ -3,6 +3,9 @@ plugins {
     id 'idea'
     id 'jacoco'
     id "org.sonarqube" version "7.2.2.6593"
+    // Relocates bundled io.confluent.* in the plugin jar so it can't shadow the Kafka Connect
+    // runtime's own Confluent converter classes (which differ by version across KC 3.9.1/4.0).
+    id "com.gradleup.shadow" version "8.3.6"
 }
 
 // Version and group are now defined in gradle.properties
@@ -550,43 +553,61 @@ jar {
     exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
     
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-} 
+}
+
+// Shaded fat jar: same contents as `jar`, but io.confluent.* is relocated so the bundled
+// Connect<->Avro classes can't shadow the Kafka Connect runtime's own Confluent converter classes
+// (which differ by version across KC 3.9.1 / 4.0). This is the artifact deployed as the plugin.
+shadowJar {
+    archiveBaseName = project.property('archivesBaseName')
+    archiveVersion = project.version
+    archiveClassifier = 'shaded'
+
+    relocate 'io.confluent', 'com.firebolt.shaded.io.confluent'
+
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+    exclude 'org/apache/hadoop/shaded/org/eclipse/jetty/**'
+    exclude 'META-INF/maven/org.eclipse.jetty/**'
+    exclude 'META-INF/maven/org.eclipse.jetty.websocket/**'
+    exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
+    exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
+
+    mergeServiceFiles()
+}
 
 // Deploy connector JAR to Kafka Connect plugin directories
 task deployToKafkaConnect {
-    dependsOn jar
-    
+    dependsOn tasks.named('shadowJar')
+
     description = 'Builds and copies the connector JAR to Kafka Connect plugin directories'
     group = 'distribution'
-    
+
     doLast {
-        def jarFile = jar.archiveFile.get().asFile
-        def jarName = jar.archiveFileName.get()
+        def jarFile = tasks.named('shadowJar').get().archiveFile.get().asFile
+        def jarName = jarFile.name
         def scriptsSourceDir = file('src/integrationTest/resources/scripts/')
+
+        // Replace any previously deployed connector jars so only the shaded jar is loaded.
+        def deployJar = { File pluginsDir ->
+            pluginsDir.mkdirs()
+            delete fileTree(pluginsDir) { include '*.jar' }
+            copy {
+                from jarFile
+                into pluginsDir
+            }
+        }
 
         // Copy to Kafka Connect 3.9.1 plugins directory
         def pluginsDir391 = file('src/integrationTest/docker/kafka-connect-3.9.1/plugins/')
-        pluginsDir391.mkdirs()
-        copy {
-            from jarFile
-            into pluginsDir391
-        }
-        
+        deployJar(pluginsDir391)
+
         // Copy to Kafka Connect 4.0 plugins directory
         def pluginsDir40 = file('src/integrationTest/docker/kafka-connect-4.0/plugins/')
-        pluginsDir40.mkdirs()
-        copy {
-            from jarFile
-            into pluginsDir40
-        }
-        
+        deployJar(pluginsDir40)
+
         // Copy to Kafka Connect Cloud plugins directory
         def pluginsDirCloud = file('src/integrationTest/docker/kafka-connect-cloud/plugins/')
-        pluginsDirCloud.mkdirs()
-        copy {
-            from jarFile
-            into pluginsDirCloud
-        }
+        deployJar(pluginsDirCloud)
 
         // Copy all script files from resources/scripts to all docker script directories
         def scriptsDir391 = file('src/integrationTest/docker/kafka-connect-3.9.1/scripts/')
