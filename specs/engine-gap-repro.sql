@@ -54,12 +54,11 @@ INSERT INTO assign_probe (b)   SELECT TRUE;                      -- OK  bool lit
 -- text -> double / real / integer / bigint also already work (only numeric/boolean/bytea are gaps).
 
 ----------------------------------------------------------------------------------------------------
--- GAP 4 — double -> real (value-dependent, runtime only)
--- Pure-literal casts get folded and pass, so this one only shows through read_json's *runtime*
--- double. Run via the HTTP upload:// API (REAL column fed a JSON number):
---
---   printf '{"r":12.34}\n' > /tmp/r.ndjson
---   curl -sS --form "sql=CREATE TABLE rt (r REAL)" <engine-url>
---   curl -sS --form "sql=INSERT INTO rt SELECT r FROM read_json('upload://d')" --form "d=@/tmp/r.ndjson" <engine-url>
---   -- ERROR: Value of type double precision cannot be safely converted into type real
+-- NOT a gap — double -> real works (this corrects an earlier mistaken claim).
+-- read_json types JSON numbers as double; assigning to a REAL (float4) column succeeds for all
+-- in-range values and is rejected ONLY when the magnitude overflows float4 (~3.4e38). Verified:
+--   12.34, -12345.67, 1234567.89, 0.0000123456, 1.23e6, 1.4e-45  -> all OK
+--   3.4028235e38 (Float.MAX_VALUE)                               -> FAIL ("cannot be safely converted")
+-- So RealSchemalessSerializerTest fails only on its Float.MAX_VALUE / -Float.MAX_VALUE edge records,
+-- not on normal data — a test edge, not a missing cast.
 ----------------------------------------------------------------------------------------------------

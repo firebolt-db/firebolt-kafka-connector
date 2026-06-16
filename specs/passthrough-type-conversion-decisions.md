@@ -19,15 +19,17 @@ coercion we deleted; they are engine decisions.
 
 ## Remaining failures — all need engine work (not connector)
 
-### 1. `text → numeric / boolean / bytea / double / real / integer / bigint` (dominant)
+### 1. `text → numeric / boolean / bytea` (dominant)
 The serializer tests pervasively use `*FromString` / `*AsString` columns
-(`bigDecimalFromString`, `booleanFromString`, `doubleFromString`, `byteaAsString`, …): the
-JSON/record field is a **string** and the column is the numeric/boolean/bytea type. Firebolt
-rejects `text → <type>` on assignment (`text can't be assigned to column ... of the type ...`).
-These are standard Postgres assignment casts. This even fails the `willNotStopProcessing…`
-tests, because their *valid* records are also string-encoded — every record hits the gap, so
-split-and-retry DLQs them all and nothing lands.
-**Engine fix:** support `text → numeric/boolean/bytea/double/real/int` as assignment casts.
+(`bigDecimalFromString`, `booleanFromString`, `byteaAsString`, …): the JSON/record field is a
+**string** and the column is the numeric/boolean/bytea type. Firebolt rejects `text → <type>`
+on assignment (`text can't be assigned to column ... of the type ...`). These are standard
+Postgres assignment casts. This even fails the `willNotStopProcessing…` tests, because their
+*valid* records are also string-encoded — every record hits the gap, so split-and-retry DLQs
+them all and nothing lands.
+(Note: `text → double / real / integer / bigint` **already work** on assignment — only
+numeric/boolean/bytea are gaps.)
+**Engine fix:** support `text → numeric/boolean/bytea` as assignment casts.
 
 ### 2. `bigint → timestamp / timestamptz` (+ `array(bigint) → array(timestamp)`)
 `read_parquet` honors the Parquet **DATE** logical type (date tests pass) but **not** the
@@ -45,6 +47,12 @@ work).
 ### 4. `struct → json` (single test: `AvroJsonSerializerTest.testAvroJsonAsNestedRecordSerialization`)
 A nested record into a `JSON` column. `read_*` surfaces a STRUCT; Firebolt has no
 `struct → json` assignment cast (Postgres uses `to_jsonb`). Nested → `STRUCT` columns work.
+
+### Not a gap — `RealSchemalessSerializerTest` (float4 overflow edge)
+`double → real` assignment **works** for all in-range values; it is rejected only when the
+magnitude overflows float4 (~3.4e38). The test fails purely on its `Float.MAX_VALUE` /
+`-Float.MAX_VALUE` records, which overflow when a JSON number (double) is narrowed to REAL.
+This is a test edge, not a missing cast — fix by dropping/adjusting those boundary records.
 
 ## To get CI green
 Two honest paths, both yours to choose:
