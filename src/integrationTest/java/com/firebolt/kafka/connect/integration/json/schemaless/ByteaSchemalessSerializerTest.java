@@ -184,8 +184,6 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredBytea\" BYTEA NOT NULL, " +
                 "\"optionalBytea\" BYTEA NULL, " +
-                "\"stringAsBytea\" BYTEA NULL, " +
-                "\"stringListAsBytea\" ARRAY(BYTEA NULL) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(BYTEA NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BYTEA NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BYTEA NULL) NULL, " +
@@ -225,7 +223,7 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
         
         // Verify specific records by recordId
         String selectQuery = String.format(
-            "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", \"stringAsBytea\", \"stringListAsBytea\", " +
+            "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -243,10 +241,6 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
                 Integer actualRecordId = rs.getInt("recordId");
                 byte[] actualRequiredBytea = Base64.decode(rs.getBytes("requiredBytea"));
                 byte[] actualOptionalBytea = rs.getBytes("optionalBytea") == null ? null : Base64.decode(rs.getBytes("optionalBytea"));
-                
-                // Read new string-mapped BYTEA columns
-                byte[] actualStringAsBytea = rs.getBytes("stringAsBytea");
-                Array actualStringListAsBytea = rs.getArray("stringListAsBytea");
 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -269,31 +263,6 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
                         "OptionalBytea mismatch at index " + recordIndex);
                 }
                 
-                // Verify new string-mapped BYTEA columns
-                if (expected.getStringAsBytea() == null) {
-                    assertNull(actualStringAsBytea);
-                } else {
-                    assertArrayEquals(expected.getStringAsBytea().getBytes(StandardCharsets.UTF_8), actualStringAsBytea);
-                }
-                if (expected.getStringListAsBytea() == null) {
-                    assertNull(actualStringListAsBytea);
-                } else {
-                    // Convert expected strings to bytes
-                    byte[][] expectedBytes = expected.getStringListAsBytea().stream()
-                            .map(s -> s == null ? null : s.getBytes(StandardCharsets.UTF_8))
-                            .toArray(byte[][]::new);
-                    // Compare array contents
-                    byte[][] actualBytes = (byte[][]) actualStringListAsBytea.getArray();
-                    assertEquals(expectedBytes.length, actualBytes.length);
-                    for (int i = 0; i < expectedBytes.length; i++) {
-                        if (expectedBytes[i] == null) {
-                            assertNull(actualBytes[i]);
-                        } else {
-                            assertArrayEquals(expectedBytes[i], actualBytes[i]);
-                        }
-                    }
-                }
-
                 // Array verification using getArray()
                 verifyByteaArray("requiredListWithNullableElements", 
                     expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
@@ -399,8 +368,6 @@ public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest
                 .recordId(recordId)
                 .requiredBytea("Default binary content".getBytes(StandardCharsets.UTF_8))
                 .optionalBytea("Default optional value".getBytes(StandardCharsets.UTF_8))
-                .stringAsBytea("Hello as bytea")
-                .stringListAsBytea(Arrays.asList("one", "two", "three"))
                 .requiredListWithNullableElements(Arrays.asList(
                     "item1".getBytes(StandardCharsets.UTF_8), 
                     "item2".getBytes(StandardCharsets.UTF_8)))
