@@ -50,9 +50,9 @@ services:
     networks:
       - kafka-network
 
-  # Firebolt Core Database
+  # Firebolt engine (OSS artefact from firebolt-kubernetes-operator)
   firebolt-core:
-    image: ${FIREBOLT_CORE_IMAGE}
+    image: ${FIREBOLT_ENGINE_IMAGE:-ghcr.io/firebolt-db/engine:release-5.0.1-0.20260615205019.4f5c69172cd3}
     hostname: firebolt-core
     container_name: firebolt-core-391
     command: --node 0
@@ -72,8 +72,9 @@ services:
     volumes:
       # Mount the config file into the container.
       - ./config.json:/firebolt-core/config.json:ro
-      # Create an anonymous volume for Firebolt's internal database files. Not using a volume would have a performance impact.
-      - ./firebolt-core:/firebolt-core/data
+      # Persist the engine's internal database files. The engine uses /firebolt-core/volume
+      # (HOME) as its data directory; the host dir must be owned by uid:gid 3473:3473.
+      - ./firebolt-core:/firebolt-core/volume
 
   kafka-connect:
     image: confluentinc/cp-kafka-connect:7.9.1

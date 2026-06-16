@@ -131,15 +131,6 @@ jobs:
           echo "COMPOSE_FILE=$COMPOSE_FILE" >> $GITHUB_ENV
           echo "Using docker-compose file: $COMPOSE_FILE"
 
-      - name: Setup firebolt core permissions
-        run: |
-          WHO="$(docker run --rm --entrypoint whoami ghcr.io/firebolt-db/firebolt-core:preview-rc)"
-          # Ensure the host directory that is mounted to /firebolt-core/data exists
-          if [ "$WHO" = "firebolt-core" ]; then
-            mkdir -p "$COMPOSE_FILE_DIR/firebolt-core"
-            sudo chown 1111:1111 "$COMPOSE_FILE_DIR/firebolt-core"
-          fi
-
       - name: Replace secrets in properties file
         run: |
           SECRETS_FILE="src/integrationTest/docker/kafka-connect-cloud/secrets/secrets.properties"
