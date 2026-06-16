@@ -187,6 +187,53 @@ class UploadIngestionServiceTest {
     }
 
     @Test
+    void emptyJsonObjectsProduceNoUpload() throws Exception {
+        service(false).addRecords(List.of(record(null, Map.of(), 0L)));
+        verify(statement, never()).execute(anyString(), anyMap());
+    }
+
+    @Test
+    void literalColumnCollidingWithFieldIsNotDuplicated() throws Exception {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("id", 1);
+        value.put("batch_id", "fromRecord");
+
+        service(false).addRecords(List.of(record(null, value, 0L)), Map.of("batch_id", "generated"));
+
+        Upload upload = captureSingleUpload();
+        assertEquals("INSERT INTO \"t\" (\"id\", \"batch_id\") SELECT \"id\", \"batch_id\" FROM read_json('upload://batch')", upload.sql);
+    }
+
+    @Test
+    void multiGroupBatchRunsInOneTransaction() throws Exception {
+        when(connection.getAutoCommit()).thenReturn(true);
+        Schema vs = SchemaBuilder.struct().name("Event").field("id", Schema.INT64_SCHEMA).build();
+
+        service(false).addRecords(List.of(
+                record(vs, new Struct(vs).put("id", 1L), 0L),
+                record(null, Map.of("id", 2), 1L)));
+
+        verify(connection).setAutoCommit(false);
+        verify(statement, times(2)).execute(anyString(), anyMap());
+        verify(connection).commit();
+        verify(connection).setAutoCommit(true);
+    }
+
+    @Test
+    void multiGroupBatchRollsBackOnFailure() throws Exception {
+        when(connection.getAutoCommit()).thenReturn(true);
+        when(statement.execute(anyString(), anyMap())).thenReturn(true).thenThrow(new SQLException("boom"));
+        Schema vs = SchemaBuilder.struct().name("Event").field("id", Schema.INT64_SCHEMA).build();
+
+        org.junit.jupiter.api.Assertions.assertThrows(SQLException.class, () -> service(false).addRecords(List.of(
+                record(vs, new Struct(vs).put("id", 1L), 0L),
+                record(null, Map.of("id", 2), 1L))));
+
+        verify(connection).rollback();
+        verify(connection, never()).commit();
+    }
+
+    @Test
     void reportsBadRecordsToDlqWhenTolerant() throws Exception {
         Schema valueSchema = SchemaBuilder.struct().name("Event").field("id", Schema.INT64_SCHEMA).build();
 

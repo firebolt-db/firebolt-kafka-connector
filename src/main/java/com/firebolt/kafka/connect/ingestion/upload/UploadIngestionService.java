@@ -97,11 +97,41 @@ public class UploadIngestionService implements IngestionService {
                     .add(record);
         }
 
-        for (Map.Entry<Object, List<SinkRecord>> group : groups.entrySet()) {
-            if (group.getKey() == SCHEMALESS) {
-                ingestJson(group.getValue(), literalColumns);
-            } else {
-                ingestParquet((Schema) group.getKey(), group.getValue(), literalColumns);
+        // A batch that mixes schemas (or schema'd + schemaless) becomes several INSERTs. Run them
+        // in one transaction so a later failure can't leave earlier groups committed while Kafka
+        // offsets are not advanced — which would duplicate those rows on retry. If a decorator
+        // (post-processing) already owns the transaction (autoCommit already false), defer to it.
+        boolean manageTransaction = groups.size() > 1 && connection.getAutoCommit();
+        if (manageTransaction) {
+            connection.setAutoCommit(false);
+        }
+        try {
+            for (Map.Entry<Object, List<SinkRecord>> group : groups.entrySet()) {
+                if (group.getKey() == SCHEMALESS) {
+                    ingestJson(group.getValue(), literalColumns);
+                } else {
+                    ingestParquet((Schema) group.getKey(), group.getValue(), literalColumns);
+                }
+            }
+            if (manageTransaction) {
+                connection.commit();
+            }
+        } catch (SQLException | RuntimeException e) {
+            if (manageTransaction) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackError) {
+                    log.error("Failed to roll back partial multi-group ingest", rollbackError);
+                }
+            }
+            throw e;
+        } finally {
+            if (manageTransaction) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException restoreError) {
+                    log.error("Failed to restore auto-commit after multi-group ingest", restoreError);
+                }
             }
         }
     }
@@ -217,11 +247,19 @@ public class UploadIngestionService implements IngestionService {
             selectExpressions.add(quoteIdentifier(field));
         }
         literalColumns.forEach((name, value) -> {
+            // Don't emit a column twice if a record field collides with a literal (e.g. a record
+            // that already carries a "batch_id"); the record's own value wins.
+            if (fields.contains(name)) {
+                return;
+            }
             insertColumns.add(quoteIdentifier(name));
             selectExpressions.add("'" + value.replace("'", "''") + "'");
         });
 
         if (insertColumns.isEmpty()) {
+            // Every record in this group was an empty object (no fields) and no literal columns
+            // apply — there is nothing to insert. Skip, but say so rather than silently dropping.
+            log.warn("Skipping upload to {}: records have no fields to ingest", tableName);
             return;
         }
 
