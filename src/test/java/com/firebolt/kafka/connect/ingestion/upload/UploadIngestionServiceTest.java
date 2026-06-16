@@ -101,8 +101,7 @@ class UploadIngestionServiceTest {
 
         Upload upload = captureSingleUpload();
         assertEquals("INSERT INTO \"t\" (\"id\", \"amount\", \"created_at\", \"tags\", \"address\") "
-                + "SELECT CAST(\"id\" AS bigint), CAST(\"amount\" AS numeric(38,2)), CAST(\"created_at\" AS timestamp), "
-                + "CAST(\"tags\" AS array(text)), CAST(\"address\" AS text) "
+                + "SELECT \"id\", \"amount\", \"created_at\", \"tags\", \"address\" "
                 + "FROM read_parquet('upload://batch')", upload.sql);
         List<GenericRecord> rows = readParquet(upload.payload);
         assertEquals(1, rows.size());
@@ -148,7 +147,7 @@ class UploadIngestionServiceTest {
 
         Upload upload = captureSingleUpload();
         assertEquals("INSERT INTO \"t\" (\"id\", \"name\", \"nested\") "
-                + "SELECT CAST(\"id\" AS bigint), CAST(\"name\" AS text), CAST(\"nested\" AS struct(k text)) "
+                + "SELECT \"id\", \"name\", \"nested\" "
                 + "FROM read_json('upload://batch')", upload.sql);
         // payload is newline-delimited JSON, one object per record
         String[] lines = new String(upload.payload, StandardCharsets.UTF_8).split("\n");
@@ -186,7 +185,7 @@ class UploadIngestionServiceTest {
         service(tableSchema, false).addRecords(List.of(record(null, value, 0L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"userid\") SELECT CAST(\"UserId\" AS bigint) FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" (\"userid\") SELECT \"UserId\" FROM read_json('upload://batch')", upload.sql);
     }
 
     // ---- shared behavior ----
@@ -218,7 +217,7 @@ class UploadIngestionServiceTest {
                 Map.of("batch_id", "my-batch", "not_a_column", "ignored"));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"id\", \"batch_id\") SELECT CAST(\"id\" AS bigint), CAST('my-batch' AS text) FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" (\"id\", \"batch_id\") SELECT \"id\", 'my-batch' FROM read_json('upload://batch')", upload.sql);
     }
 
     @Test

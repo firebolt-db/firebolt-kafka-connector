@@ -230,20 +230,21 @@ public class UploadIngestionService implements IngestionService {
         List<String> insertColumns = new ArrayList<>();
         List<String> selectExpressions = new ArrayList<>();
 
-        // Each projected value is CAST to the target column's exact type so the server does the
-        // coercion (read_xxx-inferred types are not implicitly widened, e.g. numeric(10,2) -> numeric(38,2)).
+        // No casts: the INSERT ... SELECT applies Firebolt's assignment casts, so the connector
+        // supports exactly the conversions the engine does on assignment — no connector-specific
+        // coercion that could diverge from the server.
         for (String field : fields) {
             TableSchema.Column column = columnsByLowerName.get(field.toLowerCase());
             if (column != null) {
                 insertColumns.add(quoteIdentifier(column.getName()));
-                selectExpressions.add(castExpression(quoteIdentifier(field), column));
+                selectExpressions.add(quoteIdentifier(field));
             }
         }
         literalColumns.forEach((name, value) -> {
             TableSchema.Column column = columnsByLowerName.get(name.toLowerCase());
             if (column != null) {
                 insertColumns.add(quoteIdentifier(column.getName()));
-                selectExpressions.add(castExpression("'" + value.replace("'", "''") + "'", column));
+                selectExpressions.add("'" + value.replace("'", "''") + "'");
             }
         });
 
@@ -267,10 +268,6 @@ public class UploadIngestionService implements IngestionService {
         errorReporter.report(record, cause);
         log.warn("Record from partition {} at offset {} will be submitted to the dead letter queue",
                 record.kafkaPartition(), record.kafkaOffset());
-    }
-
-    private String castExpression(String valueExpression, TableSchema.Column column) {
-        return "CAST(" + valueExpression + " AS " + column.getDataType() + ")";
     }
 
     private String quoteIdentifier(String identifier) {
