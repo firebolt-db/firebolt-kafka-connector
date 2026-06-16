@@ -159,6 +159,22 @@ class UploadIngestionServiceTest {
     }
 
     @Test
+    void loneJsonColumnStoresWholeDocumentViaParseAsJson() throws Exception {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("k", "v");
+        value.put("n", 3);
+
+        TableSchema tableSchema = new TableSchema("t");
+        tableSchema.addColumn("doc", "JSON", Types.OTHER, true);
+
+        service(tableSchema, false).addRecords(List.of(record(null, value, 0L)));
+
+        Upload upload = captureSingleUpload();
+        assertEquals("INSERT INTO \"t\" (\"doc\") SELECT * FROM read_json('upload://batch', PARSE_AS_JSON => TRUE)", upload.sql);
+        assertTrue(new String(upload.payload, StandardCharsets.UTF_8).contains("\"k\":\"v\""));
+    }
+
+    @Test
     void schemalessProjectionDropsUnknownFieldsAndMatchesCaseInsensitively() throws Exception {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("UserId", 1);

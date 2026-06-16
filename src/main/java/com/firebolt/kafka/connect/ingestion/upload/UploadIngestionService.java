@@ -144,6 +144,7 @@ public class UploadIngestionService implements IngestionService {
     private void ingestJson(List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
         ByteArrayOutputStream ndjson = new ByteArrayOutputStream();
         Set<String> fields = new LinkedHashSet<>();
+        boolean any = false;
         for (SinkRecord record : records) {
             if (!(record.value() instanceof Map)) {
                 handleBadRecord(record, new RecordConversionException("Schemaless record value is not a JSON object: " + record.value().getClass().getName()));
@@ -157,11 +158,33 @@ public class UploadIngestionService implements IngestionService {
                 continue;
             }
             ((Map<?, ?>) record.value()).keySet().forEach(key -> fields.add(String.valueOf(key)));
+            any = true;
         }
-        if (fields.isEmpty()) {
+        if (!any) {
             return;
         }
+
+        // A lone JSON column means "store the whole record": let read_json keep each document
+        // intact (PARSE_AS_JSON) instead of inferring per-field types.
+        String wholeDocColumn = soleJsonColumn();
+        if (wholeDocColumn != null) {
+            String sql = String.format("INSERT INTO \"%s\" (%s) SELECT * FROM read_json('upload://%s', PARSE_AS_JSON => TRUE)",
+                    tableSchema.getTableName(), quoteIdentifier(wholeDocColumn), MULTIPART_NAME);
+            log.debug("Ingesting {} bytes via read_json(PARSE_AS_JSON): {}", ndjson.size(), sql);
+            execute(sql, ndjson.toByteArray());
+            return;
+        }
+
         uploadAndInsert("read_json", ndjson.toByteArray(), new ArrayList<>(fields), literalColumns);
+    }
+
+    /** The single column's name if the table is exactly one JSON column, else null. */
+    private String soleJsonColumn() {
+        List<TableSchema.Column> columns = tableSchema.getColumns();
+        if (columns.size() == 1 && "JSON".equalsIgnoreCase(columns.get(0).getDataType())) {
+            return columns.get(0).getName();
+        }
+        return null;
     }
 
     /** AvroData maps an optional struct schema to a [null, record] union; the writer needs the record branch. */
