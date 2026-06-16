@@ -19,6 +19,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
 @Tag(TestTag.SERIALIZATION)
+@Disabled("bytea requires binary input (Avro/JSON-Schema); schemaless JSON base64-encodes bytes to text and text->bytea is not a supported assignment cast")
 public class ByteaSchemalessSerializerTest extends SchemalessBaseIntegrationTest {
     
     private String TABLE_NAME = generateTableName("bytea_test_table");

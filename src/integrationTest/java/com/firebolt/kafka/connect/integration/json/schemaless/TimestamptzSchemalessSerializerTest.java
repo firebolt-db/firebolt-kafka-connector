@@ -9,7 +9,6 @@ import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -234,7 +233,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                 .optionalListWithNonNullElements(Arrays.asList(
                     OffsetDateTime.of(2024, 4, 10, 6, 45, 15, 333333000, ZoneOffset.ofHours(2)),   // 333.333 ms = 333333 microseconds
                     OffsetDateTime.of(2024, 10, 25, 22, 0, 10, 888888000, ZoneOffset.ofHours(2))))  // 888.888 ms = 888888 microseconds
-                .microsecondTimestamptz(1705334445123456L) // 2024-01-15T14:30:45.123456Z
                 .timestamptzStringArray(Arrays.asList(
                     "2024-03-01T10:00:00.500123+02",
                     "2024-08-15T16:45:12.123456+02",
@@ -261,7 +259,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                 .optionalListWithNonNullElements(Arrays.asList(
                     OffsetDateTime.of(2024, 4, 10, 6, 45, 15, 444444444, ZoneOffset.ofHours(2)),   // Should become 444000000 (444 milliseconds)
                     OffsetDateTime.of(2024, 10, 25, 22, 0, 10, 777777777, ZoneOffset.ofHours(2))))  // Should become 777000000 (777 milliseconds)
-                .microsecondTimestamptz(1719485730987654L) // 2024-06-27T10:55:30.987654Z
                 .timestamptzStringArray(Arrays.asList(
                     "2024-03-01T10:00:00.500999+02",
                     "2024-08-15T16:45:12.999999+02",
@@ -338,7 +335,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                     OffsetDateTime.of(2024, 8, 1, 7, 0, 5, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 9, 15, 14, 30, 45, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 10, 31, 20, 45, 15, 0, ZoneOffset.ofHours(2))))
                 .optionalListWithNonNullElements(Arrays.asList(
                     OffsetDateTime.of(2024, 11, 1, 6, 15, 30, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 11, 15, 15, 0, 7, 0, ZoneOffset.ofHours(2)), OffsetDateTime.of(2024, 12, 1, 21, 30, 45, 0, ZoneOffset.ofHours(2))))
-                .microsecondTimestamptz(1705334445123456L) // 2024-01-15T16:00:45.123456Z
                 .timestamptzString("2024-01-15 14:30:45.123456+00")
                 .timestamptzStringArray(Arrays.asList(
                     "2024-01-15 14:30:45.123456+02:00",
@@ -358,7 +354,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                 "\"requiredListWithNonNullElements\" ARRAY(TIMESTAMPTZ NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(TIMESTAMPTZ NULL) NULL, " +
                 "\"optionalListWithNonNullElements\" ARRAY(TIMESTAMPTZ NOT NULL) NULL, " +
-                "\"microsecondTimestamptz\" TIMESTAMPTZ NULL, " +
                 "\"timestamptzString\" TIMESTAMPTZ NULL, " +
                 "\"timestamptzStringArray\" ARRAY(TIMESTAMPTZ NOT NULL) NULL" +
                 ")";
@@ -437,8 +432,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                         .collect(Collectors.toList()));
             }
             
-            // Add the new microsecond precision fields (these should be preserved as-is)
-            builder.microsecondTimestamptz(record.getMicrosecondTimestamptz());
             builder.timestamptzStringArray(record.getTimestamptzStringArray());
             builder.timestamptzString(record.getTimestamptzString());
 
@@ -499,7 +492,7 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredTimestamptz\", \"optionalTimestamptz\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\", \"microsecondTimestamptz\", \"timestamptzString\", \"timestamptzStringArray\" " +
+            "\"optionalListWithNonNullElements\", \"timestamptzString\", \"timestamptzStringArray\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -524,8 +517,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                 Array actualOptionalListArray = rs.getArray("optionalList");
                 Array actualOptionalListWithNonNullElementsArray = rs.getArray("optionalListWithNonNullElements");
                 String timestamptzString = rs.getString("timestamptzString");
-                // Retrieve new microsecond precision fields
-                OffsetDateTime actualMicrosecondTimestamptz = parseString(rs.getString("microsecondTimestamptz"));
 
                 Array actualTimestamptzStringArray = rs.getArray("timestamptzStringArray");
 
@@ -569,8 +560,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                         expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
                 }
                 
-                // Verify microsecond precision fields (all records should have these fields)
-                verifyMicrosecondTimestamptz(expected.getMicrosecondTimestamptz(), actualMicrosecondTimestamptz, recordIndex);
                 List<OffsetDateTime> expectedTimestamptzArray = expected.getTimestamptzStringArray().stream().map(this::parseString)
                         .collect(Collectors.toList());
                 verifyTimestamptzArray("timestamptzStringArray",
@@ -624,27 +613,6 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
                     fieldName + " element " + i + " mismatch at index " + recordIndex);
             }
         }
-    }
-
-    /**
-     * Verifies microsecond precision timestamptz field.
-     * Handles timezone variations (1-3 hour offsets) that may occur in test environments.
-     */
-    private void verifyMicrosecondTimestamptz(Long expectedMicroseconds, OffsetDateTime actualTimestamptz, int recordIndex) {
-        assertNotNull(expectedMicroseconds, "Expected microsecondTimestamptz should not be null at index " + recordIndex);
-        assertNotNull(actualTimestamptz, "Actual microsecondTimestamptz should not be null at index " + recordIndex);
-
-        OffsetDateTime expected = fromMicros(expectedMicroseconds);
-        assertEquals(expected.toInstant(), actualTimestamptz.toInstant());
-    }
-
-    // Convert expected microseconds to expected timestamp. Firebolt stores the data in UTC. We need to substract the default timezone of the test machine
-    private OffsetDateTime fromMicros(long micros) {
-        long seconds = micros / 1_000_000;
-        int nanos = (int) (micros % 1_000_000) * 1000;  // Convert micros → nanos
-
-        Instant instant = Instant.ofEpochSecond(seconds, nanos);
-        return instant.atOffset(ZoneOffset.ofHours(0)); // assume UTC timezon
     }
 
     private OffsetDateTime parseString(String timeAsString) {

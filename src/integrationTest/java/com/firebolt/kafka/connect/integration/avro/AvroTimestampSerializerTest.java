@@ -106,14 +106,14 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
     private GenericData.Record createValidRecord(Schema schema, int recordId, String timestampAsString) {
         GenericData.Record record = new GenericData.Record(schema);
         record.put("recordId", recordId);
-        record.put("requiredTimestamp", toEpochMicros(LocalDateTime.of(2024, 1, 15, 14, 30, 45)));
-        record.put("optionalTimestamp", toEpochMicros(LocalDateTime.of(2024, 2, 28, 16, 45, 30)));
+        record.put("requiredTimestamp", toEpochMillis(LocalDateTime.of(2024, 1, 15, 14, 30, 45)));
+        record.put("optionalTimestamp", toEpochMillis(LocalDateTime.of(2024, 2, 28, 16, 45, 30)));
         record.put("requiredListWithNullableElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 3, 1, 9, 0, 0)), null,
-                toEpochMicros(LocalDateTime.of(2024, 3, 31, 17, 30, 15))));
+                toEpochMillis(LocalDateTime.of(2024, 3, 1, 9, 0, 0)), null,
+                toEpochMillis(LocalDateTime.of(2024, 3, 31, 17, 30, 15))));
         record.put("requiredListWithNonNullElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 5, 1, 8, 30, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 6, 15, 13, 45, 30))));
+                toEpochMillis(LocalDateTime.of(2024, 5, 1, 8, 30, 0)),
+                toEpochMillis(LocalDateTime.of(2024, 6, 15, 13, 45, 30))));
         record.put("optionalList", null);
         record.put("optionalListWithNonNullElements", null);
         record.put("timestampAsString", timestampAsString);
@@ -126,39 +126,39 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
         // Record 1: typical values
         GenericData.Record r1 = new GenericData.Record(schema);
         r1.put("recordId", 1);
-        r1.put("requiredTimestamp", toEpochMicros(LocalDateTime.of(2024, 1, 15, 14, 30, 45)));
-        r1.put("optionalTimestamp", toEpochMicros(LocalDateTime.of(2024, 2, 28, 16, 45, 30)));
+        r1.put("requiredTimestamp", toEpochMillis(LocalDateTime.of(2024, 1, 15, 14, 30, 45)));
+        r1.put("optionalTimestamp", toEpochMillis(LocalDateTime.of(2024, 2, 28, 16, 45, 30)));
         r1.put("requiredListWithNullableElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 3, 1, 9, 0, 0)), null,
-                toEpochMicros(LocalDateTime.of(2024, 3, 31, 17, 30, 15)), null,
-                toEpochMicros(LocalDateTime.of(2024, 4, 15, 12, 15, 45))));
+                toEpochMillis(LocalDateTime.of(2024, 3, 1, 9, 0, 0)), null,
+                toEpochMillis(LocalDateTime.of(2024, 3, 31, 17, 30, 15)), null,
+                toEpochMillis(LocalDateTime.of(2024, 4, 15, 12, 15, 45))));
         r1.put("requiredListWithNonNullElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 5, 1, 8, 30, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 6, 15, 13, 45, 30)),
-                toEpochMicros(LocalDateTime.of(2024, 7, 31, 19, 15, 0))));
+                toEpochMillis(LocalDateTime.of(2024, 5, 1, 8, 30, 0)),
+                toEpochMillis(LocalDateTime.of(2024, 6, 15, 13, 45, 30)),
+                toEpochMillis(LocalDateTime.of(2024, 7, 31, 19, 15, 0))));
         r1.put("optionalList", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 8, 1, 7, 0, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 9, 15, 14, 30, 45)),
-                toEpochMicros(LocalDateTime.of(2024, 10, 31, 20, 45, 15))));
+                toEpochMillis(LocalDateTime.of(2024, 8, 1, 7, 0, 0)),
+                toEpochMillis(LocalDateTime.of(2024, 9, 15, 14, 30, 45)),
+                toEpochMillis(LocalDateTime.of(2024, 10, 31, 20, 45, 15))));
         r1.put("optionalListWithNonNullElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 11, 1, 6, 15, 30)),
-                toEpochMicros(LocalDateTime.of(2024, 12, 1, 21, 30, 45))));
+                toEpochMillis(LocalDateTime.of(2024, 11, 1, 6, 15, 30)),
+                toEpochMillis(LocalDateTime.of(2024, 12, 1, 21, 30, 45))));
         r1.put("timestampAsString", "2024-01-15 14:30:45");
         records.add(r1);
 
         // Record 2: Unix epoch, null optional, historical dates
         GenericData.Record r2 = new GenericData.Record(schema);
         r2.put("recordId", 2);
-        r2.put("requiredTimestamp", toEpochMicros(LocalDateTime.of(1970, 1, 1, 0, 0, 0)));
+        r2.put("requiredTimestamp", toEpochMillis(LocalDateTime.of(1970, 1, 1, 0, 0, 0)));
         r2.put("optionalTimestamp", null);
         r2.put("requiredListWithNullableElements", Arrays.asList(
                 null, null,
-                toEpochMicros(LocalDateTime.of(1970, 1, 1, 0, 0, 0)),
-                toEpochMicros(LocalDateTime.of(2000, 1, 1, 12, 0, 0))));
+                toEpochMillis(LocalDateTime.of(1970, 1, 1, 0, 0, 0)),
+                toEpochMillis(LocalDateTime.of(2000, 1, 1, 12, 0, 0))));
         r2.put("requiredListWithNonNullElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(1970, 1, 1, 0, 0, 0)),
-                toEpochMicros(LocalDateTime.of(2000, 1, 1, 0, 0, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 6, 15, 14, 30, 45))));
+                toEpochMillis(LocalDateTime.of(1970, 1, 1, 0, 0, 0)),
+                toEpochMillis(LocalDateTime.of(2000, 1, 1, 0, 0, 0)),
+                toEpochMillis(LocalDateTime.of(2024, 6, 15, 14, 30, 45))));
         r2.put("optionalList", null);
         r2.put("optionalListWithNonNullElements", null);
         r2.put("timestampAsString", "1970-01-01 00:00:00");
@@ -167,8 +167,8 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
         // Record 3: leap year dates, empty lists
         GenericData.Record r3 = new GenericData.Record(schema);
         r3.put("recordId", 3);
-        r3.put("requiredTimestamp", toEpochMicros(LocalDateTime.of(2024, 2, 29, 12, 0, 0)));
-        r3.put("optionalTimestamp", toEpochMicros(LocalDateTime.of(2020, 2, 29, 23, 59, 59)));
+        r3.put("requiredTimestamp", toEpochMillis(LocalDateTime.of(2024, 2, 29, 12, 0, 0)));
+        r3.put("optionalTimestamp", toEpochMillis(LocalDateTime.of(2020, 2, 29, 23, 59, 59)));
         r3.put("requiredListWithNullableElements", new ArrayList<>());
         r3.put("requiredListWithNonNullElements", new ArrayList<>());
         r3.put("optionalList", new ArrayList<>());
@@ -179,39 +179,39 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
         // Record 4: end-of-year timestamps, mixed arrays
         GenericData.Record r4 = new GenericData.Record(schema);
         r4.put("recordId", 4);
-        r4.put("requiredTimestamp", toEpochMicros(LocalDateTime.of(2024, 12, 31, 23, 59, 59)));
-        r4.put("optionalTimestamp", toEpochMicros(LocalDateTime.of(2025, 1, 1, 0, 0, 0)));
+        r4.put("requiredTimestamp", toEpochMillis(LocalDateTime.of(2024, 12, 31, 23, 59, 59)));
+        r4.put("optionalTimestamp", toEpochMillis(LocalDateTime.of(2025, 1, 1, 0, 0, 0)));
         r4.put("requiredListWithNullableElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 2, 29, 6, 30, 15)), null,
-                toEpochMicros(LocalDateTime.of(2020, 2, 29, 18, 45, 30))));
+                toEpochMillis(LocalDateTime.of(2024, 2, 29, 6, 30, 15)), null,
+                toEpochMillis(LocalDateTime.of(2020, 2, 29, 18, 45, 30))));
         r4.put("requiredListWithNonNullElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 2, 29, 9, 15, 45)),
-                toEpochMicros(LocalDateTime.of(2020, 2, 29, 15, 30, 0)),
-                toEpochMicros(LocalDateTime.of(2016, 2, 29, 21, 45, 15))));
+                toEpochMillis(LocalDateTime.of(2024, 2, 29, 9, 15, 45)),
+                toEpochMillis(LocalDateTime.of(2020, 2, 29, 15, 30, 0)),
+                toEpochMillis(LocalDateTime.of(2016, 2, 29, 21, 45, 15))));
         r4.put("optionalList", Arrays.asList(
-                null, toEpochMicros(LocalDateTime.of(2024, 3, 15, 10, 30, 0)), null,
-                toEpochMicros(LocalDateTime.of(2024, 9, 30, 16, 45, 30))));
+                null, toEpochMillis(LocalDateTime.of(2024, 3, 15, 10, 30, 0)), null,
+                toEpochMillis(LocalDateTime.of(2024, 9, 30, 16, 45, 30))));
         r4.put("optionalListWithNonNullElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 4, 1, 8, 0, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 8, 31, 17, 30, 45))));
+                toEpochMillis(LocalDateTime.of(2024, 4, 1, 8, 0, 0)),
+                toEpochMillis(LocalDateTime.of(2024, 8, 31, 17, 30, 45))));
         r4.put("timestampAsString", "2024-12-31 23:59:59");
         records.add(r4);
 
-        // Record 5: microsecond precision
+        // Record 5: millisecond precision (timestamp-millis only supports ms)
         GenericData.Record r5 = new GenericData.Record(schema);
         r5.put("recordId", 5);
-        r5.put("requiredTimestamp", toEpochMicros(LocalDateTime.of(2024, 1, 15, 14, 30, 45, 123456_000)));
-        r5.put("optionalTimestamp", toEpochMicros(LocalDateTime.of(2024, 6, 30, 9, 15, 30, 987654_000)));
+        r5.put("requiredTimestamp", toEpochMillis(LocalDateTime.of(2024, 1, 15, 14, 30, 45, 123_000_000)));
+        r5.put("optionalTimestamp", toEpochMillis(LocalDateTime.of(2024, 6, 30, 9, 15, 30, 987_000_000)));
         r5.put("requiredListWithNullableElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 3, 1, 10, 0, 0, 500_000_000)),
+                toEpochMillis(LocalDateTime.of(2024, 3, 1, 10, 0, 0, 500_000_000)),
                 null,
-                toEpochMicros(LocalDateTime.of(2024, 8, 15, 16, 45, 12, 123456_000))));
+                toEpochMillis(LocalDateTime.of(2024, 8, 15, 16, 45, 12, 123_000_000))));
         r5.put("requiredListWithNonNullElements", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 5, 20, 8, 30, 45, 750_000_000)),
-                toEpochMicros(LocalDateTime.of(2024, 9, 10, 20, 15, 30, 999999_000))));
+                toEpochMillis(LocalDateTime.of(2024, 5, 20, 8, 30, 45, 750_000_000)),
+                toEpochMillis(LocalDateTime.of(2024, 9, 10, 20, 15, 30, 999_000_000))));
         r5.put("optionalList", null);
         r5.put("optionalListWithNonNullElements", null);
-        r5.put("timestampAsString", "2024-01-15 14:30:45.123456");
+        r5.put("timestampAsString", "2024-01-15 14:30:45.123");
         records.add(r5);
 
         return records;
@@ -237,12 +237,12 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
                 "  \"namespace\": \"com.firebolt.kafka.connect.integration.avro\",\n" +
                 "  \"fields\": [\n" +
                 "    {\"name\": \"recordId\", \"type\": \"int\"},\n" +
-                "    {\"name\": \"requiredTimestamp\", \"type\": {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}},\n" +
-                "    {\"name\": \"optionalTimestamp\", \"type\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}], \"default\": null},\n" +
-                "    {\"name\": \"requiredListWithNullableElements\", \"type\": {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}]}},\n" +
-                "    {\"name\": \"requiredListWithNonNullElements\", \"type\": {\"type\": \"array\", \"items\": {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}}},\n" +
-                "    {\"name\": \"optionalList\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}]}], \"default\": null},\n" +
-                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}}], \"default\": null},\n" +
+                "    {\"name\": \"requiredTimestamp\", \"type\": {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}},\n" +
+                "    {\"name\": \"optionalTimestamp\", \"type\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}], \"default\": null},\n" +
+                "    {\"name\": \"requiredListWithNullableElements\", \"type\": {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}]}},\n" +
+                "    {\"name\": \"requiredListWithNonNullElements\", \"type\": {\"type\": \"array\", \"items\": {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}}},\n" +
+                "    {\"name\": \"optionalList\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}]}], \"default\": null},\n" +
+                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}}], \"default\": null},\n" +
                 "    {\"name\": \"timestampAsString\", \"type\": \"string\"}\n" +
                 "  ]\n" +
                 "}";
@@ -267,7 +267,7 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
 
                 assertEquals(expected.get("recordId"), rs.getInt("recordId"));
 
-                LocalDateTime expectedRequired = epochMicrosToLocalDateTime((Long) expected.get("requiredTimestamp"));
+                LocalDateTime expectedRequired = epochMillisToLocalDateTime((Long) expected.get("requiredTimestamp"));
                 Timestamp actualRequired = rs.getTimestamp("requiredTimestamp");
                 assertNotNull(actualRequired, "requiredTimestamp should not be null at index " + idx);
                 assertEquals(expectedRequired, actualRequired.toLocalDateTime(),
@@ -279,7 +279,7 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
                     assertNull(actualOptional, "optionalTimestamp should be null at index " + idx);
                 } else {
                     assertNotNull(actualOptional, "optionalTimestamp should not be null at index " + idx);
-                    LocalDateTime expectedOpt = epochMicrosToLocalDateTime((Long) expectedOptionalObj);
+                    LocalDateTime expectedOpt = epochMillisToLocalDateTime((Long) expectedOptionalObj);
                     assertEquals(expectedOpt, actualOptional.toLocalDateTime(),
                             "optionalTimestamp mismatch at index " + idx);
                 }
@@ -328,22 +328,19 @@ public class AvroTimestampSerializerTest extends AvroBaseIntegrationTest {
             } else {
                 assertNotNull(elements[i],
                         fieldName + " element " + i + " should not be null at index " + idx);
-                LocalDateTime expectedTs = epochMicrosToLocalDateTime((Long) expectedObj);
+                LocalDateTime expectedTs = epochMillisToLocalDateTime((Long) expectedObj);
                 assertEquals(expectedTs, elements[i].toLocalDateTime(),
                         fieldName + " element " + i + " mismatch at index " + idx);
             }
         }
     }
 
-    private long toEpochMicros(LocalDateTime ldt) {
-        Instant instant = ldt.toInstant(ZoneOffset.UTC);
-        return instant.getEpochSecond() * 1_000_000L + instant.getNano() / 1_000L;
+    private long toEpochMillis(LocalDateTime ldt) {
+        return ldt.toInstant(ZoneOffset.UTC).toEpochMilli();
     }
 
-    private LocalDateTime epochMicrosToLocalDateTime(long epochMicros) {
-        long epochSeconds = epochMicros / 1_000_000L;
-        long microRemainder = epochMicros % 1_000_000L;
-        Instant instant = Instant.ofEpochSecond(epochSeconds, microRemainder * 1_000L);
+    private LocalDateTime epochMillisToLocalDateTime(long epochMillis) {
+        Instant instant = Instant.ofEpochMilli(epochMillis);
         return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 }
