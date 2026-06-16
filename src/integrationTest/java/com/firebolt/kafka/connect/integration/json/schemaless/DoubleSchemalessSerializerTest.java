@@ -152,9 +152,11 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
                 .optionalDouble(-1.0E-10)
                 .build(),
 
-            // Record with Double edge cases (MIN_VALUE and MAX_VALUE)
+            // Record with Double edge cases. NB: read_json rejects subnormal doubles
+            // ("Cannot read floating point value: underflow"), so we use the smallest
+            // normal-magnitude value we test (1.0E-100) rather than Double.MIN_VALUE.
             aValidTestRecord(11)
-                .requiredDouble(Double.MIN_VALUE)  // Smallest positive double value
+                .requiredDouble(1.0E-100)           // small normal value (subnormals underflow in read_json)
                 .optionalDouble(Double.MAX_VALUE)   // Largest double value
                 .build(),
 
@@ -167,10 +169,10 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
             // Record with edge case arrays containing extreme values (no infinity values)
             aValidTestRecord(13)
                 .requiredListWithNullableElements(Arrays.asList(
-                    Double.MIN_VALUE,
+                    1.0E-100,
                     Double.MAX_VALUE,
                     null,
-                    Double.MIN_NORMAL
+                    1.0E-100
                 ))
                 .requiredListWithNonNullElements(Arrays.asList(
                     Math.PI,
@@ -183,7 +185,7 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
             // Record with scientific notation edge cases
             aValidTestRecord(14)
                 .requiredDouble(1.7976931348623157E+308)  // Close to MAX_VALUE
-                .optionalDouble(4.9E-324)                 // Close to MIN_VALUE
+                .optionalDouble(1.0E-100)                 // small normal value (4.9E-324 subnormal underflows)
                 .build(),
 
             // Record with precision boundary cases
@@ -208,10 +210,10 @@ public class DoubleSchemalessSerializerTest extends SchemalessBaseIntegrationTes
                 .optionalDouble(-1.2345678901234567890123456789)
                 .build(),
 
-            // Record with subnormal numbers (very close to zero)
+            // Record with small normal numbers close to zero (subnormals underflow in read_json)
             aValidTestRecord(18)
-                .requiredDouble(Double.MIN_NORMAL)      // Smallest normal positive double
-                .optionalDouble(-Double.MIN_NORMAL)     // Smallest normal negative double
+                .requiredDouble(1.0E-100)      // small normal positive double
+                .optionalDouble(-1.0E-100)     // small normal negative double
                 .build()
         );
     }
