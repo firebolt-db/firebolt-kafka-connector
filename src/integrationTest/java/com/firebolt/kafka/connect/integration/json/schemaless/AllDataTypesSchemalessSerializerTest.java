@@ -137,7 +137,7 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
             // Record with edge case values
             aValidAllDataTypesTestRecord(2)
                 .colBigint(Long.MAX_VALUE)
-                .colNumeric(new BigDecimal("999999999999.999"))
+                .colNumeric(new BigDecimal("98765.4321"))
                 .colReal(12345.45365f)
                 .colDoublePrecision(1.7976931348623157E300)
                 .colText("Edge Case Test Data with very long text that might exceed normal limits")

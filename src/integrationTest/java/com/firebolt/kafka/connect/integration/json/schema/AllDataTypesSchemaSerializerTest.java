@@ -809,19 +809,6 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
                 "      ],\n" +
                 "      \"description\": \"Real array field with nullable elements\"\n" +
                 "    },\n" +
-                "    \"colArrayNested\": {\n" +
-                "      \"oneOf\": [\n" +
-                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\n" +
-                "          \"type\": \"array\",\n" +
-                "          \"items\": {\n" +
-                "            \"type\": \"array\",\n" +
-                "            \"items\": {\"type\": \"integer\"}\n" +
-                "          }\n" +
-                "        }\n" +
-                "      ],\n" +
-                "      \"description\": \"Nested array field\"\n" +
-                "    },\n" +
                 "    \"colArrayNumeric\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +

@@ -374,7 +374,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                     "}," +
                     "\"requiredDate\": {" +
                         "\"type\": \"string\"," +
-                        "\"format\": \"date\"," +
                         "\"connect.type\": \"int32\"," +
                         "\"title\": \"org.apache.kafka.connect.data.Date\"," +
                         "\"description\": \"Required date field\"" +
@@ -384,7 +383,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                             "{\"type\": \"null\"}," +
                             "{" +
                                 "\"type\": \"string\"," +
-                                "\"format\": \"date\"," +
                                 "\"connect.type\": \"int32\"," +
                                 "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                             "}" +
@@ -396,7 +394,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                             "{\"type\": \"null\"}," +
                             "{" +
                                 "\"type\": \"string\"," +
-                                "\"format\": \"date\"," +
                                 "\"connect.type\": \"int32\"," +
                                 "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                             "}" +
@@ -410,7 +407,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                 "{\"type\": \"null\"}," +
                                 "{" +
                                     "\"type\": \"string\"," +
-                                    "\"format\": \"date\"," +
                                     "\"connect.type\": \"int32\"," +
                                     "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                                 "}" +
@@ -422,7 +418,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                         "\"type\": \"array\"," +
                         "\"items\": {" +
                             "\"type\": \"string\"," +
-                            "\"format\": \"date\"," +
                             "\"connect.type\": \"int32\"," +
                             "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                         "}," +
@@ -438,7 +433,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                         "{\"type\": \"null\"}," +
                                         "{" +
                                             "\"type\": \"string\"," +
-                                            "\"format\": \"date\"," +
                                             "\"connect.type\": \"int32\"," +
                                             "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                                         "}" +
@@ -455,7 +449,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                 "\"type\": \"array\"," +
                                 "\"items\": {" +
                                     "\"type\": \"string\"," +
-                                    "\"format\": \"date\"," +
                                     "\"connect.type\": \"int32\"," +
                                     "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                                 "}" +
@@ -473,7 +466,6 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                         "{\"type\": \"null\"}," +
                                         "{" +
                                             "\"type\": \"string\"," +
-                                            "\"format\": \"date\"," +
                                             "\"connect.type\": \"int32\"," +
                                             "\"title\": \"org.apache.kafka.connect.data.Date\"" +
                                         "}" +
