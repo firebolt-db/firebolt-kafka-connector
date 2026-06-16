@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.ingestion.parquet;
+package com.firebolt.kafka.connect.ingestion.upload;
 
 import java.io.ByteArrayOutputStream;
 import org.apache.parquet.io.OutputFile;

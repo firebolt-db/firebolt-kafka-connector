@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.ingestion.parquet.ParquetIngestionService;
+import com.firebolt.kafka.connect.ingestion.upload.UploadIngestionService;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.sql.Connection;
 import java.util.Optional;
@@ -13,7 +13,7 @@ public class IngestionServiceProvider {
 
     public IngestionService get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, SinkConfig sinkConfig) {
         IngestionService ingestionService =
-                new ParquetIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableSchema);
+                new UploadIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableSchema);
 
         Optional<String> postProcessingScript = sinkConfig.getPostProcessingScript(tableSchema.getTableName());
         return postProcessingScript == null || postProcessingScript.isEmpty() ? ingestionService

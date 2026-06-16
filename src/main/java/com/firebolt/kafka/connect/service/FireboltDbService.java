@@ -118,6 +118,11 @@ public class FireboltDbService {
                 int precision     = rs.getInt("COLUMN_SIZE");    // for DECIMAL/NUMERIC: precision
                 int scale         = rs.getInt("DECIMAL_DIGITS");
 
+                // Prefer the canonical full type from information_schema (e.g. NUMERIC(38, 2), ARRAY(TEXT));
+                // the JDBC TYPE_NAME is compacted and loses precision/element type. The full type is used
+                // as the CAST target when ingesting, so it must be complete.
+                String fullDataType = columnToFullDataTypeMap.getOrDefault(columnName, dataType);
+
                 // for numeric array get the scale and precision from the full data type
                 if (sqlType == Types.ARRAY && columnToFullDataTypeMap.get(columnName).contains("NUMERIC")) {
                     Pair<Integer, Integer> precisionAndScalePair = parsePrecisionAndScale(columnToFullDataTypeMap.get(columnName));
@@ -125,7 +130,7 @@ public class FireboltDbService {
                     scale = precisionAndScalePair.getRight();
                 }
 
-                schema.addColumn(columnName, dataType, sqlType, nullable, precision, scale);
+                schema.addColumn(columnName, fullDataType, sqlType, nullable, precision, scale);
                 log.debug("Found column in table '{}': {} ({}, SQL type: {}, nullable: {})",
                         tableName, columnName, dataType, sqlType, nullable);
             }

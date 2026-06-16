@@ -37,7 +37,7 @@ import org.apache.kafka.connect.sink.ErrantRecordReporter;
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import org.apache.kafka.connect.errors.RetriableException;
-import com.firebolt.kafka.connect.ingestion.parquet.RecordConversionException;
+import com.firebolt.kafka.connect.ingestion.upload.RecordConversionException;
 
 public class FireboltSinkTaskTest {
 

@@ -1,6 +1,6 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.ingestion.parquet.RecordConversionException;
+import com.firebolt.kafka.connect.ingestion.upload.RecordConversionException;
 import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;

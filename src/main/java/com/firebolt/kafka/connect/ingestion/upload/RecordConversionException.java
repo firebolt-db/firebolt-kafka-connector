@@ -1,4 +1,4 @@
-package com.firebolt.kafka.connect.ingestion.parquet;
+package com.firebolt.kafka.connect.ingestion.upload;
 
 /**
  * A record could not be converted to the Avro/Parquet representation. Non-retriable:
