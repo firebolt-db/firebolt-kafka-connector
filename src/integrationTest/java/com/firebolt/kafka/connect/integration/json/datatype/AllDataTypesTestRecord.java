@@ -4,6 +4,8 @@ package com.firebolt.kafka.connect.integration.json.datatype;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.firebolt.kafka.connect.integration.json.datatype.serializer.DateListSerializer;
 import com.firebolt.kafka.connect.integration.json.datatype.serializer.DateSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateTimeListSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateTimeSerializer;
 import com.firebolt.kafka.connect.integration.json.datatype.serializer.OffsetDateTimeListSerializer;
 import com.firebolt.kafka.connect.integration.json.datatype.serializer.OffsetDateTimeSerializer;
 import java.math.BigDecimal;
@@ -49,7 +51,8 @@ public class AllDataTypesTestRecord {
     // Date and timestamp types
     @JsonSerialize(using = DateSerializer.class)
     private Date colDate;           // colDate DATE
-    private LocalDateTime colTimestamp;  // colTimestamp TIMESTAMP
+    @JsonSerialize(using = LocalDateTimeSerializer.class)
+    private LocalDateTime colTimestamp;  // colTimestamp TIMESTAMP (epoch millis, Connect Timestamp logical)
     @JsonSerialize(using = OffsetDateTimeSerializer.class)
     private OffsetDateTime colTimestamptz; // colTimestamptz TIMESTAMPTZ
     
@@ -70,6 +73,7 @@ public class AllDataTypesTestRecord {
     private List<Double> colArrayDoublePrecision; // colArrayDoublePrecision ARRAY(DOUBLE PRECISION)
     @JsonSerialize(using = OffsetDateTimeListSerializer.class)
     private List<OffsetDateTime> colArrayTimestamptz; // colArrayTimestamptz ARRAY(TIMESTAMPTZ)
-    private List<LocalDateTime> colArrayTimestamp;    // colArrayTimestamp ARRAY(TIMESTAMP)
+    @JsonSerialize(using = LocalDateTimeListSerializer.class)
+    private List<LocalDateTime> colArrayTimestamp;    // colArrayTimestamp ARRAY(TIMESTAMP) (epoch millis, Connect Timestamp logical)
 
 } 

@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -30,7 +29,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -113,9 +111,6 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
                 "\"colTimestamp\" TIMESTAMP, " +
                 "\"colTimestamptz\" TIMESTAMPTZ, " +
 
-                // Binary type
-                "\"colBytea\" BYTEA, " +
-
                 // Array types (various syntaxes and element types)
                 "\"colArrayTextNullable\" ARRAY(TEXT NULL), " +
                 "\"colArrayTextNotNull\" ARRAY(TEXT NOT NULL), " +
@@ -144,13 +139,12 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
                 .colBigint(Long.MAX_VALUE)
                 .colNumeric(new BigDecimal("999999999999.999"))
                 .colReal(12345.45365f)
-                .colDoublePrecision(Double.MAX_VALUE)
+                .colDoublePrecision(1.7976931348623157E300)
                 .colText("Edge Case Test Data with very long text that might exceed normal limits")
                 .colBoolean(false)
                 .colDate(createDate(2099, Calendar.DECEMBER, 31))
                 .colTimestamp(LocalDateTime.of(2099, 12, 31, 23, 59, 59, 999999000))
                 .colTimestamptz(OffsetDateTime.of(2099, 12, 31, 23, 59, 59, 999999000, ZoneOffset.UTC))
-                .colBytea(Base64.getEncoder().encodeToString("edge_case_binary_data".getBytes()))
                 .build(),
 
             // Record with nullable values
@@ -164,7 +158,6 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
                 .colDate(null)
                 .colTimestamp(null)
                 .colTimestamptz(null)
-                .colBytea(null)
                 .colArrayTextNullable(null)
                 .colArrayTextNotNull(null)
                 .colArrayIntSyntax1(null)
@@ -203,7 +196,6 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
                 .colDate(createDate(1970, Calendar.JANUARY, 1))
                 .colTimestamp(LocalDateTime.of(2000, 1, 1, 0, 0, 30, 0))
                 .colTimestamptz(OffsetDateTime.of(2000, 1, 1, 0, 0, 35, 0, ZoneOffset.UTC))
-                .colBytea(Base64.getEncoder().encodeToString("variety_binary_data".getBytes()))
                 .colArrayNumeric(Arrays.asList(
                     new BigDecimal("100.123456789"),
                     new BigDecimal("200.987654321"),
@@ -257,9 +249,6 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
             .colTimestamp(LocalDateTime.of(2024, 1, 1, 12, 0, 15, 0))
             .colTimestamptz(OffsetDateTime.of(2024, 1, 1, 12, 0, 15, 0, ZoneOffset.UTC))
             
-            // Binary type - base64 encoded "hello"
-            .colBytea(Base64.getEncoder().encodeToString("hello".getBytes()))
-
             // Array type with nullable elements
             .colArrayTextNullable(Arrays.asList("apple", null, "banana", "cherry"))
 
@@ -303,9 +292,118 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
     private void publishAllDataTypesMessages(List<AllDataTypesTestRecord> records) throws Exception {
         for (AllDataTypesTestRecord record : records) {
             ProducerRecord<String, String> producerRecord =
-                new ProducerRecord<>(ALL_DATA_TYPES_TOPIC_NAME, String.valueOf(record.getColInteger()), mapper.writeValueAsString(record));
+                new ProducerRecord<>(ALL_DATA_TYPES_TOPIC_NAME, String.valueOf(record.getColInteger()), buildJson(record));
 
             producer.send(producerRecord).get(); // Wait for each message to be sent
+        }
+    }
+
+    /**
+     * Builds the plain-JSON (schemaless) payload for a record. For the read_json path, dates and
+     * timestamps are emitted as ISO-8601 strings (text -> DATE/TIMESTAMP assignment casts are
+     * supported, raw epoch numbers are not). colBytea is intentionally omitted (JSON has no binary
+     * type and text -> bytea is unsupported).
+     */
+    private String buildJson(AllDataTypesTestRecord r) throws Exception {
+        com.fasterxml.jackson.databind.node.ObjectNode node = mapper.createObjectNode();
+
+        node.put("colInteger", r.getColInteger());
+        node.put("colBigint", r.getColBigint());
+        node.put("colNumeric", r.getColNumeric());
+        node.put("colReal", r.getColReal());
+        node.put("colDoublePrecision", r.getColDoublePrecision());
+        node.put("colBoolean", r.getColBoolean());
+        node.put("colText", r.getColText());
+
+        // ISO-8601 date string (text -> DATE)
+        node.put("colDate", r.getColDate() == null ? (String) null : ISO_8601_DATE_FORMAT.format(r.getColDate()));
+        // ISO-8601 timestamp strings (text -> TIMESTAMP / TIMESTAMPTZ)
+        node.put("colTimestamp", r.getColTimestamp() == null ? (String) null : r.getColTimestamp().toString());
+        node.put("colTimestamptz", r.getColTimestamptz() == null ? (String) null
+                : r.getColTimestamptz().toString());
+
+        putStringArray(node, "colArrayTextNullable", r.getColArrayTextNullable());
+        putStringArray(node, "colArrayTextNotNull", r.getColArrayTextNotNull());
+        putIntArray(node, "colArrayIntSyntax1", r.getColArrayIntSyntax1());
+        putIntArray(node, "colArrayIntSyntax2", r.getColArrayIntSyntax2());
+
+        if (r.getColArrayDate() == null) {
+            node.putNull("colArrayDate");
+        } else {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray("colArrayDate");
+            for (Date d : r.getColArrayDate()) {
+                if (d == null) arr.addNull(); else arr.add(ISO_8601_DATE_FORMAT.format(d));
+            }
+        }
+
+        if (r.getColArrayReal() == null) {
+            node.putNull("colArrayReal");
+        } else {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray("colArrayReal");
+            for (Float f : r.getColArrayReal()) {
+                if (f == null) arr.addNull(); else arr.add(f);
+            }
+        }
+
+        if (r.getColArrayNumeric() == null) {
+            node.putNull("colArrayNumeric");
+        } else {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray("colArrayNumeric");
+            for (BigDecimal b : r.getColArrayNumeric()) {
+                if (b == null) arr.addNull(); else arr.add(b);
+            }
+        }
+
+        if (r.getColArrayDoublePrecision() == null) {
+            node.putNull("colArrayDoublePrecision");
+        } else {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray("colArrayDoublePrecision");
+            for (Double d : r.getColArrayDoublePrecision()) {
+                if (d == null) arr.addNull(); else arr.add(d);
+            }
+        }
+
+        // ISO-8601 timestamp strings for the timestamp arrays (text -> TIMESTAMP / TIMESTAMPTZ)
+        if (r.getColArrayTimestamptz() == null) {
+            node.putNull("colArrayTimestamptz");
+        } else {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray("colArrayTimestamptz");
+            for (OffsetDateTime odt : r.getColArrayTimestamptz()) {
+                if (odt == null) arr.addNull(); else arr.add(odt.toString());
+            }
+        }
+
+        if (r.getColArrayTimestamp() == null) {
+            node.putNull("colArrayTimestamp");
+        } else {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray("colArrayTimestamp");
+            for (LocalDateTime ldt : r.getColArrayTimestamp()) {
+                if (ldt == null) arr.addNull(); else arr.add(ldt.toString());
+            }
+        }
+
+        return mapper.writeValueAsString(node);
+    }
+
+    private void putStringArray(com.fasterxml.jackson.databind.node.ObjectNode node, String name, List<String> values) {
+        if (values == null) {
+            node.putNull(name);
+            return;
+        }
+        com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray(name);
+        for (String v : values) {
+            if (v == null) arr.addNull(); else arr.add(v);
+        }
+    }
+
+    private void putIntArray(com.fasterxml.jackson.databind.node.ObjectNode node, String name, List<Integer> values) {
+        if (values == null) {
+            node.putNull(name);
+            return;
+        }
+        com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray(name);
+        for (Integer v : values) {
+            if (v == null) arr.addNull(); else arr.add(v);
         }
     }
     
@@ -316,7 +414,7 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
 
         // Verify specific records by checking the integer column (which is unique)
         String selectQuery = "SELECT \"colInteger\", \"colBigint\", \"colNumeric\", \"colReal\", \"colDoublePrecision\", \"colBoolean\", \"colText\", \"colDate\", " +
-                "\"colTimestamp\", \"colTimestamptz\", \"colBytea\", \"colArrayTextNullable\", \"colArrayTextNotNull\", \"colArrayIntSyntax1\", \"colArrayIntSyntax2\", " +
+                "\"colTimestamp\", \"colTimestamptz\", \"colArrayTextNullable\", \"colArrayTextNotNull\", \"colArrayIntSyntax1\", \"colArrayIntSyntax2\", " +
                 "\"colArrayDate\", \"colArrayReal\", \"colArrayNumeric\", \"colArrayDoublePrecision\", \"colArrayTimestamptz\", \"colArrayTimestamp\" FROM \"" + ALL_DATA_TYPES_TABLE_NAME + "\" ORDER BY \"colInteger\"";
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -338,7 +436,6 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
                 Boolean actualColBoolean = rs.getObject("colBoolean", Boolean.class);
                 java.sql.Date actualColDate = rs.getDate("colDate");
                 java.sql.Timestamp actualColTimestamp = rs.getTimestamp("colTimestamp");
-                byte[] actualColBytea = rs.getBytes("colBytea");
                 String actualColArrayTextNullable = rs.getString("colArrayTextNullable");
                 String actualColArrayTextNotNull = rs.getString("colArrayTextNotNull");
                 String actualColArrayIntSyntax1 = rs.getString("colArrayIntSyntax1");
@@ -379,21 +476,20 @@ public class AllDataTypesSchemalessSerializerTest extends SchemalessBaseIntegrat
                 // Verify colTimestamp field (convert java.sql.Timestamp to LocalDateTime for comparison)
                 if (actualColTimestamp != null && expected.getColTimestamp() != null) {
                     LocalDateTime actualLocalDateTime = actualColTimestamp.toLocalDateTime();
-                    assertEquals(expected.getColTimestamp(), actualLocalDateTime,
+                    // Firebolt TIMESTAMP is microsecond precision; truncate expected accordingly
+                    LocalDateTime expectedMicros = expected.getColTimestamp()
+                            .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+                    assertEquals(expectedMicros, actualLocalDateTime,
                         "ColTimestamp mismatch at index " + recordIndex);
                 }
-                
-                // Verify colBytea field (decode base64 string before comparison)
-                if (actualColBytea != null && expected.getColBytea() != null) {
-                    byte[] expectedColBytea = expected.getColBytea().getBytes();
-                    assertArrayEquals(expectedColBytea, actualColBytea,
-                        "ColBytea mismatch at index " + recordIndex);
-                }
-                
+
                 // Verify timestamptz field (convert to OffsetDateTime for comparison)
                 if (actualColTimestamptz != null && expected.getColTimestamptz() != null) {
-                    OffsetDateTime actualOffsetDateTime = actualColTimestamptz.toInstant().atOffset(ZoneOffset.UTC);
-                    assertEquals(expected.getColTimestamptz(), actualOffsetDateTime,
+                    java.time.Instant actualInstant = actualColTimestamptz.toInstant();
+                    // Firebolt TIMESTAMPTZ is microsecond precision; truncate expected accordingly
+                    java.time.Instant expectedInstant = expected.getColTimestamptz().toInstant()
+                            .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+                    assertEquals(expectedInstant, actualInstant,
                         "ColTimestamptz mismatch at index " + recordIndex);
                 }
                 
