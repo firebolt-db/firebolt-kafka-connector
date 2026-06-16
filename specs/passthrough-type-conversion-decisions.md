@@ -1,11 +1,15 @@
 # Passthrough ingestion — remaining CI failures are engine assignment-cast gaps
 
 The connector is **state-free** and does **no** data parsing: it ships each record as-is
-(`INSERT INTO t (<record fields>) SELECT <record fields> FROM read_parquet|read_json('upload://batch')`)
+(`INSERT INTO t (<record fields>) SELECT <record fields> FROM read_avro|read_json('upload://batch')`)
 and relies entirely on Firebolt's **assignment casts**. After fixing every connector-side
 issue, the remaining red CI is, with very few exceptions, conversions Firebolt does not
 perform on assignment. The connector cannot fix these without re-introducing the per-type
 coercion we deleted; they are engine decisions.
+
+Schema-carrying records go through Avro + `read_avro` (not Parquet). `read_avro` honors Avro
+logical types, so the Parquet-only timestamp gap below is resolved — see the local benchmark in
+[format-benchmark-results.md](format-benchmark-results.md) for why Avro was chosen.
 
 ## Connector-side — DONE (green in CI)
 - State-free, record-driven projection; exact-name column matching.
@@ -31,12 +35,21 @@ them all and nothing lands.
 numeric/boolean/bytea are gaps.)
 **Engine fix:** support `text → numeric/boolean/bytea` as assignment casts.
 
-### 2. `bigint → timestamp / timestamptz` (+ `array(bigint) → array(timestamp)`)
-`read_parquet` honors the Parquet **DATE** logical type (date tests pass) but **not** the
-**timestamp/timestamptz** logical types — they come back as `bigint`, which won't assign to a
-`TIMESTAMP` column. Also affects schemaless epoch-number timestamps.
-**Engine fix:** `read_parquet` should surface Parquet timestamp logical types as TIMESTAMP
-(and/or support `bigint → timestamp` epoch assignment).
+### 2. `bigint → timestamp / timestamptz` — RESOLVED by the Avro switch (schema-carrying records)
+`read_parquet` returned `bigint` for Parquet timestamp logical types. **`read_avro` does not** —
+it surfaces Avro `timestamp-millis`/`timestamp-micros` as `timestamptz` and `date` as `date`, and
+they assign cleanly into TIMESTAMP/DATE columns. Confirmed through the connector's actual path
+(`AvroData` maps Connect `Timestamp` → `{long, timestamp-millis}`, Connect `Date` → `{int, date}`).
+Remaining sub-case: **schemaless** epoch-number timestamps (a JSON number into a TIMESTAMP column)
+still need `bigint → timestamp` on assignment, which the engine does not do — use ISO-8601 strings
+for schemaless timestamps (those work via `text → timestamp`).
+
+### 2b. Decimal precision > 38 (Avro)
+`AvroData` emits Connect `Decimal` as Avro `decimal` with **precision 64** (its default — Connect
+Decimal carries only scale). The engine caps Avro decimal precision at 38:
+`Avro decimal with precision 64 is not supported (maximum supported precision is 38)`.
+**Engine fix:** accept (cap to 38) Avro decimals with precision > 38. Alternatively the connector
+could clamp the emitted precision, but that re-introduces per-type handling we are avoiding.
 
 ### 3. JSON-Schema `Date` → "Date can only be used with an underlying int type"
 The `kafka-connect-json-schema-converter` produces a Connect `Date` logical type whose base

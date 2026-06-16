@@ -8,6 +8,7 @@ import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import io.confluent.connect.avro.AvroData;
 import io.confluent.connect.avro.AvroDataConfig;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -18,13 +19,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.avro.file.CodecFactory;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.avro.io.DatumWriter;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
-import org.apache.parquet.avro.AvroParquetWriter;
-import org.apache.parquet.hadoop.ParquetWriter;
 
 /**
  * Ships Kafka records to Firebolt as-is and lets the server parse them: records are uploaded
@@ -44,9 +46,10 @@ import org.apache.parquet.hadoop.ParquetWriter;
  * <p>Two flows, by record shape:
  * <ul>
  *   <li><b>Schema-carrying records</b> (Avro, Protobuf, JSON-with-schema — delivered as a Connect
- *   {@link Struct}) are written to Parquet with Confluent's {@link AvroData} and read with
- *   {@code read_parquet}. A batch is grouped by value schema so a mid-batch schema change yields
- *   one file per schema.</li>
+ *   {@link Struct}) are written to an Avro container file with Confluent's {@link AvroData} and read
+ *   with {@code read_avro}. A batch is grouped by value schema so a mid-batch schema change yields
+ *   one file per schema. {@code read_avro} honors Avro logical types, so Connect Timestamp/Date map
+ *   to TIMESTAMP/DATE.</li>
  *   <li><b>Schemaless records</b> (JSON with {@code schemas.enable=false}, delivered as a
  *   {@link Map}) are serialized back to NDJSON and read with {@code read_json}.</li>
  * </ul>
@@ -112,7 +115,7 @@ public class UploadIngestionService implements IngestionService {
                 if (group.getKey() == SCHEMALESS) {
                     ingestJson(group.getValue(), literalColumns);
                 } else {
-                    ingestParquet((Schema) group.getKey(), group.getValue(), literalColumns);
+                    ingestAvro((Schema) group.getKey(), group.getValue(), literalColumns);
                 }
             }
             if (manageTransaction) {
@@ -147,8 +150,8 @@ public class UploadIngestionService implements IngestionService {
         }
     }
 
-    /** Schema-carrying records -> Parquet -> read_parquet. */
-    private void ingestParquet(Schema connectSchema, List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
+    /** Schema-carrying records -> Avro -> read_avro. */
+    private void ingestAvro(Schema connectSchema, List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
         org.apache.avro.Schema avroSchema = nonNullUnionBranch(avroData.fromConnectSchema(connectSchema));
         if (avroSchema.getType() != org.apache.avro.Schema.Type.RECORD) {
             for (SinkRecord record : records) {
@@ -168,7 +171,7 @@ public class UploadIngestionService implements IngestionService {
                 convertible.add(record);
             } catch (RuntimeException e) {
                 handleBadRecord(record, e instanceof RecordConversionException ? e
-                        : new RecordConversionException("Failed to convert record to Parquet representation", e));
+                        : new RecordConversionException("Failed to convert record to Avro representation", e));
             }
         }
         if (convertible.isEmpty()) {
@@ -177,8 +180,8 @@ public class UploadIngestionService implements IngestionService {
 
         List<String> fields = avroSchema.getFields().stream()
                 .map(org.apache.avro.Schema.Field::name).collect(Collectors.toList());
-        uploadWithIsolation("read_parquet", convertible, literalColumns,
-                (from, to) -> new Payload(writeParquet(avroSchema, avroRecords.subList(from, to)), fields),
+        uploadWithIsolation("read_avro", convertible, literalColumns,
+                (from, to) -> new Payload(writeAvro(avroSchema, avroRecords.subList(from, to)), fields),
                 0, convertible.size());
     }
 
@@ -233,23 +236,21 @@ public class UploadIngestionService implements IngestionService {
                 .orElse(schema);
     }
 
-    private byte[] writeParquet(org.apache.avro.Schema avroSchema, List<GenericRecord> records) throws SQLException {
-        Configuration conf = new Configuration(false);
-        // Use the spec-compliant three-level list encoding so arrays with null elements round-trip.
-        conf.setBoolean("parquet.avro.write-old-list-structure", false);
-
-        InMemoryParquetFile file = new InMemoryParquetFile();
-        try (ParquetWriter<GenericRecord> writer = AvroParquetWriter.<GenericRecord>builder(file)
-                .withSchema(avroSchema)
-                .withConf(conf)
-                .build()) {
+    private byte[] writeAvro(org.apache.avro.Schema avroSchema, List<GenericRecord> records) throws SQLException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(avroSchema);
+        try (DataFileWriter<GenericRecord> writer = new DataFileWriter<>(datumWriter)) {
+            // deflate is built into avro (java.util.zip) — compression with no native lib or extra
+            // dependency. Best-speed keeps the cost low on the (hot-path) worker; payloads shrink ~5x.
+            writer.setCodec(CodecFactory.deflateCodec(java.util.zip.Deflater.BEST_SPEED));
+            writer.create(avroSchema, buffer);
             for (GenericRecord record : records) {
-                writer.write(record);
+                writer.append(record);
             }
-        } catch (Exception e) {
-            throw new SQLException("Failed to write Parquet content in-memory", e);
+        } catch (IOException e) {
+            throw new SQLException("Failed to write Avro content in-memory", e);
         }
-        return file.toByteArray();
+        return buffer.toByteArray();
     }
 
     /**

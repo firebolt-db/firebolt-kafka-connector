@@ -33,8 +33,6 @@ ext {
     githubApiVersion = '1.326'
     commonsLang3Version = '3.20.0'
     commonsTextVersion = '1.15.0'
-    parquetVersion = '1.17.0'
-    hadoopCommonVersion = '3.4.3'
 }
 
 java {
@@ -161,13 +159,6 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-api:${log4jVersion}"
     compileOnly "org.apache.logging.log4j:log4j-slf4j2-impl:${log4jVersion}"
 
-    // Minimal Hadoop classes required by parquet-hadoop Path/Configuration
-    compileOnly("org.apache.hadoop:hadoop-common:${hadoopCommonVersion}") {
-        exclude group: 'org.apache.kafka'
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-
     // Utilities - bundle this, exclude any Kafka and logging dependencies
     implementation("com.google.guava:guava:${guavaVersion}") {
         exclude group: 'org.apache.kafka'
@@ -181,30 +172,6 @@ dependencies {
     }
     implementation("org.apache.commons:commons-text:${commonsTextVersion}") {
         exclude group: 'org.apache.kafka'
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-    
-    // Parquet writer (Avro-based) for local parquet generation
-    implementation("org.apache.parquet:parquet-avro:${parquetVersion}") {
-        exclude group: 'org.apache.kafka'
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-
-    // Parquet writer (Avro-based) for local parquet generation
-    implementation("org.apache.parquet:parquet-avro:${parquetVersion}") {
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-
-    implementation("org.apache.parquet:parquet-hadoop-bundle:${parquetVersion}") {
-        exclude group: 'org.slf4j';
-        exclude group: 'org.apache.logging.log4j'
-    }
-
-    compileOnly("org.apache.hadoop:hadoop-client-api:${hadoopCommonVersion}")
-    implementation("org.apache.hadoop:hadoop-client-runtime:${hadoopCommonVersion}") {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
@@ -256,8 +223,6 @@ dependencies {
     // Awaitility for async testing
     testImplementation "org.awaitility:awaitility:${awaitilityVersion}"
 
-    // Minimal Hadoop classes required by parquet-hadoop Path/Configuration
-    testImplementation "org.apache.hadoop:hadoop-common:${hadoopCommonVersion}"
 
     }
 
@@ -405,13 +370,6 @@ configurations {
     integrationTestImplementation.extendsFrom testImplementation
     integrationTestCompileOnly.extendsFrom testCompileOnly
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
-
-    configureEach {
-        resolutionStrategy {
-            force 'io.airlift:aircompressor:2.0.3' // CVE-2025-67721
-            force 'com.nimbusds:nimbus-jose-jwt:9.37.4' // CVE-2025-53864
-        }
-    }
 }
 
 // Configure IntelliJ IDEA to recognize integration test source set
@@ -544,14 +502,6 @@ jar {
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
     exclude 'META-INF/MANIFEST.MF'
 
-    // Exclude unused Jetty classes bundled in hadoop-client-runtime (CVE-2024-6763, CVE-2025-11143)
-    exclude 'org/apache/hadoop/shaded/org/eclipse/jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty.websocket/**'
-    exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
-    // Exclude shaded nimbus-jose-jwt classes from hadoop-client-runtime (CVE-2025-53864)
-    exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
-    
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
@@ -566,11 +516,6 @@ shadowJar {
     relocate 'io.confluent', 'com.firebolt.shaded.io.confluent'
 
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
-    exclude 'org/apache/hadoop/shaded/org/eclipse/jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty.websocket/**'
-    exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
-    exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
 
     mergeServiceFiles()
 }
@@ -725,14 +670,6 @@ tasks.register('confluentJar', Jar) {
     // Exclude files that might cause conflicts
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
     exclude 'META-INF/MANIFEST.MF'
-
-    // Exclude unused Jetty classes bundled in hadoop-client-runtime (CVE-2024-6763, CVE-2025-11143)
-    exclude 'org/apache/hadoop/shaded/org/eclipse/jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty.websocket/**'
-    exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
-    // Exclude shaded nimbus-jose-jwt classes from hadoop-client-runtime (CVE-2025-53864)
-    exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 

@@ -14,7 +14,6 @@ import static org.mockito.Mockito.when;
 import com.firebolt.jdbc.connection.FireboltConnection;
 import com.firebolt.jdbc.statement.preparedstatement.FireboltParquetStatement;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -24,18 +23,17 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.avro.file.DataFileReader;
+import org.apache.avro.file.SeekableByteArrayInput;
+import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.sink.SinkRecord;
-import org.apache.parquet.avro.AvroParquetReader;
-import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.parquet.io.DelegatingSeekableInputStream;
-import org.apache.parquet.io.InputFile;
-import org.apache.parquet.io.SeekableInputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -66,10 +64,10 @@ class UploadIngestionServiceTest {
         return new SinkRecord(TOPIC, 0, null, null, valueSchema, value, offset);
     }
 
-    // ---- schema-carrying records -> Parquet / read_parquet ----
+    // ---- schema-carrying records -> Avro / read_avro ----
 
     @Test
-    void schemaRecordsRoundTripThroughParquet() throws Exception {
+    void schemaRecordsRoundTripThroughAvro() throws Exception {
         Schema addressSchema = SchemaBuilder.struct().name("Address")
                 .field("city", Schema.STRING_SCHEMA).build();
         Schema valueSchema = SchemaBuilder.struct().name("Event")
@@ -93,15 +91,16 @@ class UploadIngestionServiceTest {
         // column whose name equals the field exactly).
         assertEquals("INSERT INTO \"t\" (\"id\", \"amount\", \"created_at\", \"tags\", \"address\") "
                 + "SELECT \"id\", \"amount\", \"created_at\", \"tags\", \"address\" "
-                + "FROM read_parquet('upload://batch')", upload.sql);
-        List<GenericRecord> rows = readParquet(upload.payload);
+                + "FROM read_avro('upload://batch')", upload.sql);
+        List<GenericRecord> rows = readAvro(upload.payload);
         assertEquals(1, rows.size());
         assertEquals(7L, rows.get(0).get("id"));
-        assertEquals(java.time.Instant.ofEpochMilli(1718000000000L), rows.get(0).get("created_at"));
+        // AvroData maps Connect Timestamp -> avro long with logicalType timestamp-millis.
+        assertEquals(1718000000000L, rows.get(0).get("created_at"));
     }
 
     @Test
-    void schemaRecordsSplitParquetFilePerSchema() throws Exception {
+    void schemaRecordsSplitAvroFilePerSchema() throws Exception {
         Schema v1 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA).build();
         Schema v2 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA)
                 .field("b", Schema.OPTIONAL_STRING_SCHEMA).build();
@@ -166,7 +165,7 @@ class UploadIngestionServiceTest {
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(statement, times(2)).execute(sql.capture(), anyMap());
-        assertTrue(sql.getAllValues().stream().anyMatch(s -> s.contains("read_parquet")));
+        assertTrue(sql.getAllValues().stream().anyMatch(s -> s.contains("read_avro")));
         assertTrue(sql.getAllValues().stream().anyMatch(s -> s.contains("read_json")));
     }
 
@@ -302,45 +301,15 @@ class UploadIngestionServiceTest {
         return new Upload(sqlCaptor.getValue(), filesCaptor.getValue().get("batch"));
     }
 
-    private List<GenericRecord> readParquet(byte[] bytes) throws IOException {
+    private List<GenericRecord> readAvro(byte[] bytes) throws IOException {
         List<GenericRecord> rows = new ArrayList<>();
-        try (ParquetReader<GenericRecord> reader = AvroParquetReader.<GenericRecord>builder(new ByteArrayInputFile(bytes)).build()) {
-            for (GenericRecord row = reader.read(); row != null; row = reader.read()) {
-                rows.add(row);
+        DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+        try (DataFileReader<GenericRecord> reader =
+                     new DataFileReader<>(new SeekableByteArrayInput(bytes), datumReader)) {
+            while (reader.hasNext()) {
+                rows.add(reader.next());
             }
         }
         return rows;
-    }
-
-    private static final class ByteArrayInputFile implements InputFile {
-        private final byte[] bytes;
-
-        ByteArrayInputFile(byte[] bytes) {
-            this.bytes = bytes;
-        }
-
-        @Override
-        public long getLength() {
-            return bytes.length;
-        }
-
-        @Override
-        public SeekableInputStream newStream() {
-            ByteArrayInputStream stream = new ByteArrayInputStream(bytes);
-            return new DelegatingSeekableInputStream(stream) {
-                @Override
-                public long getPos() {
-                    return bytes.length - stream.available();
-                }
-
-                @Override
-                public void seek(long newPos) throws IOException {
-                    stream.reset();
-                    if (stream.skip(newPos) != newPos) {
-                        throw new IOException("Could not seek to " + newPos);
-                    }
-                }
-            };
-        }
     }
 }

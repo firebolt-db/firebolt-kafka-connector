@@ -46,7 +46,7 @@ public class ConnectorConfigDefinition {
     // INGESTION MODE
     // =========================
     public static final String INGESTION_TYPE_CONFIG = "ingestion.type";
-    public static final String INGESTION_TYPE_DOC = "Deprecated and ignored. Records are uploaded over upload:// and ingested server-side via read_parquet (schema-carrying records) or read_json (schemaless JSON). Accepted for backwards compatibility with existing connector configs.";
+    public static final String INGESTION_TYPE_DOC = "Deprecated and ignored. Records are uploaded over upload:// and ingested server-side via read_avro (schema-carrying records) or read_json (schemaless JSON). Accepted for backwards compatibility with existing connector configs.";
     public static final String INGESTION_TYPE_DEFAULT = "parquet";
 
     // =========================
