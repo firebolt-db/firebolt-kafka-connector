@@ -122,6 +122,11 @@ dependencies {
         exclude group: 'org.apache.kafka'
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
+        // AvroData uses NonRecordContainer / AvroSchema but NOT the schema (de)serializer base.
+        // Bundling kafka-schema-serializer shadows the Kafka Connect runtime's own copy and breaks
+        // the JsonSchema/Avro converters when their version differs (e.g. NoSuchMethodError on
+        // AbstractKafkaSchemaSerDe under Kafka Connect 4.0 / Confluent 8.x). Let the runtime own it.
+        exclude group: 'io.confluent', module: 'kafka-schema-serializer'
     }
     
     // Firebolt JDBC Driver - bundle this, exclude any Kafka and logging dependencies

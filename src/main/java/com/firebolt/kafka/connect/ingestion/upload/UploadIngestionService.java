@@ -16,7 +16,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.generic.GenericRecord;
@@ -59,10 +58,6 @@ public class UploadIngestionService implements IngestionService {
 
     // The multipart part name referenced by upload://. Must match [_0-9a-zA-Z.-]+ and be unique per request.
     private static final String MULTIPART_NAME = "batch";
-
-    // Identifiers that are safe to emit unquoted, so Firebolt folds them to lower case and they
-    // match normally-created (lower-cased) columns regardless of the field's own case.
-    private static final Pattern SIMPLE_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /** group key for records without a value schema */
     private static final Object SCHEMALESS = new Object();
@@ -209,21 +204,20 @@ public class UploadIngestionService implements IngestionService {
 
     /**
      * Builds {@code INSERT INTO t (<fields>) SELECT <fields> FROM <tvf>('upload://batch')} from the
-     * record's own field names and runs it. Insert-side identifiers are emitted unquoted when simple,
-     * so Firebolt folds them to lower case and they match normally-created columns; select-side
-     * identifiers are quoted to match the exact name read_xxx inferred. {@code literalColumns} (e.g.
-     * a batch id) are appended as constants.
+     * record's own field names and runs it. Identifiers are quoted on both sides, so a field is
+     * matched to the column whose name equals it exactly (case-sensitive) — the field name is the
+     * column name. {@code literalColumns} (e.g. a batch id) are appended as constants.
      */
     private void uploadAndInsert(String tvf, byte[] payload, List<String> fields, Map<String, String> literalColumns) throws SQLException {
         List<String> insertColumns = new ArrayList<>();
         List<String> selectExpressions = new ArrayList<>();
 
         for (String field : fields) {
-            insertColumns.add(insertIdentifier(field));
+            insertColumns.add(quoteIdentifier(field));
             selectExpressions.add(quoteIdentifier(field));
         }
         literalColumns.forEach((name, value) -> {
-            insertColumns.add(insertIdentifier(name));
+            insertColumns.add(quoteIdentifier(name));
             selectExpressions.add("'" + value.replace("'", "''") + "'");
         });
 
@@ -246,11 +240,6 @@ public class UploadIngestionService implements IngestionService {
         errorReporter.report(record, cause);
         log.warn("Record from partition {} at offset {} will be submitted to the dead letter queue",
                 record.kafkaPartition(), record.kafkaOffset());
-    }
-
-    /** Unquoted when a simple identifier (folds to lower case, matching normal columns); quoted otherwise. */
-    private String insertIdentifier(String name) {
-        return SIMPLE_IDENTIFIER.matcher(name).matches() ? name : quoteIdentifier(name);
     }
 
     private String quoteIdentifier(String identifier) {

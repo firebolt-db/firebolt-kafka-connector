@@ -89,9 +89,9 @@ class UploadIngestionServiceTest {
         service(false).addRecords(List.of(record(valueSchema, value, 1L)));
 
         Upload upload = captureSingleUpload();
-        // insert columns come from the record's own fields (unquoted simple identifiers fold to
-        // lower case); select identifiers are quoted to match what read_parquet inferred.
-        assertEquals("INSERT INTO \"t\" (id, amount, created_at, tags, address) "
+        // columns come from the record's own fields, quoted on both sides (matched to the table
+        // column whose name equals the field exactly).
+        assertEquals("INSERT INTO \"t\" (\"id\", \"amount\", \"created_at\", \"tags\", \"address\") "
                 + "SELECT \"id\", \"amount\", \"created_at\", \"tags\", \"address\" "
                 + "FROM read_parquet('upload://batch')", upload.sql);
         List<GenericRecord> rows = readParquet(upload.payload);
@@ -129,7 +129,7 @@ class UploadIngestionServiceTest {
         service(false).addRecords(List.of(record(null, first, 0L), record(null, second, 1L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (id, name, nested) "
+        assertEquals("INSERT INTO \"t\" (\"id\", \"name\", \"nested\") "
                 + "SELECT \"id\", \"name\", \"nested\" FROM read_json('upload://batch')", upload.sql);
         // payload is newline-delimited JSON, one object per record
         String[] lines = new String(upload.payload, StandardCharsets.UTF_8).split("\n");
@@ -150,19 +150,9 @@ class UploadIngestionServiceTest {
         service(false).addRecords(List.of(record(null, value, 0L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (UserId, extra) SELECT \"UserId\", \"extra\" FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" (\"UserId\", \"extra\") SELECT \"UserId\", \"extra\" FROM read_json('upload://batch')", upload.sql);
     }
 
-    @Test
-    void nonSimpleFieldNamesAreQuotedOnTheInsertSide() throws Exception {
-        Map<String, Object> value = new LinkedHashMap<>();
-        value.put("user-id", 1);
-
-        service(false).addRecords(List.of(record(null, value, 0L)));
-
-        Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"user-id\") SELECT \"user-id\" FROM read_json('upload://batch')", upload.sql);
-    }
 
     // ---- shared behavior ----
 
@@ -187,7 +177,7 @@ class UploadIngestionServiceTest {
                 Map.of("batch_id", "my-batch"));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (id, batch_id) SELECT \"id\", 'my-batch' FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" (\"id\", \"batch_id\") SELECT \"id\", 'my-batch' FROM read_json('upload://batch')", upload.sql);
     }
 
     @Test
