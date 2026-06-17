@@ -18,9 +18,9 @@ import org.apache.kafka.connect.sink.SinkRecord;
 public class TableWriter {
 
     /**
-     * For which table this write is for
+     * The name of the table this writer writes to
      */
-    private TableSchema tableSchema;
+    private String tableName;
 
     // when this table writer is created we should fetch the offsets from the metadata table
     private Map<Integer, Long> processedPartitionOffsets;
@@ -29,8 +29,8 @@ public class TableWriter {
     private FireboltMetadataService fireboltMetadataService;
     private String topicName;
 
-    public TableWriter(TableSchema tableSchema, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, IngestionService ingestionService) {
-        this.tableSchema = tableSchema;
+    public TableWriter(String tableName, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, IngestionService ingestionService) {
+        this.tableName = tableName;
         this.fireboltMetadataService = fireboltMetadataService;
         this.topicName = topicName;
         this.processedPartitionOffsets = processedPartitionOffsets;
@@ -38,7 +38,7 @@ public class TableWriter {
     }
 
     public void insertRecords(List<SinkRecord> records) throws SQLException {
-        log.debug("Processing {} records for table: {}", records.size(), tableSchema.getTableName());
+        log.debug("Processing {} records for table: {}", records.size(), tableName);
 
         if (CollectionUtils.isEmpty(records)) {
             return;

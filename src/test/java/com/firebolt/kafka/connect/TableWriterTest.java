@@ -36,9 +36,6 @@ public class TableWriterTest {
     private static final Integer PARTITION_2 = 2;
 
     @Mock
-    private TableSchema mockTableSchema;
-
-    @Mock
     private IngestionService mockIngestionService;
 
     @Mock
@@ -50,13 +47,11 @@ public class TableWriterTest {
     void setUp() throws SQLException {
         MockitoAnnotations.openMocks(this);
 
-        when(mockTableSchema.getTableName()).thenReturn(TABLE_NAME);
-
         Map<Integer, Long> lastPartitionOffset = new HashMap<>();
         lastPartitionOffset.put(PARTITION_0,  -1L);
         lastPartitionOffset.put(PARTITION_1,  -1L);
         lastPartitionOffset.put(PARTITION_2,  -1L);
-        tableWriter = new TableWriter(mockTableSchema, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockIngestionService);
+        tableWriter = new TableWriter(TABLE_NAME, mockFireboltMetadataService, TOPIC_NAME,  lastPartitionOffset, mockIngestionService);
 
         doNothing().when(mockIngestionService).addRecords(anyList());
     }
@@ -180,7 +175,7 @@ public class TableWriterTest {
     void shouldNotCallUpdateOffsetsWhenMetadataServiceIsNull() throws SQLException {
         // At-least-once mode: no metadata service → no persistence call, no NPE.
         TableWriter writerWithoutMetadata = new TableWriter(
-                mockTableSchema, null, TOPIC_NAME,
+                TABLE_NAME, null, TOPIC_NAME,
                 new HashMap<>(Map.of(0, -1L)), mockIngestionService);
 
         doNothing().when(mockIngestionService).addRecords(anyList());

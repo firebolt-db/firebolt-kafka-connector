@@ -11,11 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 @NoArgsConstructor
 public class IngestionServiceProvider {
 
-    public IngestionService get(Connection connection, TableSchema tableSchema, ErrorReporter errorReporter, SinkConfig sinkConfig) {
+    public IngestionService get(Connection connection, String tableName, ErrorReporter errorReporter, SinkConfig sinkConfig) {
         IngestionService ingestionService =
-                new UploadIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableSchema.getTableName());
+                new UploadIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableName);
 
-        Optional<String> postProcessingScript = sinkConfig.getPostProcessingScript(tableSchema.getTableName());
+        Optional<String> postProcessingScript = sinkConfig.getPostProcessingScript(tableName);
         return postProcessingScript == null || postProcessingScript.isEmpty() ? ingestionService
                 : new IngestionServiceWithPostProcessing(ingestionService, connection, postProcessingScript.get());
     }

@@ -190,7 +190,7 @@ public class FireboltSinkConnector extends SinkConnector {
             Set<String> tableNames = getTableNames(connectorConfigs);
             
             if (!tableNames.isEmpty()) {
-                Set<String> nonExistentTables = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tableNames);
+                Set<String> nonExistentTables = fireboltDbService.findNonExistentTables(getJdbcConfig(connectorConfigs), tableNames);
                 
                 if (!nonExistentTables.isEmpty()) {
                     String errorMessage = String.format("The following tables do not exist in the database: %s. " +
@@ -260,7 +260,7 @@ public class FireboltSinkConnector extends SinkConnector {
                 return; // nothing to validate
             }
 
-            Set<String> missing = fireboltDbService.validateTablesExist(getJdbcConfig(connectorConfigs), tables);
+            Set<String> missing = fireboltDbService.findNonExistentTables(getJdbcConfig(connectorConfigs), tables);
             if (!missing.isEmpty()) {
                 addErrorToConfig(configValues,
                         ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,

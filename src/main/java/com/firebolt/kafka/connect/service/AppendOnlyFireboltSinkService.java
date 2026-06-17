@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.SinkConfig;
-import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.TableWriter;
 import com.google.common.annotations.VisibleForTesting;
 
@@ -61,7 +60,7 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
     }
 
     @Override
-    public void processRecord(Collection<SinkRecord> records, Map<String, TableSchema> tableSchemas) throws SQLException {
+    public void processRecord(Collection<SinkRecord> records) throws SQLException {
         if (CollectionUtils.isEmpty(records)) {
             log.debug("No records to process");
             return;
@@ -78,36 +77,31 @@ public class AppendOnlyFireboltSinkService implements FireboltSinkService {
             List<SinkRecord> groupedRecords = entry.getValue();
 
             String tableName = config.getTableNameForTopic(topic);
-            TableSchema tableSchema = tableSchemas.get(tableName);
-            if (tableSchema == null) {
-                log.error("Did not find table schema for topic {}. Ignoring the record", topic);
-                continue;
-            }
 
             if (!assignedTopicPartitions.containsKey(topic)) {
                 log.error("The topic {} does not have any assigned partition to this instance of Kafka Connect.", topic);
                 continue;
             }
 
-            TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> createTableWriter(topic, tableSchema));
+            TableWriter tableWriter = tableWriterMap.computeIfAbsent(tableName, name -> createTableWriter(topic, tableName));
 
             List<SinkRecord> unprocessedRecords = filterProcessedRecords(topic, groupedRecords, tableWriter.getProcessedPartitionOffsets());
             tableWriter.insertRecords(unprocessedRecords);
         }
     }
 
-    private TableWriter createTableWriter(String topicName, TableSchema tableSchema) {
-        log.info("Creating the table writer for {}", tableSchema.getTableName());
-        Optional<String> postProcessingScript = config.getPostProcessingScript(tableSchema.getTableName());
+    private TableWriter createTableWriter(String topicName, String tableName) {
+        log.info("Creating the table writer for {}", tableName);
+        Optional<String> postProcessingScript = config.getPostProcessingScript(tableName);
         if (postProcessingScript.isPresent()) {
-            log.info("Post-processing script found for table {} (length: {} chars)", tableSchema.getTableName(), postProcessingScript.get().length());
+            log.info("Post-processing script found for table {} (length: {} chars)", tableName, postProcessingScript.get().length());
         } else {
-            log.info("No post-processing script configured for table {}", tableSchema.getTableName());
+            log.info("No post-processing script configured for table {}", tableName);
         }
 
         Map<Integer, Long> lastPartitionOffsets = getLastPartitionOffsets(topicName);
         Supplier<Connection> connectionSupplier = () -> fireboltDbService.createConnection(config.getJdbcConfig());
-        return tableWriterProvider.get(tableSchema, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, config);
+        return tableWriterProvider.get(tableName, connectionSupplier, fireboltMetadataService, topicName, lastPartitionOffsets, errorReporter, config);
     }
 
     // if exactly once is configured, then we need to fetch the saved offsets for each of the partition

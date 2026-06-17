@@ -47,22 +47,24 @@ Class chain:
 
 ## What state actually remains in the connector
 
-The ingestion path itself is **state-free** — `UploadIngestionService` holds only a JDBC
-`Connection`, the **table name** (a `String`), the `ErrorReporter`, the error-tolerance flag,
-and a stateless `AvroData` converter. It never looks at the table's columns.
+The connector no longer discovers or caches **any** table schema. `TableSchema` and all column
+metadata fetching were removed — the connector only ever needs a table *name*, which it already
+has from config. The ingestion path is **state-free**: `UploadIngestionService` holds only a JDBC
+`Connection`, the **table name** (a `String`), the `ErrorReporter`, the error-tolerance flag, and
+a stateless `AvroData` converter.
 
-State that *does* still live in the connector, and why:
+The only runtime state that remains:
 
-| State | Where | Still needed? |
+| State | Where | Why |
 |---|---|---|
-| **Processed partition offsets** | `TableWriter.processedPartitionOffsets`, persisted to a Firebolt metadata table | **Yes** — drives at-least-once/idempotent offset tracking; persisted before local advance. |
-| `topicToTableMapping`, `assignedTopicPartitions`, `errorToleranceAll` | `FireboltSinkTask` / `AppendOnlyFireboltSinkService` | **Yes** — routing + behavior config. |
-| **`TableSchema` (columns!)** | discovered at startup by `FireboltDbService`, cached in `FireboltSinkTask.tableSchemas`, held by `TableWriter` | **Mostly vestigial.** Ingestion no longer uses the columns. Only two things survive: (1) a startup **existence check** (fail fast if a target table is missing), and (2) `tableSchema.getTableName()` passed to the ingestion service. |
+| **Processed partition offsets** | `TableWriter.processedPartitionOffsets`, persisted to a Firebolt metadata table | drives at-least-once/idempotent offset tracking; persisted before local advance. |
+| `topicToTableMapping`, `assignedTopicPartitions`, `errorToleranceAll` | `FireboltSinkTask` / `AppendOnlyFireboltSinkService` | routing + behavior config. |
 
-> **Cleanup opportunity (flagged for the reviewer):** the table-schema *discovery* still fetches
-> full column metadata, but the columns are now dead weight — it could be reduced to a cheap
-> "does this table exist?" probe. `TableSchema`/`TableWriter` could then carry just the table
-> name. Not done in this PR to keep the diff focused on the ingestion rewrite.
+**Table existence** is checked exactly once, at config-submission time, by
+`FireboltSinkConnector.validate()` (`FireboltDbService.findNonExistentTables` → a config error if a
+mapped table is missing). It is the single existence guard — nothing is cached, and there is no
+per-task re-discovery. A table dropped while the connector runs surfaces as a normal batch failure
+(task fails, or DLQ under error tolerance), consistent with "the table is the contract."
 
 ## Cast semantics (summary)
 
@@ -156,9 +158,9 @@ are manual `./gradlew` harnesses. Coverage tooling: JaCoCo + SonarCloud.
 
 | Area | LOC | Notes |
 |---|---:|---|
-| **Production** (`src/main`) | **2,706** | 24 classes — the whole connector |
-| **Unit tests** (`src/test`) | **4,445** | ~225 tests |
-| **Integration tests** (`src/integrationTest`) | **30,746** | full breakdown below |
+| **Production** (`src/main`) | **2,488** | 24 classes — the whole connector (down from 2,706 after removing schema discovery) |
+| **Unit tests** (`src/test`) | **3,826** | ~219 tests |
+| **Integration tests** (`src/integrationTest`) | **30,753** | full breakdown below |
 | &nbsp;&nbsp;json/schema (read_avro) | 7,470 | |
 | &nbsp;&nbsp;json/schemaless (read_json) | 6,870 | |
 | &nbsp;&nbsp;avro (read_avro) | 4,346 | |
@@ -168,7 +170,7 @@ are manual `./gradlew` harnesses. Coverage tooling: JaCoCo + SonarCloud.
 | &nbsp;&nbsp;e2e | 1,376 | |
 | &nbsp;&nbsp;customer | 179 | |
 
-**~35k test LOC against 2.7k production LOC (~13:1).** The integration matrix is intentionally the
+**~34.5k test LOC against 2.5k production LOC (~14:1).** The integration matrix is intentionally the
 bulk: because all parsing/typing now happens server-side, behavior is only observable end-to-end,
 so the converter-path × data-type matrix is where correctness is actually pinned. Keep that
 structure when adding types.

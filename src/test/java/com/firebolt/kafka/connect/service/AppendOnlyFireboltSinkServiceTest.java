@@ -1,7 +1,6 @@
 package com.firebolt.kafka.connect.service;
 
 import com.firebolt.kafka.connect.SinkConfig;
-import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.TableWriter;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import java.sql.Connection;
@@ -47,11 +46,6 @@ public class AppendOnlyFireboltSinkServiceTest {
     private static final String TABLE_B = "tableB";
 
     @Mock
-    private TableSchema mockSchemaTableA;
-    @Mock
-    private TableSchema mockSchemaTableB;
-
-    @Mock
     private SinkConfig mockSinkConfig;
 
     @Mock
@@ -94,27 +88,14 @@ public class AppendOnlyFireboltSinkServiceTest {
         when(mockSinkConfig.getJdbcConfig()).thenReturn(null);
 
         when(mockDbService.createConnection(any())).thenReturn(mockConnection);
-
-        when(mockSchemaTableA.getTableName()).thenReturn(TABLE_A);
-        when(mockSchemaTableB.getTableName()).thenReturn(TABLE_B);
     }
 
     @Test
     void shouldReturnWhenNoRecords() {
-        assertDoesNotThrow(() -> service.processRecord(List.of(), Map.of()));
+        assertDoesNotThrow(() -> service.processRecord(List.of()));
         verify(mockSinkConfig, times(1)).isExactlyOnce();
         verifyNoMoreInteractions(mockSinkConfig);
         verifyNoInteractions(mockDbService, mockTableWriterProvider);
-    }
-
-    @Test
-    void shouldIgnoreRecordsWhenTableSchemaMissing()  {
-        SinkRecord rec = buildRecord(TOPIC_A, 0, 1L);
-        Map<String, TableSchema> schemas = Map.of();
-
-        // No schema for the table -> no writer should be created and nothing inserted
-        assertDoesNotThrow(() -> service.processRecord(List.of(rec), schemas));
-        verifyNoInteractions(mockTableWriterProvider);
     }
 
     @Test
@@ -123,8 +104,6 @@ public class AppendOnlyFireboltSinkServiceTest {
         SinkRecord recA1 = buildRecord(TOPIC_A, 0, 1L);
         SinkRecord recA2 = buildRecord(TOPIC_A, 0, 2L);
         SinkRecord recB1 = buildRecord(TOPIC_B, 0, 5L);
-
-        Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA, TABLE_B, mockSchemaTableB);
 
         // Provide pre-created writers to avoid DB work and to verify inserts per table
         TableWriter writerA = mock(TableWriter.class);
@@ -135,7 +114,7 @@ public class AppendOnlyFireboltSinkServiceTest {
         tableWriterMap.put(TABLE_B, writerB);
 
         // process
-        assertDoesNotThrow(() -> service.processRecord(List.of(recA1, recA2, recB1), schemas));
+        assertDoesNotThrow(() -> service.processRecord(List.of(recA1, recA2, recB1)));
         verify(writerA).insertRecords(tableARecordListCaptor.capture());
         verify(writerB).insertRecords(tableBRecordListCaptor.capture());
 
@@ -158,7 +137,7 @@ public class AppendOnlyFireboltSinkServiceTest {
         TableWriter writer = mock(TableWriter.class);
         when(writer.getProcessedPartitionOffsets()).thenReturn(Map.of(0, -1L));
         when(mockTableWriterProvider.get(
-                eq(mockSchemaTableA),
+                eq(TABLE_A),
                 any(),
                 any(),
                 eq(TOPIC_A),
@@ -168,9 +147,8 @@ public class AppendOnlyFireboltSinkServiceTest {
         )).thenReturn(writer);
 
         SinkRecord recA = buildRecord(TOPIC_A, 0, 1L);
-        Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
 
-        assertDoesNotThrow(() -> service.processRecord(List.of(recA), schemas));
+        assertDoesNotThrow(() -> service.processRecord(List.of(recA)));
 
         verify(writer).insertRecords(tableARecordListCaptor.capture());
         List<SinkRecord> tableARecords = tableARecordListCaptor.getValue();
@@ -192,7 +170,7 @@ public class AppendOnlyFireboltSinkServiceTest {
         TableWriter writer = mock(TableWriter.class);
         when(writer.getProcessedPartitionOffsets()).thenReturn(Map.of(0, 10L));
         when(mockTableWriterProvider.get(
-                eq(mockSchemaTableA),
+                eq(TABLE_A),
                 any(),
                 any(),
                 eq(TOPIC_A),
@@ -204,9 +182,8 @@ public class AppendOnlyFireboltSinkServiceTest {
         // Prepare two records: one below and one above the saved offset (10)
         SinkRecord below = buildRecord(TOPIC_A, 0, 9L);
         SinkRecord above = buildRecord(TOPIC_A, 0, 11L);
-        Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
 
-        assertDoesNotThrow(() -> service.processRecord(List.of(below, above), schemas));
+        assertDoesNotThrow(() -> service.processRecord(List.of(below, above)));
 
         verify(writer).insertRecords(tableARecordListCaptor.capture());
         assertEquals(1, tableARecordListCaptor.getValue().size());
@@ -219,8 +196,6 @@ public class AppendOnlyFireboltSinkServiceTest {
         SinkRecord rec1 = buildRecord(TOPIC_A, 0, 100L);
         SinkRecord rec2 = buildRecord(TOPIC_A, 0, 50L);
 
-        Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
-
         // Simulate an existing writer with processed offsets
         TableWriter existingWriter = mock(TableWriter.class);
         Map<Integer, Long> offsets = Map.of(0, 75L);
@@ -229,7 +204,7 @@ public class AppendOnlyFireboltSinkServiceTest {
         // Inject existing writer into map
         tableWriterMap.put(TABLE_A, existingWriter);
 
-        assertDoesNotThrow(() -> service.processRecord(List.of(rec1, rec2), schemas));
+        assertDoesNotThrow(() -> service.processRecord(List.of(rec1, rec2)));
 
         // Only rec1 (100L) should be inserted, rec2 (50L) filtered
         verify(existingWriter).insertRecords(tableARecordListCaptor.capture());
@@ -244,12 +219,11 @@ public class AppendOnlyFireboltSinkServiceTest {
         service = new AppendOnlyFireboltSinkService(mockSinkConfig, mockDbService, tableWriterMap, Map.of(TOPIC_B, Set.of(0)), mockErrorReporter, false, mockTableWriterProvider);
 
         SinkRecord recA = buildRecord(TOPIC_A, 0, 1L);
-        Map<String, TableSchema> schemas = Map.of(TABLE_A, mockSchemaTableA);
 
         TableWriter writerA = mock(TableWriter.class);
         tableWriterMap.put(TABLE_A, writerA);
 
-        assertDoesNotThrow(() -> service.processRecord(List.of(recA), schemas));
+        assertDoesNotThrow(() -> service.processRecord(List.of(recA)));
         verify(writerA, never()).insertRecords(anyList());
         verifyNoInteractions(mockTableWriterProvider);
     }
