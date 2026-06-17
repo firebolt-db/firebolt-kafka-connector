@@ -2,8 +2,8 @@ package com.firebolt.kafka.connect.integration.json.datatype;
 
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.firebolt.kafka.connect.integration.json.datatype.serializer.DateListSerializer;
-import com.firebolt.kafka.connect.integration.json.datatype.serializer.DateSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.IsoDateListSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.IsoDateSerializer;
 import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateTimeListSerializer;
 import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateTimeSerializer;
 import com.firebolt.kafka.connect.integration.json.datatype.serializer.OffsetDateTimeListSerializer;
@@ -49,7 +49,7 @@ public class AllDataTypesTestRecord {
     private String colText;              // colText TEXT
     
     // Date and timestamp types
-    @JsonSerialize(using = DateSerializer.class)
+    @JsonSerialize(using = IsoDateSerializer.class)
     private Date colDate;           // colDate DATE
     @JsonSerialize(using = LocalDateTimeSerializer.class)
     private LocalDateTime colTimestamp;  // colTimestamp TIMESTAMP (epoch millis, Connect Timestamp logical)
@@ -65,7 +65,7 @@ public class AllDataTypesTestRecord {
     private List<Integer> colArrayIntSyntax1;     // colArrayIntSyntax1 ARRAY(INTEGER)
     private List<Integer> colArrayIntSyntax2;     // colArrayIntSyntax2 INTEGER[]
 
-    @JsonSerialize(using = DateListSerializer.class)
+    @JsonSerialize(using = IsoDateListSerializer.class)
     private List<Date> colArrayDate;         // colArrayDate ARRAY(DATE)
     private List<Float> colArrayReal;             // colArrayReal ARRAY(REAL)
 

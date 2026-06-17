@@ -374,8 +374,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                     "}," +
                     "\"requiredDate\": {" +
                         "\"type\": \"string\"," +
-                        "\"connect.type\": \"int32\"," +
-                        "\"title\": \"org.apache.kafka.connect.data.Date\"," +
+                        "\"format\": \"date\"," +
                         "\"description\": \"Required date field\"" +
                     "}," +
                     "\"optionalDate\": {" +
@@ -383,8 +382,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                             "{\"type\": \"null\"}," +
                             "{" +
                                 "\"type\": \"string\"," +
-                                "\"connect.type\": \"int32\"," +
-                                "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                                "\"format\": \"date\"" +
                             "}" +
                         "]," +
                         "\"description\": \"Optional date field\"" +
@@ -394,8 +392,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                             "{\"type\": \"null\"}," +
                             "{" +
                                 "\"type\": \"string\"," +
-                                "\"connect.type\": \"int32\"," +
-                                "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                                "\"format\": \"date\"" +
                             "}" +
                         "]," +
                         "\"description\": \"Optional LocalDate field\"" +
@@ -407,8 +404,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                 "{\"type\": \"null\"}," +
                                 "{" +
                                     "\"type\": \"string\"," +
-                                    "\"connect.type\": \"int32\"," +
-                                    "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                                    "\"format\": \"date\"" +
                                 "}" +
                             "]" +
                         "}," +
@@ -418,8 +414,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                         "\"type\": \"array\"," +
                         "\"items\": {" +
                             "\"type\": \"string\"," +
-                            "\"connect.type\": \"int32\"," +
-                            "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                            "\"format\": \"date\"" +
                         "}," +
                         "\"description\": \"Required list with non-null elements\"" +
                     "}," +
@@ -433,8 +428,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                         "{\"type\": \"null\"}," +
                                         "{" +
                                             "\"type\": \"string\"," +
-                                            "\"connect.type\": \"int32\"," +
-                                            "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                                            "\"format\": \"date\"" +
                                         "}" +
                                     "]" +
                                 "}" +
@@ -449,8 +443,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                 "\"type\": \"array\"," +
                                 "\"items\": {" +
                                     "\"type\": \"string\"," +
-                                    "\"connect.type\": \"int32\"," +
-                                    "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                                    "\"format\": \"date\"" +
                                 "}" +
                             "}" +
                         "]," +
@@ -466,8 +459,7 @@ public class DateSchemaSerializerTest extends SchemaBaseIntegrationTest {
                                         "{\"type\": \"null\"}," +
                                         "{" +
                                             "\"type\": \"string\"," +
-                                            "\"connect.type\": \"int32\"," +
-                                            "\"title\": \"org.apache.kafka.connect.data.Date\"" +
+                                            "\"format\": \"date\"" +
                                         "}" +
                                     "]" +
                                 "}" +

@@ -367,20 +367,100 @@ public class TimestamptzSchemalessSerializerTest extends SchemalessBaseIntegrati
         for (TimestamptzTestRecord record : records) {
             String key = "timestamptz-test-key-" + record.getRecordId();
             ProducerRecord<String, String> producerRecord =
-                new ProducerRecord<>(TOPIC_NAME, key, mapper.writeValueAsString(record));
-            
+                new ProducerRecord<>(TOPIC_NAME, key, buildJsonPayload(record));
+
             producer.send(producerRecord, (metadata, exception) -> {
                 if (exception != null) {
                     log.error("Failed to send message with key {}: {}", key, exception.getMessage());
                 } else {
-                    log.debug("Successfully sent message with key {} to partition {} at offset {}", 
+                    log.debug("Successfully sent message with key {} to partition {} at offset {}",
                         key, metadata.partition(), metadata.offset());
                 }
             }).get();
         }
-        
+
         producer.flush();
     }
+
+    /**
+     * Builds the schemaless (plain JSON) payload manually.
+     *
+     * <p>read_json (schemaless) can parse a scalar timestamptz string with any offset, but for an
+     * ARRAY of timestamptz strings it only accepts {@code Z} (UTC). To be consistent we serialize
+     * every OffsetDateTime — scalar and array element alike — converted to UTC and formatted with a
+     * trailing {@code Z}. The String fields (timestamptzString / timestamptzStringArray) are already
+     * valid timestamptz strings and are passed through as-is.
+     */
+    private String buildJsonPayload(TimestamptzTestRecord r) throws Exception {
+        com.fasterxml.jackson.databind.node.ObjectNode node = mapper.createObjectNode();
+        node.put("recordId", r.getRecordId());
+        putTimestamptz(node, "requiredTimestamptz", r.getRequiredTimestamptz());
+        putTimestamptz(node, "optionalTimestamptz", r.getOptionalTimestamptz());
+        putTimestamptzArray(node, "requiredListWithNullableElements", r.getRequiredListWithNullableElements());
+        putTimestamptzArray(node, "requiredListWithNonNullElements", r.getRequiredListWithNonNullElements());
+        putTimestamptzArray(node, "optionalList", r.getOptionalList());
+        putTimestamptzArray(node, "optionalListWithNonNullElements", r.getOptionalListWithNonNullElements());
+
+        if (r.getTimestamptzString() == null) {
+            node.putNull("timestamptzString");
+        } else {
+            node.put("timestamptzString", r.getTimestamptzString());
+        }
+
+        if (r.getTimestamptzStringArray() == null) {
+            node.putNull("timestamptzStringArray");
+        } else {
+            // read_json only accepts a Z (UTC) offset for elements of a timestamptz array, so convert
+            // each timestamptz string to UTC with a trailing Z. The instant is preserved, so the
+            // verification (which normalises to +2) still matches.
+            com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray("timestamptzStringArray");
+            for (String s : r.getTimestamptzStringArray()) {
+                if (s == null) {
+                    arr.addNull();
+                } else {
+                    arr.add(toUtcString(FireboltTimestamptzConverter.parseTimestamptz(s)));
+                }
+            }
+        }
+
+        return mapper.writeValueAsString(node);
+    }
+
+    private void putTimestamptz(com.fasterxml.jackson.databind.node.ObjectNode node, String field, OffsetDateTime value) {
+        if (value == null) {
+            node.putNull(field);
+        } else {
+            node.put(field, toUtcString(value));
+        }
+    }
+
+    private void putTimestamptzArray(com.fasterxml.jackson.databind.node.ObjectNode node, String field, List<OffsetDateTime> values) {
+        if (values == null) {
+            node.putNull(field);
+            return;
+        }
+        com.fasterxml.jackson.databind.node.ArrayNode arr = node.putArray(field);
+        for (OffsetDateTime value : values) {
+            if (value == null) {
+                arr.addNull();
+            } else {
+                arr.add(toUtcString(value));
+            }
+        }
+    }
+
+    /**
+     * Converts an OffsetDateTime to a UTC ISO-8601 string with a trailing {@code Z}, rounded to
+     * microsecond precision (matching createExpectedRecordsWithTruncatedNanoseconds so that what we
+     * send and what we expect stay consistent).
+     */
+    private String toUtcString(OffsetDateTime value) {
+        OffsetDateTime utc = truncateToMicroseconds(value).withOffsetSameInstant(ZoneOffset.UTC);
+        return UTC_FORMATTER.format(utc) + "Z";
+    }
+
+    private static final java.time.format.DateTimeFormatter UTC_FORMATTER =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss[.SSSSSS]");
     
     /**
      * Converts OffsetDateTime to milliseconds since Unix epoch for TIMESTAMPTZ.

@@ -697,7 +697,7 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
                 "    \"colDate\": {\n" +
                 "      \"oneOf\": [\n" +
                 "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"integer\", \"connect.type\": \"int32\", \"title\": \"org.apache.kafka.connect.data.Date\"}\n" +
+                "        {\"type\": \"string\", \"format\": \"date\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Date field\"\n" +
                 "    },\n" +
@@ -708,7 +708,7 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
                 "          \"type\": \"integer\",\n" +
                 "          \"connect.type\": \"int64\",\n" +
                 "          \"connect.version\": 1,\n" +
-                "          \"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
+                "          \"title\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
                 "        }\n" +
                 "      ],\n" +
                 "      \"description\": \"Timestamp field\"\n" +
@@ -720,7 +720,7 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
                 "          \"type\": \"integer\",\n" +
                 "          \"connect.type\": \"int64\",\n" +
                 "          \"connect.version\": 1,\n" +
-                "          \"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
+                "          \"title\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
                 "        }\n" +
                 "      ]\n" +
                 "    },\n" +
@@ -787,7 +787,7 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
                 "          \"items\": {\n" +
                 "            \"oneOf\": [\n" +
                 "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"integer\", \"connect.type\": \"int32\", \"title\": \"org.apache.kafka.connect.data.Date\"}\n" +
+                "              {\"type\": \"string\", \"format\": \"date\"}\n" +
                 "            ]\n" +
                 "          }\n" +
                 "        }\n" +
@@ -851,7 +851,7 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
                 "                \"type\": \"integer\",\n" +
                 "                \"connect.type\": \"int64\",\n" +
                 "                \"connect.version\": 1,\n" +
-                "                \"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
+                "                \"title\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
                 "              }\n" +
                 "            ]\n" +
                 "          }\n" +
@@ -871,7 +871,7 @@ public class AllDataTypesSchemaSerializerTest extends SchemaBaseIntegrationTest 
                 "                \"type\": \"integer\",\n" +
                 "                \"connect.type\": \"int64\",\n" +
                 "                \"connect.version\": 1,\n" +
-                "                \"connect.name\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
+                "                \"title\": \"org.apache.kafka.connect.data.Timestamp\"\n" +
                 "              }\n" +
                 "            ]\n" +
                 "          }\n" +
