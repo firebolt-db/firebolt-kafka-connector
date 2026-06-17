@@ -24,7 +24,10 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
+import org.apache.kafka.connect.data.Decimal;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
 
@@ -61,6 +64,13 @@ public class UploadIngestionService implements IngestionService {
 
     // The multipart part name referenced by upload://. Must match [_0-9a-zA-Z.-]+ and be unique per request.
     private static final String MULTIPART_NAME = "batch";
+
+    // AvroData reads a Connect Decimal's precision from this parameter and otherwise defaults to 64,
+    // which the engine rejects (it caps decimal precision at 38). When the source schema declares no
+    // precision we default to Firebolt's NUMERIC(38, scale) precision instead. (The scale is always
+    // carried by the Connect Decimal and is left untouched.)
+    private static final String DECIMAL_PRECISION_PARAM = "connect.decimal.precision";
+    private static final String DEFAULT_DECIMAL_PRECISION = "38";
 
     /** group key for records without a value schema */
     private static final Object SCHEMALESS = new Object();
@@ -152,7 +162,12 @@ public class UploadIngestionService implements IngestionService {
 
     /** Schema-carrying records -> Avro -> read_avro. */
     private void ingestAvro(Schema connectSchema, List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
-        org.apache.avro.Schema avroSchema = nonNullUnionBranch(avroData.fromConnectSchema(connectSchema));
+        // Writer schema: default precision-less Decimals to NUMERIC(38, scale) so we don't emit Avro
+        // decimal precision 64 (which the engine rejects). Only the schema's precision metadata changes
+        // — record bytes are scale-encoded identically — so this is applied to the writer schema only;
+        // fromConnectData keeps the record's original schema (AvroData requires the value's schema to
+        // match). Identity-returns when there's no such Decimal, leaving the common path untouched.
+        org.apache.avro.Schema avroSchema = nonNullUnionBranch(avroData.fromConnectSchema(defaultDecimalPrecision(connectSchema)));
         if (avroSchema.getType() != org.apache.avro.Schema.Type.RECORD) {
             for (SinkRecord record : records) {
                 handleBadRecord(record, new RecordConversionException("Record value schema is not a struct: " + connectSchema.type()));
@@ -234,6 +249,80 @@ public class UploadIngestionService implements IngestionService {
                 .filter(branch -> branch.getType() != org.apache.avro.Schema.Type.NULL)
                 .findFirst()
                 .orElse(schema);
+    }
+
+    /**
+     * Returns a copy of {@code schema} where every Connect {@link Decimal} that declares no precision
+     * gets {@value #DECIMAL_PRECISION_PARAM}={@value #DEFAULT_DECIMAL_PRECISION} (Firebolt's NUMERIC
+     * default), recursing through structs/arrays/maps. AvroData would otherwise emit Avro decimal
+     * precision 64, which the engine rejects. Returns the same object when nothing needs defaulting, so
+     * the common case (no Decimal, or Decimals that already declare precision) is left untouched.
+     */
+    private Schema defaultDecimalPrecision(Schema schema) {
+        if (schema == null) {
+            return null;
+        }
+        switch (schema.type()) {
+            case BYTES:
+                if (Decimal.LOGICAL_NAME.equals(schema.name())
+                        && (schema.parameters() == null || !schema.parameters().containsKey(DECIMAL_PRECISION_PARAM))) {
+                    SchemaBuilder builder = SchemaBuilder.bytes().name(schema.name());
+                    if (schema.parameters() != null) {
+                        schema.parameters().forEach(builder::parameter);
+                    }
+                    builder.parameter(DECIMAL_PRECISION_PARAM, DEFAULT_DECIMAL_PRECISION);
+                    return copyMeta(schema, builder);
+                }
+                return schema;
+            case STRUCT: {
+                boolean changed = false;
+                SchemaBuilder builder = SchemaBuilder.struct();
+                for (Field field : schema.fields()) {
+                    Schema fieldSchema = defaultDecimalPrecision(field.schema());
+                    changed |= fieldSchema != field.schema();
+                    builder.field(field.name(), fieldSchema);
+                }
+                return changed ? copyMeta(schema, builder) : schema;
+            }
+            case ARRAY: {
+                Schema value = defaultDecimalPrecision(schema.valueSchema());
+                return value == schema.valueSchema() ? schema : copyMeta(schema, SchemaBuilder.array(value));
+            }
+            case MAP: {
+                Schema key = defaultDecimalPrecision(schema.keySchema());
+                Schema value = defaultDecimalPrecision(schema.valueSchema());
+                return key == schema.keySchema() && value == schema.valueSchema()
+                        ? schema : copyMeta(schema, SchemaBuilder.map(key, value));
+            }
+            default:
+                return schema;
+        }
+    }
+
+    /** Copies name/version/doc/parameters and optional/default from {@code from} onto {@code builder}. */
+    private Schema copyMeta(Schema from, SchemaBuilder builder) {
+        if (from.type() == Schema.Type.STRUCT) {
+            // name/parameters for a STRUCT are copied here; for BYTES the caller already set them.
+            if (from.name() != null) {
+                builder.name(from.name());
+            }
+            if (from.parameters() != null) {
+                from.parameters().forEach(builder::parameter);
+            }
+        }
+        if (from.version() != null) {
+            builder.version(from.version());
+        }
+        if (from.doc() != null) {
+            builder.doc(from.doc());
+        }
+        if (from.defaultValue() != null) {
+            builder.defaultValue(from.defaultValue());
+        }
+        if (from.isOptional()) {
+            builder.optional();
+        }
+        return builder.build();
     }
 
     private byte[] writeAvro(org.apache.avro.Schema avroSchema, List<GenericRecord> records) throws SQLException {

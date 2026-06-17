@@ -43,13 +43,15 @@ Connect schema. It only falls back to a default of **64** when the source schema
 precision (e.g. a hand-built `Decimal.schema(scale)` with no precision parameter). The engine caps
 Avro decimal precision at 38, so a source precision > 38 (or the 64 default) is rejected.
 
-Implication for the earlier open question: **the connector already takes the source schema's
-precision** — no precision-narrowing assignment cast in Firebolt is needed, and we agree that
-would be an anti-pattern. Real registered Avro / JSON-Schema decimals carry a precision ≤ 38 and
-work as-is. The only failure mode is a source that genuinely declares precision > 38 (which the
-engine can't store anyway) or one that declares none (hits the 64 default). If the latter ever
-bites real connectors, the fix is connector-side (constrain the emitted precision), not an engine
-cast.
+**The connector takes the source schema's precision, and defaults a precision-less Decimal to
+Firebolt's `NUMERIC(38, scale)` default (38) rather than AvroData's 64.** Real registered Avro /
+JSON-Schema decimals carry a precision ≤ 38 and pass through as-is; only a source that declares no
+precision used to hit the 64 default and get rejected — now `UploadIngestionService` sets
+`connect.decimal.precision=38` on such fields (recursively, on the writer schema only; the record
+bytes are scale-encoded identically). No precision-narrowing assignment cast in Firebolt is needed
+— we agree that would be an anti-pattern. The only remaining failure mode is a source that
+genuinely declares precision > 38, which Firebolt can't store regardless (such a value would be
+DLQ'd).
 
 For reference: Postgres *does* coerce `numeric` into a `numeric(p,s)` column on assignment by
 applying the column's type modifier — rounding the scale and erroring if the integer digits

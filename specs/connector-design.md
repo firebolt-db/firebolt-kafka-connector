@@ -101,11 +101,12 @@ mirror that logic rather than re-implement coercion. Full matrix + runnable prob
    - `read_json` rejects arrays of timestamp strings carrying a numeric offset (`+02:00`); only `Z`
      (UTC) works inside arrays. Scalars accept any offset.
    - `read_json` rejects subnormal doubles (underflow).
-   - Confluent `AvroData` requires a `Decimal` value's scale to equal the schema scale, and emits
-     decimal **precision 64 by default** when the source Connect schema declares none — the engine
-     caps decimal precision at 38. See the decimal note in
-     [format-benchmark-results.md](format-benchmark-results.md): the connector already honors the
-     *source* schema's precision; no precision-narrowing engine cast is required.
+   - Confluent `AvroData` requires a `Decimal` value's scale to equal the schema scale. For
+     precision: the connector honors the *source* schema's precision and **defaults a precision-less
+     Decimal to 38** (Firebolt's `NUMERIC(38, scale)` default) instead of AvroData's 64, which the
+     engine (cap 38) would reject — done on the writer schema in `UploadIngestionService`. No
+     precision-narrowing engine cast is required. See
+     [format-benchmark-results.md](format-benchmark-results.md).
 5. **Decimal/timestamp precision.** Connect `Timestamp` is millisecond precision (Avro
    `timestamp-micros` degrades), and Firebolt timestamps are microsecond precision — sub-unit
    values truncate.

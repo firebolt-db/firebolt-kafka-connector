@@ -97,6 +97,12 @@ class UploadIngestionServiceTest {
         assertEquals(7L, rows.get(0).get("id"));
         // AvroData maps Connect Timestamp -> avro long with logicalType timestamp-millis.
         assertEquals(1718000000000L, rows.get(0).get("created_at"));
+        // The "amount" field is a Connect Decimal with no declared precision; rather than AvroData's
+        // default of 64 (which the engine rejects), the connector defaults it to Firebolt's NUMERIC(38).
+        org.apache.avro.LogicalTypes.Decimal amountType = (org.apache.avro.LogicalTypes.Decimal)
+                org.apache.avro.LogicalTypes.fromSchema(rows.get(0).getSchema().getField("amount").schema());
+        assertEquals(38, amountType.getPrecision());
+        assertEquals(2, amountType.getScale());
     }
 
     @Test
