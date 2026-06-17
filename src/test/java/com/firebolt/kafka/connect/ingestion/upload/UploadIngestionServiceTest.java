@@ -186,9 +186,19 @@ class UploadIngestionServiceTest {
     }
 
     @Test
-    void emptyJsonObjectsProduceNoUpload() throws Exception {
-        service(false).addRecords(List.of(record(null, Map.of(), 0L)));
+    void emptyJsonObjectThrowsWhenNotTolerant() throws Exception {
+        // A record with no fields can't be represented as an INSERT; rather than silently advance
+        // past it (dropping it with no trace), it fails the task when error tolerance is off.
+        org.junit.jupiter.api.Assertions.assertThrows(RecordConversionException.class,
+                () -> service(false).addRecords(List.of(record(null, Map.of(), 0L))));
         verify(statement, never()).execute(anyString(), anyMap());
+    }
+
+    @Test
+    void emptyJsonObjectGoesToDlqWhenTolerant() throws Exception {
+        service(true).addRecords(List.of(record(null, Map.of(), 0L)));
+        verify(statement, never()).execute(anyString(), anyMap());
+        verify(errorReporter, times(1)).report(any(SinkRecord.class), any(Exception.class));
     }
 
     @Test

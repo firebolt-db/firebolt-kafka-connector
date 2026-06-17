@@ -240,9 +240,8 @@ public class UploadIngestionService implements IngestionService {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(avroSchema);
         try (DataFileWriter<GenericRecord> writer = new DataFileWriter<>(datumWriter)) {
-            // deflate is built into avro (java.util.zip) — compression with no native lib or extra
-            // dependency. Best-speed keeps the cost low on the (hot-path) worker; payloads shrink ~5x.
-            writer.setCodec(CodecFactory.deflateCodec(java.util.zip.Deflater.BEST_SPEED));
+            // Snappy: cheap CPU on the (hot-path) worker, good ratio. See specs/format-benchmark-results.md.
+            writer.setCodec(CodecFactory.snappyCodec());
             writer.create(avroSchema, buffer);
             for (GenericRecord record : records) {
                 writer.append(record);
@@ -264,6 +263,14 @@ public class UploadIngestionService implements IngestionService {
         Payload payload = assembler.assemble(from, to);
         String sql = buildInsertSql(tvf, payload.fields, literalColumns);
         if (sql == null) {
+            // No columns to insert — e.g. every record in this range is an empty object {}. We
+            // can't represent "insert a row with no fields", so don't silently advance past them
+            // (which would drop them with no trace): route each to the DLQ when error tolerance is
+            // on, or fail the task when it's off — same as any other unprocessable record.
+            for (int i = from; i < to; i++) {
+                handleBadRecord(records.get(i),
+                        new RecordConversionException("Record has no fields to ingest into table " + tableName));
+            }
             return;
         }
         try {

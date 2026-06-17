@@ -27,6 +27,7 @@ ext {
     guavaVersion = '33.5.0-jre'
     confluentVersion = '7.9.1'
     avroVersion = '1.12.1'
+    snappyVersion = '1.1.10.7'
     mockitoVersion = '5.21.0'
     awaitilityVersion = '4.3.0'
     protobufVersion = '3.25.5'
@@ -116,6 +117,9 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
+    // Snappy codec for the Avro container files we upload (Avro's built-in codec hook needs the
+    // xerial implementation on the classpath). Bundled into the plugin jar.
+    implementation("org.xerial.snappy:snappy-java:${snappyVersion}")
 
     // Connect Schema <-> Avro conversion (Apache 2.0 licensed, unlike most of schema-registry).
     // Bundled: not provided by vanilla Kafka Connect runtimes.

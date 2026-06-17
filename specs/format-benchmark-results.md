@@ -1,69 +1,57 @@
-# Parquet vs Avro ingestion benchmark (local)
+# Decision record — schema-carrying ingestion format
 
-Question: for schema-carrying records, does the hop through **Parquet + `read_parquet`** beat
-**Avro + `read_avro`**? Both share the `AvroData` → `GenericRecord` step (~20 ms / 10k records);
-this measures only the format-dependent legs.
+**Decision: schema-carrying records are written as an Avro container file compressed with
+Snappy and ingested via `read_avro`.** (Schemaless JSON continues to go through `read_json`.)
+This supersedes the earlier Parquet + `read_parquet` prototype.
 
-Harness: `BenchmarkFormatComparison` (integrationTest), run via `./gradlew runFormatBenchmark`
-against a local engine (`release-5.0.1`). 12-column event schema (longs, strings, low-cardinality
-country, doubles, int, bool, epoch, `array<string>`, a text comment). Median of 7, 2 warmup.
-Numbers are local (loopback upload, single engine node) — see caveats.
+## Why (summary of the local benchmark)
 
-## Throughput (100k records)
+A local benchmark (`BenchmarkFormatComparison`, since removed) compared Parquet+`read_parquet`
+against Avro+`read_avro` on a 12-column event schema, both sharing the `AvroData` → record step.
+Net throughput was a wash; the decision turned on the secondary factors.
 
-| format                | serialize ms | payload MB | server read+insert ms | rows/s (ser+insert) |
-|-----------------------|-------------:|-----------:|----------------------:|--------------------:|
-| parquet (uncompressed)|        145   |    9.7     |        108            |     395k            |
-| parquet (snappy)      |        144   |    2.3     |         89            |     428k            |
-| avro (uncompressed)   |         73   |   13.4     |        161            |     428k            |
-| avro (snappy)         |         77   |    3.7     |        148            |     444k            |
-| avro (deflate)        |        202   |    2.7     |        151            |     283k            |
+| format | serialize ms/100k | payload MB | server read+insert ms | rows/s |
+|---|---:|---:|---:|---:|
+| parquet (uncompressed) | 145 | 9.7 | 108 | 395k |
+| parquet (snappy) | 144 | 2.3 | 89 | 428k |
+| avro (uncompressed) | 73 | 13.4 | 161 | 428k |
+| **avro (snappy)** | **77** | **3.7** | **148** | **444k** |
+| avro (deflate) | 202 | 2.7 | 151 | 283k |
 
-(10k batch shows the same shape; at 1k Parquet's footer overhead makes it relatively worse.)
+Avro + Snappy was chosen because:
+- **Throughput parity** with the best Parquet option.
+- **~2× cheaper to serialize** on the (horizontally-scalable) Connect worker than Parquet.
+- **Snappy over deflate**: deflate compresses slightly smaller but costs ~2.6× the serialize CPU
+  for no net throughput gain; Snappy is the cheap-CPU / good-ratio sweet spot.
+- **`read_avro` honors Avro logical types** (`timestamp-millis`, `date`) — the Parquet path
+  returned bigint for timestamps.
+- **Eliminates the entire Parquet/Hadoop dependency stack** (parquet-avro, parquet-hadoop-bundle,
+  hadoop-client-runtime/api/common + their Jetty/nimbus CVE exclusions). The shaded plugin jar
+  dropped to ~21 MB. `org.apache.avro` was already required by `AvroData`; `snappy-java` is a
+  small, widely-used dependency.
 
-## Reading
+Caveat the benchmark could not measure: Parquet's smaller compressed payload and faster
+server-side read favor it under cross-network upload to a shared cloud engine. With realistic
+Kafka batch sizes (hundreds–thousands of records, single-digit-KB compressed payloads) the
+difference is not decisive, and the simplification + logical-type win dominate.
 
-- **Net throughput is a wash.** parquet-snappy (428k) ≈ avro-snappy (444k). Avro serializes
-  ~2× cheaper on the client; Parquet reads ~1.7× faster on the server. They cancel.
-- **Avro serialize is much cheaper** (73–77 ms vs 144 ms / 100k) — less CPU on the Connect worker.
-- **Parquet payload is ~38% smaller** compressed (2.3 vs 3.7 MB) and reads faster server-side —
-  matters more in production than locally (loopback hides upload bandwidth; a single local node
-  understates shared-engine read cost).
-- Avoid **deflate** (level 6): smallest but 2.6× the serialize cost of snappy for no net gain.
+## Decimal precision (resolved)
 
-## The decisive non-perf finding: `read_avro` honors logical types
+Confluent `AvroData` maps a Connect `Decimal` to an Avro `decimal(precision, scale)`. **The
+precision comes from the source schema** — `AvroData` reads `connect.decimal.precision` from the
+Connect schema. It only falls back to a default of **64** when the source schema declares no
+precision (e.g. a hand-built `Decimal.schema(scale)` with no precision parameter). The engine caps
+Avro decimal precision at 38, so a source precision > 38 (or the 64 default) is rejected.
 
-`read_parquet` returned **bigint** for Parquet timestamp logical types (only DATE worked) — the
-gap behind the failing timestamp tests. `read_avro` does **not** have this gap. Verified through
-the connector's actual path (`AvroData` → Avro → `read_avro`):
+Implication for the earlier open question: **the connector already takes the source schema's
+precision** — no precision-narrowing assignment cast in Firebolt is needed, and we agree that
+would be an anti-pattern. Real registered Avro / JSON-Schema decimals carry a precision ≤ 38 and
+work as-is. The only failure mode is a source that genuinely declares precision > 38 (which the
+engine can't store anyway) or one that declares none (hits the 64 default). If the latter ever
+bites real connectors, the fix is connector-side (constrain the emitted precision), not an engine
+cast.
 
-```
-AvroData maps Connect Timestamp -> {long, logicalType: timestamp-millis}
-AvroData maps Connect Date      -> {int,  logicalType: date}
-read_avro ts -> timestamptz, assigns into TIMESTAMP  -> 2024-06-10 06:13:20  OK
-read_avro d  -> date,        assigns into DATE        -> 2024-01-15           OK
-```
-
-So switching to Avro **fixes the timestamp/date gap with no engine change**.
-
-## Open edge — Decimal precision
-
-`AvroData` emits Connect `Decimal` as Avro `decimal` with **precision 64** (its default; Connect
-Decimal carries only scale). The engine rejects precision > 38:
-`Avro decimal with precision 64 is not supported (maximum supported precision is 38)`.
-Independent of Parquet-vs-Avro; needs either the engine to cap/accept ≤38, or the connector to
-constrain the emitted precision. Flagged, not yet handled.
-
-## Recommendation
-
-**Switch to Avro + `read_avro`**, drop the Parquet path:
-- Net throughput parity.
-- Fixes timestamp/date logical types (greens those tests without engine work).
-- Eliminates the entire Parquet/Hadoop dependency stack (`parquet-avro`,
-  `parquet-hadoop-bundle`, `hadoop-client-runtime`, `hadoop-common`) and its Jetty/nimbus CVE
-  exclusions — the single biggest chunk of the connector's weight. `org.apache.avro` is already
-  required by `AvroData`; `snappy-java` is already on the classpath.
-
-Caveat the user should weigh: Parquet's smaller compressed payload and faster server-side read
-favor it under **cross-network upload to a shared cloud engine** — conditions this local
-benchmark cannot reproduce.
+For reference: Postgres *does* coerce `numeric` into a `numeric(p,s)` column on assignment by
+applying the column's type modifier — rounding the scale and erroring if the integer digits
+overflow `p`. That's the column type-modifier behavior, not a narrowing cast between two arbitrary
+numeric types, so it isn't a precedent for adding narrowing casts to Firebolt.
