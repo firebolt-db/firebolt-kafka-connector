@@ -1,9 +1,12 @@
 # Cast semantics — what the connector can ingest
 
-The connector does **no** coercion of its own. Each record is shipped as-is and ingested with
-`INSERT INTO t (<fields>) SELECT <fields> FROM read_avro|read_json('upload://batch')`, so the
-operation that decides whether a value lands is a Firebolt **assignment cast** from the type
-`read_avro`/`read_json` surfaces to the target column type.
+The connector does **no** coercion of its own, and does not read the target table's schema. Each
+record is shipped as-is and ingested with
+`INSERT INTO t (<record's own fields>) SELECT <record's own fields> FROM read_avro|read_json('upload://batch')`
+— `<fields>` are the field names that came with the record, never columns the connector looked up
+(it doesn't). So the operation that decides whether a value lands is a Firebolt **assignment cast**
+from the type `read_avro`/`read_json` surfaces to the target column type. (Field-name vs. column
+matching is described in [connector-design.md](connector-design.md) → "Record ↔ column matching".)
 
 **The connector's supported conversions therefore equal Firebolt's assignment-cast matrix — by
 design.** This document is the reference for that matrix: it tells a future maintainer which

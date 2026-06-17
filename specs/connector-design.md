@@ -15,13 +15,39 @@ SELECT <record's own fields>
 FROM read_avro|read_json('upload://batch')
 ```
 
-The column list is built from **each record's own field names**, quoted on both sides, so a
-field is matched to the column whose name equals it exactly (case-sensitive). Consequences, by
-design:
-- A record may carry a *subset* of the table's columns — absent columns take their default.
-  **Firebolt-side schema evolution therefore needs zero connector handling.**
-- A field that is **not** a column of the table fails the batch — the table is the contract.
-- Type coercion is exactly Firebolt's assignment casts; the connector adds none.
+The connector **never reads the target table's schema.** The column list above is built purely
+from **each record's own field names** — the names the worker's converter already attached to the
+record — quoted on both sides. It lists them only because Firebolt has no name-based `INSERT`: a
+bare `INSERT INTO t SELECT * FROM read_*(...)` maps the file's columns to the table's **by
+position** (verified), which is fragile, and `INSERT ... BY NAME` is not supported. Naming the
+record's own fields on both sides is how each field reliably lands in the column of the same name.
+Because the connector only ever knows the *record's* fields and nothing about the table, schema
+evolution is free — see "Record ↔ column matching" below. Type coercion is exactly Firebolt's
+assignment casts; the connector adds none.
+
+## Kafka Connect background (for reviewers new to it)
+
+A Kafka Connect **sink connector** is plugin code that runs inside a Kafka Connect **worker** (a
+JVM process). The worker — not our code — owns consuming from Kafka, committing offsets, and
+deserializing record bytes. Two pieces matter here:
+
+- **`value.converter`** (worker config): the class that turns a record's raw bytes into an
+  in-memory Connect value *before the connector sees it*. With a schema-registry converter
+  (`AvroConverter`, `JsonSchemaConverter`, `ProtobufConverter`) the record arrives as a typed
+  `Struct` (a value + its Connect `Schema`); with the plain `JsonConverter` and
+  `schemas.enable=false` it arrives as a schemaless `Map`. The connector's only job is to take that
+  value and get it into Firebolt — it does not parse bytes itself. (Our `key.converter` is
+  irrelevant; this is value-only.)
+- **DLQ (dead-letter queue):** Kafka Connect's built-in error handling. When the worker is
+  configured with `errors.tolerance=all` and `errors.deadletterqueue.topic.name=…`, records the
+  connector reports as bad are routed to that Kafka topic instead of failing the task. With
+  `errors.tolerance=none` (the default) a bad record fails the task instead. The connector receives
+  an `ErrorReporter` from the framework and uses exactly this mechanism — it never invents its own.
+
+Delivery is **at-least-once** by default; with `exactlyOnce=true` the connector tracks processed
+offsets in a Firebolt metadata table (persisted before local advance) and skips already-ingested
+records on restart. That offset table is the connector's only durable state, and only in the
+exactly-once mode.
 
 ## Data flow
 
@@ -57,7 +83,7 @@ The only runtime state that remains:
 
 | State | Where | Why |
 |---|---|---|
-| **Processed partition offsets** | `TableWriter.processedPartitionOffsets`, persisted to a Firebolt metadata table | drives at-least-once/idempotent offset tracking; persisted before local advance. |
+| **Processed partition offsets** (only when `exactlyOnce=true`) | `TableWriter.processedPartitionOffsets`, persisted to a Firebolt metadata table | exactly-once replay protection; persisted before local advance. Default (`false`) is at-least-once and tracks nothing. |
 | `topicToTableMapping`, `assignedTopicPartitions`, `errorToleranceAll` | `FireboltSinkTask` / `AppendOnlyFireboltSinkService` | routing + behavior config. |
 
 **Table existence** is checked exactly once, at config-submission time, by
@@ -66,24 +92,46 @@ mapped table is missing). It is the single existence guard — nothing is cached
 per-task re-discovery. A table dropped while the connector runs surfaces as a normal batch failure
 (task fails, or DLQ under error tolerance), consistent with "the table is the contract."
 
+## Record ↔ column matching
+
+Because the connector names the record's own fields on both sides of the INSERT, matching is
+**by name** and order-independent. The three cases (all verified against the engine):
+
+| Case | Result |
+|---|---|
+| Record carries a **subset** of the table's columns | Works. Unnamed columns take their `DEFAULT` (or `NULL`). This is what makes **schema evolution** free: add a column to the table and old records — which simply don't name it — keep ingesting. |
+| Record field name **matches** a column (any order) | Works. The field lands in the same-named column. |
+| Record carries a field that is **not** a column | The batch **fails** with `Column '<x>' does not exist in the target INSERT table` — it is *not* silently discarded. |
+
+The third case is intentional ("the table is the contract") and fails *loudly* — there's no data
+corruption or silent drop. It is **not** a defect: the connector can't discard unknown fields
+without either reading the table schema (which would re-introduce the state we removed) or a
+Firebolt feature that ignores unmatched source columns. So the one schema-evolution scenario it
+does *not* absorb is a producer adding a field **before** the column exists in Firebolt; that batch
+fails until the column is added (or, with `errors.tolerance=all`, the offending records go to the
+DLQ and the rest land). Tolerating that gracefully would need an engine-side name-based ingest
+(e.g. `INSERT … BY NAME` with unmatched-source-column discard) — a possible future ask, noted here
+for the reviewer.
+
 ## Cast semantics (summary)
 
 The connector's supported conversions **are** Firebolt's assignment casts — we deliberately
 mirror that logic rather than re-implement coercion. Full matrix + runnable probes:
 [cast-semantics.md](cast-semantics.md). Headlines:
 
-- **Works:** numbers→numeric/int/bigint/double/real (in range), `text`→text/numeric? no —
-  `text`→int/bigint/double/real and `text`→timestamp/date/timestamptz (ISO-8601 strings),
-  real binary→bytea, Avro `timestamp-millis`/`date` logical types, struct→json (engine cast,
-  landing).
-- **Not supported (rejected on assignment, by design):** `text`→numeric/boolean/bytea,
+- **Works:** number→numeric/int/bigint/double/real (in range); `text`→int/bigint/double/real;
+  `text`→timestamp/date/timestamptz (ISO-8601 strings); real binary→bytea; Avro
+  `timestamp-millis`/`date` logical types; struct→json.
+- **Not supported (rejected on assignment, by design):** `text`→numeric/boolean/bytea;
   raw epoch number→timestamp/date.
 
 ## Main risks / things to look at in review
 
-1. **The table is the contract.** Any record field without a matching column fails the *whole
-   batch*. This is intended (and is what makes schema evolution free), but it means producer/table
-   drift surfaces as a hard failure, not a silent skip. Covered by name-matching tests.
+1. **The table is the contract** (see "Record ↔ column matching"). Records carrying a *subset* of
+   columns are fine (defaults fill the rest) — this is the schema-evolution path. A record field
+   that is *not* a column fails the batch loudly (no silent drop / no corruption). The only
+   not-absorbed case is a producer adding a field before its column exists. Covered by
+   name-matching tests; a dedicated schema-evolution IT is added below.
 2. **Offset/transaction correctness.** Multi-schema batches run as one transaction so a later
    group's failure can't leave earlier groups committed while offsets lag (which would duplicate
    on retry). With error-tolerance on, groups commit independently so split-and-retry can land the
@@ -176,7 +224,10 @@ bulk: because all parsing/typing now happens server-side, behavior is only obser
 so the converter-path × data-type matrix is where correctness is actually pinned. Keep that
 structure when adding types.
 
-### Gap worth closing
-Schema evolution is a headline property of the state-free design but isn't *directly* asserted —
-a test that ingests, runs `ALTER TABLE … ADD COLUMN`, then ingests records carrying the new field
-and verifies it lands would lock it in.
+### Schema evolution
+Schema evolution is a headline property of the state-free design, so it has a dedicated IT:
+`integration/SchemaEvolutionTest` ingests into a table, runs `ALTER TABLE … ADD COLUMN`, then
+ingests records carrying the new field (and confirms older-shaped records still land with the new
+column defaulted) — all with no connector restart, since the connector never caches the schema.
+*Extensive* evolution coverage (drops, type widening, reordering across all converter paths) is a
+sensible follow-up PR.
