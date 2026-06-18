@@ -61,3 +61,6 @@ src/integrationTest/docker/kafka-connect-cloud/scripts
 
 # Autobuild setup artifacts
 .obvious-install/
+
+# Local Claude Code agent state
+.claude/

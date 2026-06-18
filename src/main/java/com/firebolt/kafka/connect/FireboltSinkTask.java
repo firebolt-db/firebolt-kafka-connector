@@ -1,11 +1,8 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
-import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
-import com.firebolt.kafka.connect.service.FireboltDbService;
+import com.firebolt.kafka.connect.ingestion.upload.RecordConversionException;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;
-import com.google.common.collect.Sets;
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import java.io.IOException;
@@ -17,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -43,9 +39,7 @@ public class FireboltSinkTask extends SinkTask {
     private SinkConfig sinkConfig;
     private Set<String> assignedTopics;
     private Map<String, String> topicToTableMapping;
-    private Map<String, TableSchema> tableSchemas;
     private Map<String, Set<Integer>> assignedTopicPartitions;
-    private FireboltDbService fireboltDbService;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
 
@@ -75,14 +69,10 @@ public class FireboltSinkTask extends SinkTask {
             // Initialize collections
             this.assignedTopics = new HashSet<>();
             this.topicToTableMapping = new HashMap<>();
-            this.tableSchemas = new HashMap<>();
             this.assignedTopicPartitions = new HashMap<>();
 
             this.errorToleranceAll = this.sinkConfig.isErrorToleranceAll();
             createAndSetErrorReporter();
-
-            // Initialize services
-            this.fireboltDbService = new FireboltDbService();
 
             log.info("Firebolt Sink Task started successfully");
 
@@ -119,9 +109,6 @@ public class FireboltSinkTask extends SinkTask {
             // Map topics to table names
             buildTopicToTableMapping();
 
-            // Discover table schemas from Firebolt
-            discoverTableSchemas();
-
             // open method might get called on partition rebalancing. It might be that start method does not get called.
             // We need to move the firebolSinkService creation here, since we need to know which partitions will the service handle
             if (fireboltSinkService != null) {
@@ -149,7 +136,7 @@ public class FireboltSinkTask extends SinkTask {
         log.info("Received {} records for processing", records.size());
         try {
             // Delegate to the appropriate service
-            fireboltSinkService.processRecord(records, tableSchemas);
+            fireboltSinkService.processRecord(records);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
         } catch (Exception batchException) {
             log.error("Error processing records", batchException);
@@ -225,35 +212,6 @@ public class FireboltSinkTask extends SinkTask {
         }
     }
 
-    /**
-     * Discovers table schemas from Firebolt for all mapped tables.
-     */
-    private void discoverTableSchemas() {
-        tableSchemas.clear();
-
-        if (topicToTableMapping.isEmpty()) {
-            log.info("No table mappings available, skipping schema discovery");
-            return;
-        }
-
-        Set<String> uniqueTableNames = new HashSet<>(topicToTableMapping.values());
-        try {
-            JdbcConfig jdbcConfig = sinkConfig.getJdbcConfig();
-            this.tableSchemas = fireboltDbService.discoverTableSchemas(jdbcConfig, uniqueTableNames);
-            log.info("Successfully discovered schemas for {} tables", tableSchemas.size());
-        } catch (Exception e) {
-            log.error("Failed to discover table schemas", e);
-            throw new RuntimeException("Failed to discover table schemas", e);
-        }
-
-        // if we did not find all the tables names from the mapping then throw an exception
-        Set<String> tablesNotFoundInFirebolt = Sets.difference(uniqueTableNames, tableSchemas.entrySet().stream().map(Map.Entry::getKey).collect(Collectors.toSet()));
-        if (!tablesNotFoundInFirebolt.isEmpty()) {
-            log.error("The following tables were not found in firebolt: {}", tablesNotFoundInFirebolt);
-            throw new RuntimeException("The following tables were not found in Firebolt:" + tablesNotFoundInFirebolt.stream().collect(Collectors.joining(",")));
-        }
-    }
-
     private void handleError(Exception batchException, Collection<SinkRecord> records) {
         if (errorToleranceAll) {
             log.info("Errors tolerance is enabled, reporting to DLQ and continuing: {}", batchException.getLocalizedMessage());
@@ -281,7 +239,7 @@ public class FireboltSinkTask extends SinkTask {
             return false;
         }
 
-        if (throwable instanceof RecordConversionException || throwable instanceof RecordConversionFailedException) {
+        if (throwable instanceof RecordConversionException) {
             return false;
         }
 

@@ -1,10 +1,8 @@
 package com.firebolt.kafka.connect;
 
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
-import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;
-import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.data.Schema;
@@ -37,7 +35,7 @@ import org.apache.kafka.connect.sink.ErrantRecordReporter;
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
 import org.apache.kafka.connect.errors.RetriableException;
-import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
+import com.firebolt.kafka.connect.ingestion.upload.RecordConversionException;
 
 public class FireboltSinkTaskTest {
 
@@ -46,15 +44,9 @@ public class FireboltSinkTaskTest {
     
     @Mock
     private FireboltSinkService mockSinkService;
-    
-    @Mock
-    private FireboltDbService mockDbService;
-    
+
     @Mock
     private SinkConfig mockSinkConfig;
-    
-    @Mock
-    private JdbcConfig mockJdbcConfig;
 
     private FireboltSinkTask fireboltSinkTask;
     private Map<String, String> validConfig;
@@ -248,46 +240,6 @@ public class FireboltSinkTaskTest {
     }
 
     @Test
-    void shouldThrowExceptionWhenSchemaDiscoveryFails() {
-        try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
-            mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class), any(), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
-            
-            fireboltSinkTask.start(validConfig);
-            
-            // Set up mocks to fail schema discovery
-            setupMocksForOpenWithSchemaFailure();
-            
-            RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-                fireboltSinkTask.open(testPartitions);
-            });
-            
-            assertTrue(exception.getMessage().contains("Failed to open Firebolt Sink Task"));
-        }
-    }
-
-    @Test
-    void shouldThrowExceptionWhenTableNotFoundInFirebolt() {
-        try (MockedStatic<FireboltSinkServiceProvider> mockedProvider = mockStatic(FireboltSinkServiceProvider.class)) {
-            mockedProvider.when(FireboltSinkServiceProvider::getInstance).thenReturn(mockServiceProvider);
-            when(mockServiceProvider.getService(any(SinkConfig.class), any(), any(ErrorReporter.class), anyBoolean())).thenReturn(mockSinkService);
-            
-            fireboltSinkTask.start(validConfig);
-            
-            // Set up mocks where tables are not found
-            setupMocksForOpenWithMissingTables();
-            
-            RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-                fireboltSinkTask.open(testPartitions);
-            });
-            
-            // Check for any of the possible error messages related to missing tables
-            String message = exception.getMessage();
-            assertTrue(message.contains("table") || message.contains("schema") || message.contains("Failed to open"));
-        }
-    }
-
-    @Test
     void shouldProcessRecordsSuccessfully() throws SQLException {
         // Start and open the task
         startAndOpenTask();
@@ -296,7 +248,7 @@ public class FireboltSinkTaskTest {
             fireboltSinkTask.put(testRecords);
         });
         
-        verify(mockSinkService).processRecord(eq(testRecords), any(Map.class));
+        verify(mockSinkService).processRecord(eq(testRecords));
     }
 
     @Test
@@ -309,7 +261,7 @@ public class FireboltSinkTaskTest {
         });
         
         // Verify service was not called with null records
-        verify(mockSinkService, never()).processRecord(any(), any());
+        verify(mockSinkService, never()).processRecord(any());
     }
 
     @Test
@@ -322,7 +274,7 @@ public class FireboltSinkTaskTest {
         });
         
         // Verify service was not called with empty records
-        verify(mockSinkService, never()).processRecord(any(), any());
+        verify(mockSinkService, never()).processRecord(any());
     }
 
     @Test
@@ -333,7 +285,7 @@ public class FireboltSinkTaskTest {
         // Mock service to throw a retriable FireboltException
         FireboltException fireboltException = mock(FireboltException.class);
         when(fireboltException.getType()).thenReturn(ExceptionType.TOO_MANY_REQUESTS);
-        doThrow(fireboltException).when(mockSinkService).processRecord(any(), any());
+        doThrow(fireboltException).when(mockSinkService).processRecord(any());
 
         assertThrows(RetriableException.class, () -> fireboltSinkTask.put(testRecords));
     }
@@ -346,7 +298,7 @@ public class FireboltSinkTaskTest {
         // Mock service to throw a FireboltException with a conflict message in the cause
         FireboltException conflictException = mock(FireboltException.class);
         when(conflictException.getType()).thenReturn(ExceptionType.CONFLICT);
-        doThrow(conflictException).when(mockSinkService).processRecord(any(), any());
+        doThrow(conflictException).when(mockSinkService).processRecord(any());
 
         assertThrows(RetriableException.class, () -> fireboltSinkTask.put(testRecords));
     }
@@ -359,7 +311,7 @@ public class FireboltSinkTaskTest {
         // Mock service to throw a non-retriable FireboltException (HTTP 413)
         FireboltException fireboltException = mock(FireboltException.class);
         when(fireboltException.getType()).thenReturn(ExceptionType.REQUEST_BODY_TOO_LARGE);
-        doThrow(fireboltException).when(mockSinkService).processRecord(any(), any());
+        doThrow(fireboltException).when(mockSinkService).processRecord(any());
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> fireboltSinkTask.put(testRecords));
         assertTrue(exception.getMessage().contains("Number of records that failed: 1"));
@@ -372,18 +324,12 @@ public class FireboltSinkTaskTest {
         startAndOpenTask();
 
         // Mock service to throw a non-retriable conversion exception
-        RecordConversionFailedException conversionFailed = RecordConversionFailedException.builder()
-                .message("conversion failed")
-                .tableName("test_table")
-                .topicName("test_topic")
-                .kafkaPartition(0)
-                .kafkaOffset(100L)
-                .build();
-        doThrow(conversionFailed).when(mockSinkService).processRecord(any(), any());
+        RecordConversionException conversionFailed = new RecordConversionException("conversion failed");
+        doThrow(conversionFailed).when(mockSinkService).processRecord(any());
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> fireboltSinkTask.put(testRecords));
         assertTrue(exception.getMessage().contains("Number of records that failed: 1"));
-        assertInstanceOf(RecordConversionFailedException.class, exception.getCause());
+        assertInstanceOf(RecordConversionException.class, exception.getCause());
     }
 
     @Test
@@ -394,7 +340,7 @@ public class FireboltSinkTaskTest {
         
         // Mock service to throw exception
         doThrow(new RuntimeException("Processing failed")).when(mockSinkService)
-            .processRecord(any(), any());
+            .processRecord(any());
         
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
             fireboltSinkTask.put(testRecords);
@@ -411,7 +357,7 @@ public class FireboltSinkTaskTest {
 
         // Mock service to throw exception
         doThrow(new RuntimeException("Processing failed")).when(mockSinkService)
-            .processRecord(any(), any());
+            .processRecord(any());
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
             fireboltSinkTask.put(testRecords);
@@ -436,7 +382,7 @@ public class FireboltSinkTaskTest {
 
         // Mock service to throw exception
         doThrow(new RuntimeException("Processing failed")).when(mockSinkService)
-            .processRecord(any(), any());
+            .processRecord(any());
         when(errantRecordReporterMock.report(any(),any())).thenReturn(CompletableFuture.completedFuture(null));
 
         assertDoesNotThrow(() -> {
@@ -630,7 +576,7 @@ public class FireboltSinkTaskTest {
             fireboltSinkTask.put(multipleRecords);
         });
         
-        verify(mockSinkService).processRecord(eq(multipleRecords), any(Map.class));
+        verify(mockSinkService).processRecord(eq(multipleRecords));
     }
 
     @Test
@@ -678,69 +624,14 @@ public class FireboltSinkTaskTest {
         // Mock SinkConfig
         when(mockSinkConfig.getTableNameForTopic("test_topic")).thenReturn("test_table");
         when(mockSinkConfig.getTableNameForTopic("another_topic")).thenReturn("another_table");
-        when(mockSinkConfig.getJdbcConfig()).thenReturn(mockJdbcConfig);
-        
-        // Mock successful schema discovery
-        Map<String, TableSchema> schemas = new HashMap<>();
-        schemas.put("test_table", new TableSchema("test_table"));
-        schemas.put("another_table", new TableSchema("another_table"));
-        
-        try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.<java.util.Set<String>>any()))
-                .thenReturn(schemas);
-        } catch (Exception e) {
-            // This shouldn't happen in the mock setup
-        }
     }
-    
-    private void setupMocksForOpenWithSchemaFailure() {
-        when(mockSinkConfig.getTableNameForTopic(anyString())).thenReturn("test_table");
-        when(mockSinkConfig.getJdbcConfig()).thenReturn(mockJdbcConfig);
-        
-        try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.<java.util.Set<String>>any()))
-                .thenThrow(new ConnectionFailedException("Schema discovery failed"));
-        } catch (Exception e) {
-            // This shouldn't happen in the mock setup
-        }
-        
-        injectMockedDependencies();
-    }
-    
-    private void setupMocksForOpenWithMissingTables() {
-        when(mockSinkConfig.getTableNameForTopic("test_topic")).thenReturn("test_table");
-        when(mockSinkConfig.getJdbcConfig()).thenReturn(mockJdbcConfig);
-        
-        // Return empty schemas (no tables found)
-        try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.<java.util.Set<String>>any()))
-                .thenReturn(Collections.emptyMap());
-        } catch (Exception e) {
-            // This shouldn't happen in the mock setup
-        }
-        
-        injectMockedDependencies();
-    }
-    
+
     private void setupMocksForOpenWithMultipleTopics() {
         // Mock SinkConfig
         when(mockSinkConfig.getTableNameForTopic("topic1")).thenReturn("topic1_table");
         when(mockSinkConfig.getTableNameForTopic("topic2")).thenReturn("topic2_table");
-        when(mockSinkConfig.getJdbcConfig()).thenReturn(mockJdbcConfig);
-        
-        // Mock successful schema discovery
-        Map<String, TableSchema> schemas = new HashMap<>();
-        schemas.put("topic1_table", new TableSchema("topic1_table"));
-        schemas.put("topic2_table", new TableSchema("topic2_table"));
-        
-        try {
-            when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), ArgumentMatchers.<java.util.Set<String>>any()))
-                .thenReturn(schemas);
-        } catch (Exception e) {
-            // This shouldn't happen in the mock setup
-        }
     }
-    
+
     private void startAndOpenTask() {
         // Skip the complex open operation for simple tests
         // Just start the task, which is sufficient for testing put/flush operations
@@ -768,10 +659,6 @@ public class FireboltSinkTaskTest {
             java.lang.reflect.Field sinkConfigField = FireboltSinkTask.class.getDeclaredField("sinkConfig");
             sinkConfigField.setAccessible(true);
             sinkConfigField.set(fireboltSinkTask, mockSinkConfig);
-            
-            java.lang.reflect.Field dbServiceField = FireboltSinkTask.class.getDeclaredField("fireboltDbService");
-            dbServiceField.setAccessible(true);
-            dbServiceField.set(fireboltSinkTask, mockDbService);
         } catch (Exception e) {
             // If reflection fails, skip dependency injection
             // Tests may not work as expected but won't crash

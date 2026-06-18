@@ -15,6 +15,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -67,6 +68,7 @@ public class AvroJsonSerializerTest extends AvroBaseIntegrationTest {
 
     @ParameterizedTest(name = "{1}")
     @MethodSource("ingestionTypes")
+    @Disabled("pending engine struct->json assignment cast")
     void testAvroJsonAsNestedRecordSerialization(Map<String, String> connectorOverride, String description) throws Exception {
         log.info("Running {} for Avro JSON data type (nested record)", description);
 

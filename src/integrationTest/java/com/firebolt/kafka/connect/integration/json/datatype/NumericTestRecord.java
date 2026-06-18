@@ -35,8 +35,6 @@ public class NumericTestRecord {
 
     private Double optionalDouble;
 
-    private String bigDecimalFromString;
-    
     private List<BigDecimal> requiredListWithNullableElements;
 
     private List<BigDecimal> requiredListWithNonNullElements;

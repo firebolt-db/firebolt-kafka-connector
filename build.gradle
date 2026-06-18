@@ -3,6 +3,9 @@ plugins {
     id 'idea'
     id 'jacoco'
     id "org.sonarqube" version "7.2.2.6593"
+    // Relocates bundled io.confluent.* in the plugin jar so it can't shadow the Kafka Connect
+    // runtime's own Confluent converter classes (which differ by version across KC 3.9.1/4.0).
+    id "com.gradleup.shadow" version "8.3.6"
 }
 
 // Version and group are now defined in gradle.properties
@@ -24,14 +27,13 @@ ext {
     guavaVersion = '33.5.0-jre'
     confluentVersion = '7.9.1'
     avroVersion = '1.12.1'
+    snappyVersion = '1.1.10.7'
     mockitoVersion = '5.21.0'
     awaitilityVersion = '4.3.0'
     protobufVersion = '3.25.5'
     githubApiVersion = '1.326'
     commonsLang3Version = '3.20.0'
     commonsTextVersion = '1.15.0'
-    parquetVersion = '1.17.0'
-    hadoopCommonVersion = '3.4.3'
 }
 
 java {
@@ -115,6 +117,22 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
+    // Snappy codec for the Avro container files we upload (Avro's built-in codec hook needs the
+    // xerial implementation on the classpath). Bundled into the plugin jar.
+    implementation("org.xerial.snappy:snappy-java:${snappyVersion}")
+
+    // Connect Schema <-> Avro conversion (Apache 2.0 licensed, unlike most of schema-registry).
+    // Bundled: not provided by vanilla Kafka Connect runtimes.
+    implementation("io.confluent:kafka-connect-avro-data:${confluentVersion}") {
+        exclude group: 'org.apache.kafka'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+        // AvroData uses NonRecordContainer / AvroSchema but NOT the schema (de)serializer base.
+        // Bundling kafka-schema-serializer shadows the Kafka Connect runtime's own copy and breaks
+        // the JsonSchema/Avro converters when their version differs (e.g. NoSuchMethodError on
+        // AbstractKafkaSchemaSerDe under Kafka Connect 4.0 / Confluent 8.x). Let the runtime own it.
+        exclude group: 'io.confluent', module: 'kafka-schema-serializer'
+    }
     
     // Firebolt JDBC Driver - bundle this, exclude any Kafka and logging dependencies
     implementation("io.firebolt:firebolt-jdbc:${fireboltJdbcVersion}") {
@@ -145,13 +163,6 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-api:${log4jVersion}"
     compileOnly "org.apache.logging.log4j:log4j-slf4j2-impl:${log4jVersion}"
 
-    // Minimal Hadoop classes required by parquet-hadoop Path/Configuration
-    compileOnly("org.apache.hadoop:hadoop-common:${hadoopCommonVersion}") {
-        exclude group: 'org.apache.kafka'
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-
     // Utilities - bundle this, exclude any Kafka and logging dependencies
     implementation("com.google.guava:guava:${guavaVersion}") {
         exclude group: 'org.apache.kafka'
@@ -165,30 +176,6 @@ dependencies {
     }
     implementation("org.apache.commons:commons-text:${commonsTextVersion}") {
         exclude group: 'org.apache.kafka'
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-    
-    // Parquet writer (Avro-based) for local parquet generation
-    implementation("org.apache.parquet:parquet-avro:${parquetVersion}") {
-        exclude group: 'org.apache.kafka'
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-
-    // Parquet writer (Avro-based) for local parquet generation
-    implementation("org.apache.parquet:parquet-avro:${parquetVersion}") {
-        exclude group: 'org.slf4j'
-        exclude group: 'org.apache.logging.log4j'
-    }
-
-    implementation("org.apache.parquet:parquet-hadoop-bundle:${parquetVersion}") {
-        exclude group: 'org.slf4j';
-        exclude group: 'org.apache.logging.log4j'
-    }
-
-    compileOnly("org.apache.hadoop:hadoop-client-api:${hadoopCommonVersion}")
-    implementation("org.apache.hadoop:hadoop-client-runtime:${hadoopCommonVersion}") {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
@@ -240,8 +227,6 @@ dependencies {
     // Awaitility for async testing
     testImplementation "org.awaitility:awaitility:${awaitilityVersion}"
 
-    // Minimal Hadoop classes required by parquet-hadoop Path/Configuration
-    testImplementation "org.apache.hadoop:hadoop-common:${hadoopCommonVersion}"
 
     }
 
@@ -389,13 +374,6 @@ configurations {
     integrationTestImplementation.extendsFrom testImplementation
     integrationTestCompileOnly.extendsFrom testCompileOnly
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
-
-    configureEach {
-        resolutionStrategy {
-            force 'io.airlift:aircompressor:2.0.3' // CVE-2025-67721
-            force 'com.nimbusds:nimbus-jose-jwt:9.37.4' // CVE-2025-53864
-        }
-    }
 }
 
 // Configure IntelliJ IDEA to recognize integration test source set
@@ -528,52 +506,57 @@ jar {
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
     exclude 'META-INF/MANIFEST.MF'
 
-    // Exclude unused Jetty classes bundled in hadoop-client-runtime (CVE-2024-6763, CVE-2025-11143)
-    exclude 'org/apache/hadoop/shaded/org/eclipse/jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty.websocket/**'
-    exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
-    // Exclude shaded nimbus-jose-jwt classes from hadoop-client-runtime (CVE-2025-53864)
-    exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
-    
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-} 
+}
+
+// Shaded fat jar: same contents as `jar`, but io.confluent.* is relocated so the bundled
+// Connect<->Avro classes can't shadow the Kafka Connect runtime's own Confluent converter classes
+// (which differ by version across KC 3.9.1 / 4.0). This is the artifact deployed as the plugin.
+shadowJar {
+    archiveBaseName = project.property('archivesBaseName')
+    archiveVersion = project.version
+    archiveClassifier = 'shaded'
+
+    relocate 'io.confluent', 'com.firebolt.shaded.io.confluent'
+
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+
+    mergeServiceFiles()
+}
 
 // Deploy connector JAR to Kafka Connect plugin directories
 task deployToKafkaConnect {
-    dependsOn jar
-    
+    dependsOn tasks.named('shadowJar')
+
     description = 'Builds and copies the connector JAR to Kafka Connect plugin directories'
     group = 'distribution'
-    
+
     doLast {
-        def jarFile = jar.archiveFile.get().asFile
-        def jarName = jar.archiveFileName.get()
+        def jarFile = tasks.named('shadowJar').get().archiveFile.get().asFile
+        def jarName = jarFile.name
         def scriptsSourceDir = file('src/integrationTest/resources/scripts/')
+
+        // Replace any previously deployed connector jars so only the shaded jar is loaded.
+        def deployJar = { File pluginsDir ->
+            pluginsDir.mkdirs()
+            delete fileTree(pluginsDir) { include '*.jar' }
+            copy {
+                from jarFile
+                into pluginsDir
+            }
+        }
 
         // Copy to Kafka Connect 3.9.1 plugins directory
         def pluginsDir391 = file('src/integrationTest/docker/kafka-connect-3.9.1/plugins/')
-        pluginsDir391.mkdirs()
-        copy {
-            from jarFile
-            into pluginsDir391
-        }
-        
+        deployJar(pluginsDir391)
+
         // Copy to Kafka Connect 4.0 plugins directory
         def pluginsDir40 = file('src/integrationTest/docker/kafka-connect-4.0/plugins/')
-        pluginsDir40.mkdirs()
-        copy {
-            from jarFile
-            into pluginsDir40
-        }
-        
+        deployJar(pluginsDir40)
+
         // Copy to Kafka Connect Cloud plugins directory
         def pluginsDirCloud = file('src/integrationTest/docker/kafka-connect-cloud/plugins/')
-        pluginsDirCloud.mkdirs()
-        copy {
-            from jarFile
-            into pluginsDirCloud
-        }
+        deployJar(pluginsDirCloud)
 
         // Copy all script files from resources/scripts to all docker script directories
         def scriptsDir391 = file('src/integrationTest/docker/kafka-connect-3.9.1/scripts/')
@@ -691,14 +674,6 @@ tasks.register('confluentJar', Jar) {
     // Exclude files that might cause conflicts
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
     exclude 'META-INF/MANIFEST.MF'
-
-    // Exclude unused Jetty classes bundled in hadoop-client-runtime (CVE-2024-6763, CVE-2025-11143)
-    exclude 'org/apache/hadoop/shaded/org/eclipse/jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty/**'
-    exclude 'META-INF/maven/org.eclipse.jetty.websocket/**'
-    exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
-    // Exclude shaded nimbus-jose-jwt classes from hadoop-client-runtime (CVE-2025-53864)
-    exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 

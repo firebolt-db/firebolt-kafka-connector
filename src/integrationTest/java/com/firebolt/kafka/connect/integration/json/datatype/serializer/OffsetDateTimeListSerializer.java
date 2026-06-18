@@ -23,9 +23,8 @@ public class OffsetDateTimeListSerializer extends JsonSerializer<List<OffsetDate
             if (dateTime == null) {
                 gen.writeNull();
             } else {
-                // Convert to microseconds since epoch
-                long timestampMicros = dateTime.toInstant().getEpochSecond() * 1_000_000 + dateTime.toInstant().getNano() / 1_000;
-                gen.writeNumber(timestampMicros);
+                // Convert to milliseconds since epoch (Kafka Connect Timestamp logical type)
+                gen.writeNumber(dateTime.toInstant().toEpochMilli());
             }
         }
         gen.writeEndArray();

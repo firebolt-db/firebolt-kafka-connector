@@ -46,8 +46,8 @@ public class ConnectorConfigDefinition {
     // INGESTION MODE
     // =========================
     public static final String INGESTION_TYPE_CONFIG = "ingestion.type";
-    public static final String INGESTION_TYPE_DOC = "Ingestion mode. Supported values: 'sql' (default) to insert via SQL, or 'binary' to upload Parquet and ingest via read_parquet().";
-    public static final String INGESTION_TYPE_DEFAULT = "sql";
+    public static final String INGESTION_TYPE_DOC = "Deprecated and ignored. Records are uploaded over upload:// and ingested server-side via read_avro (schema-carrying records) or read_json (schemaless JSON). Accepted for backwards compatibility with existing connector configs.";
+    public static final String INGESTION_TYPE_DEFAULT = "parquet";
 
     // =========================
     // ERROR HANDLING CONFIGURATION (delegated from Kafka Connect worker)
@@ -94,8 +94,8 @@ public class ConnectorConfigDefinition {
                 .define(INGESTION_TYPE_CONFIG,
                         ConfigDef.Type.STRING,
                         INGESTION_TYPE_DEFAULT,
-                        ConfigDef.ValidString.in("sql", "binary"),
-                        ConfigDef.Importance.HIGH,
+                        ConfigDef.ValidString.in("sql", "binary", "parquet"),
+                        ConfigDef.Importance.LOW,
                         INGESTION_TYPE_DOC)
 
                 // Table Configuration
