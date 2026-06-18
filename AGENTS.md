@@ -12,7 +12,7 @@ sleep 5
 sudo chmod 666 /var/run/docker.sock
 
 # The compose file pins a sensible default; export this only to override it.
-export FIREBOLT_ENGINE_IMAGE=ghcr.io/firebolt-db/engine:release-5.0.1-0.20260615205019.4f5c69172cd3
+export FIREBOLT_ENGINE_IMAGE=ghcr.io/firebolt-db/engine:dev
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export SCHEMA_REGISTRY_URL=http://localhost:8081
 export KAFKA_CONNECT_URL=http://localhost:8083
@@ -22,7 +22,7 @@ export KAFKA_CONNECT_VERSION=3.9.1
 
 # The engine runs as a non-root user and writes into this bind mount, so own it with
 # the image's uid:gid (read from the image rather than hardcoded).
-ENGINE_IMAGE="${FIREBOLT_ENGINE_IMAGE:-ghcr.io/firebolt-db/engine:release-5.0.1-0.20260615205019.4f5c69172cd3}"
+ENGINE_IMAGE="${FIREBOLT_ENGINE_IMAGE:-ghcr.io/firebolt-db/engine:dev}"
 mkdir -p src/integrationTest/docker/kafka-connect-3.9.1/firebolt-core
 sudo chown "$(docker run --rm --entrypoint id "$ENGINE_IMAGE" -u):$(docker run --rm --entrypoint id "$ENGINE_IMAGE" -g)" \
   src/integrationTest/docker/kafka-connect-3.9.1/firebolt-core
@@ -35,7 +35,7 @@ timeout 90 bash -c 'until curl -sf http://localhost:8083/connectors; do sleep 3;
 
 ### Non-obvious gotchas
 
-- The engine image is `ghcr.io/firebolt-db/engine` (the OSS artefact from `firebolt-kubernetes-operator`; publicly pullable). The docker-compose files pin a default tag; override it with the `FIREBOLT_ENGINE_IMAGE` env var locally or the `vars.FIREBOLT_ENGINE_IMAGE` GitHub Actions repo variable.
+- The engine image is `ghcr.io/firebolt-db/engine` (the OSS artefact from `firebolt-kubernetes-operator`; publicly pullable). The docker-compose files default to the `dev` tag (the freshest build off the engine's master branch — picks up new engine features automatically); override it with the `FIREBOLT_ENGINE_IMAGE` env var locally or the `vars.FIREBOLT_ENGINE_IMAGE` GitHub Actions repo variable.
 - The engine runs as a non-root user and stores its data under `/firebolt-core/volume`, so the mounted host directory must be owned by the image's uid:gid. Read it from the image (`docker run --rm --entrypoint id <image> -u`) rather than hardcoding — it is currently `3473`.
 - Docker runs nested (DinD in Firecracker). Requires `fuse-overlayfs` storage driver and `iptables-legacy`. The update script configures this; if dockerd fails to start, check `/etc/docker/daemon.json` and iptables alternatives.
 - No dedicated linter exists — `./gradlew check` is compilation + tests + JaCoCo.
