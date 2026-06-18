@@ -56,7 +56,7 @@ services:
 
   # Firebolt engine (OSS artefact from firebolt-kubernetes-operator)
   firebolt-core:
-    image: ${FIREBOLT_ENGINE_IMAGE:-ghcr.io/firebolt-db/engine:release-5.0.1-0.20260615205019.4f5c69172cd3}
+    image: ${FIREBOLT_ENGINE_IMAGE:-ghcr.io/firebolt-db/engine:dev}
     hostname: firebolt-core
     container_name: firebolt-core-40
     command: --node 0
