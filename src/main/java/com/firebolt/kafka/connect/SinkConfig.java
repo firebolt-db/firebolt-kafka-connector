@@ -143,6 +143,22 @@ public class SinkConfig {
         return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
     }
 
+    public boolean isSchemaRefreshEnabled() {
+        String val = config.get(ConnectorConfigDefinition.SCHEMA_REFRESH_ENABLED_CONFIG);
+        if (val == null) {
+            return ConnectorConfigDefinition.SCHEMA_REFRESH_ENABLED_DEFAULT;
+        }
+        return Boolean.parseBoolean(val);
+    }
+
+    public long getSchemaRefreshIntervalMs() {
+        String val = config.get(ConnectorConfigDefinition.SCHEMA_REFRESH_INTERVAL_MS_CONFIG);
+        if (val == null) {
+            return ConnectorConfigDefinition.SCHEMA_REFRESH_INTERVAL_MS_DEFAULT;
+        }
+        return Long.parseLong(val);
+    }
+
     public IngestionType getIngestionType() {
         String value = config.get(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG);
         if (StringUtils.isBlank(value)) {
