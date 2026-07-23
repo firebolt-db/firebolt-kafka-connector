@@ -110,6 +110,18 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'org.apache.logging.log4j'
     }
+    // Protobuf converter is shipped by the Confluent Kafka Connect images we target; treating
+    // it as compileOnly mirrors the Avro / JSON-Schema pattern above. Bundling it (runtimeOnly)
+    // would package a pinned Confluent serializer version into the connector uber-jar that then
+    // overrides the worker's bundled version on the classloader, breaking sibling converters
+    // (notably the AvroConverter NoSuchMethodError on KC 4.0 which ships Confluent 8.0.0).
+    compileOnly("io.confluent:kafka-connect-protobuf-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
     implementation("org.apache.avro:avro:${avroVersion}") {
         exclude group: 'org.apache.kafka'
         exclude group: 'org.slf4j'
@@ -464,6 +476,18 @@ dependencies {
         exclude group: 'org.apache.logging.log4j'
     }
     integrationTestImplementation("io.confluent:kafka-connect-avro-converter:${confluentVersion}") {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'connect-api'
+        exclude group: 'org.apache.kafka', module: 'connect-transforms'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    // Confluent Protobuf serializer and converter for Protobuf integration tests
+    integrationTestImplementation("io.confluent:kafka-protobuf-serializer:${confluentVersion}") {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    integrationTestImplementation("io.confluent:kafka-connect-protobuf-converter:${confluentVersion}") {
         exclude group: 'org.apache.kafka', module: 'kafka-clients'
         exclude group: 'org.apache.kafka', module: 'connect-api'
         exclude group: 'org.apache.kafka', module: 'connect-transforms'

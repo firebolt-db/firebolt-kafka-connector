@@ -14,7 +14,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
  * Converter for SinkRecords that have an embedded schema and are typically Struct values.
- * This handles records coming from converters like Avro or JSON with schema registry.
+ * This handles records coming from converters like Avro, JSON Schema, or Protobuf with Schema Registry.
  */
 @Slf4j
 public class SchemaBasedRecordConverter extends RecordConverter<SchemaKafkaMessageColumnValue> {
@@ -35,7 +35,7 @@ public class SchemaBasedRecordConverter extends RecordConverter<SchemaKafkaMessa
 
     @Override
     public String getDescription() {
-        return "Handles records with embedded schemas (typically Struct values from Avro/JSON+Schema)";
+        return "Handles records with embedded schemas (typically Struct values from Avro/JSON Schema/Protobuf)";
     }
 
     @Override

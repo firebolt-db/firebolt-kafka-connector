@@ -14,15 +14,28 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.ArrayList;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Struct;
 
 /**
- * A class that tries to convert the value from the kafka message to an array firebolt type
+ * A class that tries to convert the value from the kafka message to an array firebolt type.
+ *
+ * <p>TODO: this class plus {@link SchemaTimestamptzDataTypeConverter} and the broader schema-based
+ * converter factory accumulate format-specific cases (Avro Long-millis vs. Protobuf
+ * {@code java.util.Date}, Avro List vs. Protobuf wrapper Struct, FLOAT32 stringification, ...) on
+ * a per-method basis. Nested arrays only round-trip for {@code array(array(integer))} today, and
+ * Connect Struct values (Protobuf nested messages, non-flattened {@code oneof}) have no SQL-side
+ * handler at all. A follow-up PR will revisit the overall serialization/deserialization
+ * architecture to consolidate this logic and unblock deeper nesting + STRUCT support. Negative
+ * coverage for the unsupported shapes lives in
+ * {@code ProtobufUnsupportedShapesIntegrationTest}.
  */
 public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<SchemaKafkaMessageColumnValue> {
 
@@ -43,6 +56,10 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
         String typeName = detectTypeName(fireboltColumn);
         if (CollectionUtils.isEmpty(elements)) {
             return connection.createArrayOf(typeName, elements.toArray());
+        }
+
+        if (isNestedIntegerArray(fireboltColumn)) {
+            return connection.createArrayOf(typeName, elements.stream().map(this::asNestedArrayElement).toArray());
         }
 
         // jdbc driver is not creating timestamps but array[integers] since the values are coming as ints
@@ -70,7 +87,7 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
 
     private Object[] toObjectArray(List<Object> elements) {
         Optional<Object> maybeFirst = elements.stream().filter(Objects::nonNull).findFirst();
-        if (maybeFirst.isPresent() && maybeFirst.get().getClass() == ArrayList.class) {
+        if (maybeFirst.isPresent() && maybeFirst.get() instanceof List) {
             return elements.stream().map(element -> {
                 if (element == null) {
                     return null;
@@ -81,8 +98,33 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
         return elements.toArray();
     }
 
+    private Object asNestedArrayElement(Object element) {
+        if (element == null) {
+            return null;
+        }
+        if (element instanceof List) {
+            return toObjectArray((List<Object>) element);
+        }
+        if (element instanceof Struct) {
+            // Protobuf wrapper Structs may carry a null inner repeated field (e.g., when the
+            // proto value was explicitly cleared); propagate null instead of NPE'ing.
+            List<Object> innerList = extractArrayField((Struct) element);
+            return innerList == null ? null : toObjectArray(innerList);
+        }
+        throw new ColumnConversionFailedException("", "", "failed to convert nested array element");
+    }
+
+    private List<Object> extractArrayField(Struct struct) {
+        for (Field field : struct.schema().fields()) {
+            if (field.schema().type() == Schema.Type.ARRAY) {
+                return (List<Object>) struct.get(field);
+            }
+        }
+        throw new ColumnConversionFailedException("", "", "failed to convert nested array struct");
+    }
+
     private String detectTypeName(TableSchema.Column fireboltColumn) {
-        if (fireboltColumn.getDataType().equals("array(integer)")) {
+        if (fireboltColumn.getDataType().equals("array(integer)") || isNestedIntegerArray(fireboltColumn)) {
             return "integer";
         } else if (fireboltColumn.getDataType().equals("array(timestamp)")) {
             return TIMESTAMP_ARRAY_TYPE_NAME;
@@ -108,6 +150,10 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
 
         // add more data types
         return "string";
+    }
+
+    private boolean isNestedIntegerArray(TableSchema.Column fireboltColumn) {
+        return "array(array(integer))".equals(fireboltColumn.getDataType());
     }
 
     private Array createByteaArray(Connection connection, SchemaKafkaMessageColumnValue schemaKafkaMessageColumnValue, TableSchema.Column fireboltColumn) throws SQLException {
@@ -153,7 +199,9 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
         List<Object> elements = (List) schemaKafkaMessageColumnValue.getValue();
 
        if (schemaKafkaMessageColumnValue.getSchemaSubType() == Schema.Type.INT64) {
-           return connection.createArrayOf(TIMESTAMPTZ_ARRAY_TYPE_NAME, elements.stream().map(objectValue -> TimestampUtil.asOffsetDateTime((Long) objectValue)).toArray());
+           // ProtobufConverter maps google.protobuf.Timestamp elements to java.util.Date;
+           // Avro / JSON Schema send Long (millis). Handle both.
+           return connection.createArrayOf(TIMESTAMPTZ_ARRAY_TYPE_NAME, elements.stream().map(this::asOffsetDateTime).toArray());
        } else if (schemaKafkaMessageColumnValue.getSchemaSubType() == Schema.Type.STRING) {
            return connection.createArrayOf("string", elements.stream().map(this::asStringTimestamptz).toArray());
        }
@@ -174,6 +222,16 @@ public class SchemaArrayDataTypeConverter extends CompositeDataTypeConverter<Sch
 
 
         throw new ColumnConversionFailedException("","", "failed to convert string as timestamp");
+    }
+
+
+    /** Converts a timestamptz array element (Long millis or java.util.Date) to OffsetDateTime. */
+    private OffsetDateTime asOffsetDateTime(Object element) {
+        if (element == null) return null;
+        if (element instanceof java.util.Date) {
+            return ((java.util.Date) element).toInstant().atOffset(ZoneOffset.UTC);
+        }
+        return TimestampUtil.asOffsetDateTime((Long) element);
     }
 
     private Object asStringTimestamptz(Object arrayElement) {
