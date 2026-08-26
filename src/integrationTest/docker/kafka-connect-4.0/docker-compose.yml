@@ -69,7 +69,7 @@ services:
       - --data-dir
       - /firebolt-core/volume
       - --server-config
-      - /firebolt-core/config.json
+      - /firebolt-core/config.yaml
     restart: no         # equivalent to --rm (no persistence)
     tty: true
     privileged: true
@@ -85,7 +85,7 @@ services:
           - firebolt-core.local
     volumes:
       # Mount the config file into the container.
-      - ./config.json:/firebolt-core/config.json:ro
+      - ./config.yaml:/firebolt-core/config.yaml:ro
       # Persist the engine's internal database files. The engine uses /firebolt-core/volume
       # (HOME) as its data directory; the host dir must be owned by uid:gid 3473:3473.
       - ./firebolt-core:/firebolt-core/volume
