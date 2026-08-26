@@ -59,7 +59,17 @@ services:
     image: ${FIREBOLT_ENGINE_IMAGE:-ghcr.io/firebolt-db/engine:dev}
     hostname: firebolt-core
     container_name: firebolt-core-40
-    command: --node 0
+    # Image CMD is `server --data-dir /var/lib/firebolt`. Compose `command` replaces it,
+    # so we must keep the `server` subcommand. `--node 0` alone is rejected by the CLI
+    # wrapper (same invocation as firebolt-kubernetes-operator: `firebolt server --node $POD_INDEX`).
+    command:
+      - server
+      - --node
+      - "0"
+      - --data-dir
+      - /firebolt-core/volume
+      - --server-config
+      - /firebolt-core/config.json
     restart: no         # equivalent to --rm (no persistence)
     tty: true
     privileged: true
