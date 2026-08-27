@@ -393,7 +393,7 @@ configurations {
     configureEach {
         resolutionStrategy {
             force 'io.airlift:aircompressor:2.0.3' // CVE-2025-67721
-            force 'com.nimbusds:nimbus-jose-jwt:9.37.4' // CVE-2025-53864
+            force 'com.nimbusds:nimbus-jose-jwt:10.9' // CVE-2025-53864
         }
     }
 }
