@@ -1,26 +1,26 @@
 {
   "at_least_once-sql": {
-    "commit_sha": "f0d6af9d6749f4ba74d919fa23e0062cf17459cf",
-    "timestamp": "2026-06-18T22:25:20.843587Z",
+    "commit_sha": "8634a716e0d88253697c330ea4c370c0ada25ccd",
+    "timestamp": "2026-08-27T06:21:50.631542Z",
     "duration_seconds": 10.0,
-    "total_records_produced": 682000,
-    "produce_rate_records_per_sec": 67872,
-    "produce_throughput_mb_per_sec": 16.6,
-    "ingest_duration_seconds": 55.1,
-    "ingest_rate_records_per_sec": 12373,
-    "ingest_throughput_mb_per_sec": 3.0,
+    "total_records_produced": 561000,
+    "produce_rate_records_per_sec": 56071,
+    "produce_throughput_mb_per_sec": 13.7,
+    "ingest_duration_seconds": 40.1,
+    "ingest_rate_records_per_sec": 13997,
+    "ingest_throughput_mb_per_sec": 3.4,
     "record_size_bytes": 256
   },
   "exactly_once-sql": {
-    "commit_sha": "f0d6af9d6749f4ba74d919fa23e0062cf17459cf",
-    "timestamp": "2026-06-18T22:28:19.901297Z",
+    "commit_sha": "8634a716e0d88253697c330ea4c370c0ada25ccd",
+    "timestamp": "2026-08-27T06:24:04.485823Z",
     "duration_seconds": 10.0,
-    "total_records_produced": 1182000,
-    "produce_rate_records_per_sec": 118105,
-    "produce_throughput_mb_per_sec": 28.8,
-    "ingest_duration_seconds": 165.4,
-    "ingest_rate_records_per_sec": 7146,
-    "ingest_throughput_mb_per_sec": 1.7,
+    "total_records_produced": 973000,
+    "produce_rate_records_per_sec": 97272,
+    "produce_throughput_mb_per_sec": 23.7,
+    "ingest_duration_seconds": 120.3,
+    "ingest_rate_records_per_sec": 8090,
+    "ingest_throughput_mb_per_sec": 2.0,
     "record_size_bytes": 256
   }
 }
