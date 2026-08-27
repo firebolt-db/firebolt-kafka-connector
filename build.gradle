@@ -12,7 +12,7 @@ plugins {
 // and it will be applied to all dependencies that use that library
 ext {
     lombokVersion = '1.18.42'
-    jacksonVersion = '2.21.1'
+    jacksonVersion = '2.21.5'
     jacksonAnnotationsVersion = '2.21' // got out of sync from jacksonVersion
     junitJupiterVersion = '5.13.4'
     log4jVersion = '2.25.3'
@@ -535,9 +535,18 @@ jar {
     exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
     // Exclude shaded nimbus-jose-jwt classes from hadoop-client-runtime (CVE-2025-53864)
     exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
-    
+    // Exclude unused JLine Telnet server classes (CVE-2026-56740, CVE-2026-56741) - connector never runs a telnet server
+    exclude 'org/jline/builtins/telnet/**'
+    exclude 'org/apache/hadoop/shaded/org/jline/builtins/telnet/**'
+    exclude 'META-INF/maven/org.jline/jline-remote-telnet/**'
+    exclude 'META-INF/maven/org.jline/jline/**'
+    // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/AbstractYAMLBasedConfiguration*'
+    exclude 'META-INF/maven/org.apache.commons/commons-configuration2/**'
+
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-} 
+}
 
 // Deploy connector JAR to Kafka Connect plugin directories
 task deployToKafkaConnect {
@@ -699,6 +708,15 @@ tasks.register('confluentJar', Jar) {
     exclude 'META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty*'
     // Exclude shaded nimbus-jose-jwt classes from hadoop-client-runtime (CVE-2025-53864)
     exclude 'org/apache/hadoop/shaded/com/nimbusds/**'
+    // Exclude unused JLine Telnet server classes (CVE-2026-56740, CVE-2026-56741)
+    exclude 'org/jline/builtins/telnet/**'
+    exclude 'org/apache/hadoop/shaded/org/jline/builtins/telnet/**'
+    exclude 'META-INF/maven/org.jline/jline-remote-telnet/**'
+    exclude 'META-INF/maven/org.jline/jline/**'
+    // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/AbstractYAMLBasedConfiguration*'
+    exclude 'META-INF/maven/org.apache.commons/commons-configuration2/**'
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
