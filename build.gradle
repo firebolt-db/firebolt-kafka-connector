@@ -539,8 +539,10 @@ jar {
     exclude 'org/jline/builtins/telnet/**'
     exclude 'org/apache/hadoop/shaded/org/jline/builtins/telnet/**'
     exclude 'META-INF/maven/org.jline/jline-remote-telnet/**'
-    // Exclude shaded commons-configuration2 classes from hadoop-client-runtime (CVE-2026-45205)
-    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/**'
+    exclude 'META-INF/maven/org.jline/jline/**'
+    // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/AbstractYAMLBasedConfiguration*'
     exclude 'META-INF/maven/org.apache.commons/commons-configuration2/**'
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -710,8 +712,10 @@ tasks.register('confluentJar', Jar) {
     exclude 'org/jline/builtins/telnet/**'
     exclude 'org/apache/hadoop/shaded/org/jline/builtins/telnet/**'
     exclude 'META-INF/maven/org.jline/jline-remote-telnet/**'
-    // Exclude shaded commons-configuration2 classes from hadoop-client-runtime (CVE-2026-45205)
-    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/**'
+    exclude 'META-INF/maven/org.jline/jline/**'
+    // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
+    exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/AbstractYAMLBasedConfiguration*'
     exclude 'META-INF/maven/org.apache.commons/commons-configuration2/**'
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
