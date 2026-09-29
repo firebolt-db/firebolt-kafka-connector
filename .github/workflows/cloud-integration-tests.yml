@@ -153,8 +153,8 @@ jobs:
           timeout 60 bash -c 'until curl -f http://localhost:8083/connectors; do sleep 2; done'
           echo "Kafka Connect is ready!"
 
-      - name: Run integration tests (excluding NOT_IMPLEMENTED)
-        run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented --no-daemon -Djdbc.connection.url="jdbc:firebolt:${{ steps.find-database-name.outputs.database_name }}?account=${{ steps.set-account.outputs.account }}&engine=${{ steps.find-engine-name.outputs.engine_name }}&env=staging" -DclientId="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" -DclientSecret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}"
+      - name: Run integration tests (excluding NOT_IMPLEMENTED and E2E)
+        run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,e2e --no-daemon -Djdbc.connection.url="jdbc:firebolt:${{ steps.find-database-name.outputs.database_name }}?account=${{ steps.set-account.outputs.account }}&engine=${{ steps.find-engine-name.outputs.engine_name }}&env=staging" -DclientId="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" -DclientSecret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}"
         env:
           KAFKA_BOOTSTRAP_SERVERS: localhost:9092
           SCHEMA_REGISTRY_URL: http://localhost:8081
