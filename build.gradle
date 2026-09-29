@@ -538,7 +538,18 @@ jar {
     // Exclude unused JLine Telnet server classes (CVE-2026-56740, CVE-2026-56741) - connector never runs a telnet server
     exclude 'org/jline/builtins/telnet/**'
     exclude 'org/apache/hadoop/shaded/org/jline/builtins/telnet/**'
+    // Also exclude full JLine builtins/reader trees (CVE-2026-77422, CVE-2026-77421, CVE-2026-77420).
+    // builtins/** supersedes the telnet-only class excludes from #313; those stay for CVE traceability.
+    // Also drop orphaned jline-remote-ssh Maven fingerprint (classes already removed with builtins).
+    // Keep jline-terminal / jline-style class trees and Maven fingerprints.
+    exclude 'org/jline/builtins/**'
+    exclude 'org/apache/hadoop/shaded/org/jline/builtins/**'
+    exclude 'org/jline/reader/**'
+    exclude 'org/apache/hadoop/shaded/org/jline/reader/**'
     exclude 'META-INF/maven/org.jline/jline-remote-telnet/**'
+    exclude 'META-INF/maven/org.jline/jline-builtins/**'
+    exclude 'META-INF/maven/org.jline/jline-reader/**'
+    exclude 'META-INF/maven/org.jline/jline-remote-ssh/**'
     exclude 'META-INF/maven/org.jline/jline/**'
     // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
     exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
@@ -711,7 +722,18 @@ tasks.register('confluentJar', Jar) {
     // Exclude unused JLine Telnet server classes (CVE-2026-56740, CVE-2026-56741)
     exclude 'org/jline/builtins/telnet/**'
     exclude 'org/apache/hadoop/shaded/org/jline/builtins/telnet/**'
+    // Also exclude full JLine builtins/reader trees (CVE-2026-77422, CVE-2026-77421, CVE-2026-77420).
+    // builtins/** supersedes the telnet-only class excludes from #313; those stay for CVE traceability.
+    // Also drop orphaned jline-remote-ssh Maven fingerprint (classes already removed with builtins).
+    // Keep jline-terminal / jline-style class trees and Maven fingerprints.
+    exclude 'org/jline/builtins/**'
+    exclude 'org/apache/hadoop/shaded/org/jline/builtins/**'
+    exclude 'org/jline/reader/**'
+    exclude 'org/apache/hadoop/shaded/org/jline/reader/**'
     exclude 'META-INF/maven/org.jline/jline-remote-telnet/**'
+    exclude 'META-INF/maven/org.jline/jline-builtins/**'
+    exclude 'META-INF/maven/org.jline/jline-reader/**'
+    exclude 'META-INF/maven/org.jline/jline-remote-ssh/**'
     exclude 'META-INF/maven/org.jline/jline/**'
     // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
     exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
