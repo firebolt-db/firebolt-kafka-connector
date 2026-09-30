@@ -31,7 +31,7 @@ ext {
     commonsLang3Version = '3.20.0'
     commonsTextVersion = '1.15.0'
     parquetVersion = '1.17.0'
-    hadoopCommonVersion = '3.4.3'
+    hadoopCommonVersion = '3.5.0'
 }
 
 java {
