@@ -44,32 +44,24 @@ public class IngestionServiceWithPostProcessing implements IngestionService {
         literalColumnsWithBatchId.put(BATCH_ID_COLUMN_NAME, batchId);
 
         connection.setAutoCommit(false);
-
         try {
             ingestionService.addRecords(records, literalColumnsWithBatchId);
-
             try (Statement statement = connection.createStatement()) {
                 log.info("Executing the post processing script");
-                String processedScript = processScript(postProcessingScript, batchId);
-                statement.execute(processedScript);
+                statement.execute(processScript(postProcessingScript, batchId));
             }
-
-        } catch (SQLException ex) {
-            log.error("There was an error so rolling back the transaction: ", ex.getMessage());
-            connection.rollback();
-            throw ex;
-        } finally {
+            connection.commit();
+        } catch (SQLException | RuntimeException e) {
+            // Any failure — including a record conversion error from the ingestion service — rolls back the
+            // whole batch, so rows are never committed without their post-processing.
+            log.error("Ingest or post-processing failed; rolling back the transaction", e);
             try {
-                connection.commit();
-            } catch (SQLException e) {
-                log.error("Failed to commit the transaction. Will rollback");
                 connection.rollback();
-
-                // rethrow the original exception
-                throw e;
+            } catch (SQLException rollbackError) {
+                e.addSuppressed(rollbackError);
             }
+            throw e;
         }
-
     }
 
     @Override

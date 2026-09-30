@@ -495,11 +495,6 @@ public class E2ETestHarness {
             props.put("exactlyOnce", "true");
         }
 
-        // Ingestion type
-        if (config.getIngestionType() == IngestionType.BINARY) {
-            props.put("ingestion.type", "binary");
-        }
-
         return props;
     }
 

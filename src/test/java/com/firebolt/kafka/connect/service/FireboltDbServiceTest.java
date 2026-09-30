@@ -196,26 +196,6 @@ class FireboltDbServiceTest {
         }
 
         @Test
-        void shouldSuccessfullyTestConnectionWithCustomTimeout() throws SQLException {
-            String connectionUrl = "jdbc:firebolt:test_database?engine=test_engine&account=test_account";
-            int customTimeout = 10;
-            ConnectionOptions connectionOptions = ConnectionOptions.builder()
-                    .connectionTimeoutSeconds(customTimeout)
-                    .build();
-            Connection mockConnection = mock(Connection.class);
-
-            try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
-                mockedDriverManager.when(() -> DriverManager.getConnection(eq(connectionUrl), any(Properties.class)))
-                        .thenReturn(mockConnection);
-                when(mockConnection.isValid(customTimeout)).thenReturn(true);
-
-                assertDoesNotThrow(() -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl), connectionOptions));
-                
-                verify(mockConnection).isValid(customTimeout);
-            }
-        }
-
-        @Test
         void shouldThrowExceptionWhenConnectionUrlNull() {
             JdbcConfig nullUrlConfig = JdbcConfig.builder()
                     .jdbcConnectionUrl(null)
@@ -255,19 +235,6 @@ class FireboltDbServiceTest {
                     () -> fireboltDbService.testConnection(whitespaceUrlConfig));
             
             assertEquals("Connection URL cannot be null or empty", exception.getMessage());
-        }
-
-        @Test
-        void shouldThrowExceptionWhenTimeoutNegative() {
-            String connectionUrl = "jdbc:firebolt:test_database";
-            ConnectionOptions invalidOptions = ConnectionOptions.builder()
-                    .connectionTimeoutSeconds(-1)
-                    .build();
-
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                    () -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl), invalidOptions));
-            
-            assertEquals("Timeout must be non-negative", exception.getMessage());
         }
 
         @Test
@@ -313,106 +280,6 @@ class FireboltDbServiceTest {
             }
         }
 
-        @Test
-        void shouldUseDefaultConnectionOptionsWhenNoneProvided() throws SQLException {
-            String connectionUrl = "jdbc:firebolt:test_database?engine=test_engine&account=test_account";
-            Connection mockConnection = mock(Connection.class);
-
-            try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
-                mockedDriverManager.when(() -> DriverManager.getConnection(eq(connectionUrl), any(Properties.class)))
-                        .thenReturn(mockConnection);
-                when(mockConnection.isValid(300)).thenReturn(true);
-
-                assertDoesNotThrow(() -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl)));
-                
-                verify(mockConnection).isValid(300);
-            }
-        }
-
-        @Test
-        void shouldHandleZeroTimeoutCorrectly() throws SQLException {
-            String connectionUrl = "jdbc:firebolt:test_database";
-            ConnectionOptions zeroTimeoutOptions = ConnectionOptions.builder()
-                    .connectionTimeoutSeconds(0)
-                    .build();
-            Connection mockConnection = mock(Connection.class);
-
-            try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
-                mockedDriverManager.when(() -> DriverManager.getConnection(eq(connectionUrl), any(Properties.class)))
-                        .thenReturn(mockConnection);
-                when(mockConnection.isValid(0)).thenReturn(true);
-
-                assertDoesNotThrow(() -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl), zeroTimeoutOptions));
-                
-                verify(mockConnection).isValid(0);
-            }
-        }
-
-        @Test
-        void shouldHandleLargeTimeoutValues() throws SQLException {
-            String connectionUrl = "jdbc:firebolt:test_database";
-            int largeTimeout = 300;
-            ConnectionOptions largeTimeoutOptions = ConnectionOptions.builder()
-                    .connectionTimeoutSeconds(largeTimeout)
-                    .build();
-            Connection mockConnection = mock(Connection.class);
-
-            try (MockedStatic<DriverManager> mockedDriverManager = mockStatic(DriverManager.class)) {
-                mockedDriverManager.when(() -> DriverManager.getConnection(eq(connectionUrl), any(Properties.class)))
-                        .thenReturn(mockConnection);
-                when(mockConnection.isValid(largeTimeout)).thenReturn(true);
-
-                assertDoesNotThrow(() -> fireboltDbService.testConnection(createJdbcConfig(connectionUrl), largeTimeoutOptions));
-                
-                verify(mockConnection).isValid(largeTimeout);
-            }
-        }
-    }
-
-    @Nested
-    class ConnectionOptionsTests {
-
-        @Test
-        void shouldCreateConnectionOptionsWithDefaultTimeout() {
-            ConnectionOptions options = ConnectionOptions.builder().build();
-
-            assertEquals(300, options.getConnectionTimeoutSeconds(), "Default timeout should be 300 seconds");
-        }
-
-        @Test
-        void shouldCreateConnectionOptionsWithCustomTimeout() {
-            ConnectionOptions options = ConnectionOptions.builder()
-                    .connectionTimeoutSeconds(30)
-                    .build();
-
-            assertEquals(30, options.getConnectionTimeoutSeconds(), "Custom timeout should be 30 seconds");
-        }
-
-        @Test
-        void shouldCreateConnectionOptionsWithNoArgsConstructor() {
-            ConnectionOptions options = new ConnectionOptions();
-
-            assertEquals(300, options.getConnectionTimeoutSeconds(), "Default timeout should be 300 seconds");
-        }
-
-        @Test
-        void shouldCreateConnectionOptionsWithAllArgsConstructor() {
-            ConnectionOptions options = new ConnectionOptions(60);
-
-            assertEquals(60, options.getConnectionTimeoutSeconds(), "Timeout should be 60 seconds");
-        }
-
-        @Test
-        void shouldHaveMeaningfulToStringRepresentation() {
-            ConnectionOptions options = ConnectionOptions.builder()
-                    .connectionTimeoutSeconds(15)
-                    .build();
-
-            String toString = options.toString();
-
-            assertNotNull(toString);
-            assertTrue(toString.contains("15"), "toString should contain the timeout value");
-        }
     }
 
     @Nested

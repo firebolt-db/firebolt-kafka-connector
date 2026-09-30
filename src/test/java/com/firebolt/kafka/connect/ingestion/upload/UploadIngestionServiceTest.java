@@ -103,6 +103,24 @@ class UploadIngestionServiceTest {
     }
 
     @Test
+    void capsDeclaredDecimalPrecisionAt38() throws Exception {
+        // e.g. a Postgres NUMERIC(50,2) via Debezium: values that fit NUMERIC(38,2) land; larger ones
+        // are rejected by the engine on read (the unscaled bytes are untouched).
+        Schema valueSchema = SchemaBuilder.struct().name("Event")
+                .field("amount", Decimal.builder(2).parameter("connect.decimal.precision", "50").build())
+                .build();
+
+        service(false).addRecords(List.of(record(valueSchema,
+                new Struct(valueSchema).put("amount", new BigDecimal("1.50")), 0L)));
+
+        GenericRecord row = readAvro(captureSingleUpload().payload).get(0);
+        org.apache.avro.LogicalTypes.Decimal amountType = (org.apache.avro.LogicalTypes.Decimal)
+                org.apache.avro.LogicalTypes.fromSchema(row.getSchema().getField("amount").schema());
+        assertEquals(38, amountType.getPrecision());
+        assertEquals(2, amountType.getScale());
+    }
+
+    @Test
     void schemaRecordsSplitAvroFilePerSchema() throws Exception {
         Schema v1 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA).build();
         Schema v2 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA)

@@ -557,17 +557,14 @@ public abstract class BaseIntegrationTest {
      * @return
      */
     protected static Stream<Arguments> ingestionTypesWithOrWithoutNulls() {
+        // The connector has one ingestion path (ingestion.type is ignored), so only null handling varies.
         return Stream.of(
-                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
-                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "sql"), "sql ingestion without null values"),
-                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion with null values"),
-                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of("ingestion.type", "binary"), "binary ingestion without null values"));
+                Arguments.of(INCLUDE_NULL_SERIALIZED_VALUES, Map.of(), "with null values"),
+                Arguments.of(DO_NOT_INCLUDE_NULL_SERIALIZED_VALUES, Map.of(), "without null values"));
     }
 
     protected static Stream<Arguments> ingestionTypes() {
-        return Stream.of(
-                Arguments.of(Map.of("ingestion.type", "sql"), "sql ingestion with null values"),
-                Arguments.of(Map.of("ingestion.type", "binary"), "binary ingestion with null values"));
+        return Stream.of(Arguments.of(Map.of(), "default connector config"));
     }
 
 }

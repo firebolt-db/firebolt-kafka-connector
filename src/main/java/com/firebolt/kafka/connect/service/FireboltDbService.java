@@ -26,6 +26,9 @@ public class FireboltDbService {
     private static final String JDBC_CLIENT_ID = "client_id";
     private static final String JDBC_CLIENT_SECRET = "client_secret";
 
+    // A stopped engine may need a while to start, so connection validation waits generously.
+    private static final int CONNECTION_TIMEOUT_SECONDS = 300;
+
     /**
      * Returns the subset of the specified table names that do not exist in the database.
      *
@@ -58,7 +61,6 @@ public class FireboltDbService {
 
             while (tableResultSet.next()) {
                 allTables.add(tableResultSet.getString("TABLE_NAME"));
-                log.info(tableResultSet.getString("TABLE_NAME"));
             }
             return allTables;
 
@@ -85,8 +87,6 @@ public class FireboltDbService {
             props.setProperty(JDBC_CLIENT_SECRET, clientSecret.get());
         }
 
-        // always batch prepared statements
-        props.put("merge_prepared_statement_batches", "true");
         props.put("compress_request_payload", "true");
 
         // Attempt to create the connection
@@ -100,27 +100,8 @@ public class FireboltDbService {
      * @throws ConnectionFailedException if the connection fails for any reason
      */
     public void testConnection(JdbcConfig jdbcConfig) throws ConnectionFailedException {
-        testConnection(jdbcConfig, ConnectionOptions.builder().build()); // Default timeout of 5 seconds
-    }
-
-    /**
-     * Tests the JDBC connection to Firebolt using the provided connection URL.
-     *
-     * @param jdbcConfig the JDBC connection configuration
-     * @param connectionOptions - timeout in seconds for connection validation
-     * @throws ConnectionFailedException if the connection fails for any reason
-     */
-    public void testConnection(JdbcConfig jdbcConfig, ConnectionOptions connectionOptions) throws ConnectionFailedException {
         if (StringUtils.isBlank(jdbcConfig.getJdbcConnectionUrl())) {
             throw new ConnectionFailedException("Connection URL cannot be null or empty");
-        }
-
-        if (connectionOptions == null) {
-            connectionOptions = ConnectionOptions.builder().build();
-        }
-
-        if (connectionOptions.getConnectionTimeoutSeconds() < 0) {
-            throw new IllegalArgumentException("Timeout must be non-negative");
         }
 
         try {
@@ -128,7 +109,7 @@ public class FireboltDbService {
 
             // Attempt to establish connection
             try (Connection connection = getConnection(jdbcConfig)) {
-                if (connection.isValid(connectionOptions.getConnectionTimeoutSeconds())) {
+                if (connection.isValid(CONNECTION_TIMEOUT_SECONDS)) {
                     log.info("Successfully connected to Firebolt database");
                 } else {
                     throw new ConnectionFailedException("Connection is not valid");

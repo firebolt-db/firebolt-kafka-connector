@@ -121,7 +121,22 @@ public class IngestionServiceWithPostProcessingTest {
 
         verify(mockConnection).setAutoCommit(false);
         verify(mockConnection).rollback();
-        verify(mockConnection).commit();
+        verify(mockConnection, Mockito.never()).commit();
+        Mockito.verifyNoInteractions(mockStatement);
+    }
+
+    @Test
+    void shouldRollbackWithoutCommittingOnRuntimeFailure() throws Exception {
+        // e.g. a RecordConversionException from a later schema group: earlier groups must not be committed
+        doThrow(new IllegalStateException("conversion")).when(mockIngestionService).addRecords(anyList(), anyMap());
+        IngestionServiceWithPostProcessing subject = new IngestionServiceWithPostProcessing(
+                mockIngestionService, mockConnection, "SELECT 1");
+
+        assertThrows(IllegalStateException.class,
+                () -> subject.addRecords(List.of(new SinkRecord("topic", 0, null, null, null, null, 1L))));
+
+        verify(mockConnection).rollback();
+        verify(mockConnection, Mockito.never()).commit();
         Mockito.verifyNoInteractions(mockStatement);
     }
 

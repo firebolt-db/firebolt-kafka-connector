@@ -1,6 +1,8 @@
 package com.firebolt.kafka.connect.ingestion.upload;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.firebolt.jdbc.connection.FireboltConnection;
 import com.firebolt.jdbc.statement.preparedstatement.FireboltParquetStatement;
 import com.firebolt.kafka.connect.IngestionService;
@@ -16,17 +18,13 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.file.CodecFactory;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
-import org.apache.kafka.connect.data.Decimal;
-import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
 
@@ -65,42 +63,14 @@ public class UploadIngestionService implements IngestionService {
     // The multipart part name referenced by upload://. Must match [_0-9a-zA-Z.-]+ and be unique per request.
     private static final String MULTIPART_NAME = "batch";
 
-    // AvroData reads a Connect Decimal's precision from this parameter and otherwise defaults to 64,
-    // which the engine rejects (it caps decimal precision at 38). When the source schema declares no
-    // precision we default to Firebolt's NUMERIC(38, scale) precision instead. (The scale is always
-    // carried by the Connect Decimal and is left untouched.)
-    private static final String DECIMAL_PRECISION_PARAM = "connect.decimal.precision";
-    private static final String DEFAULT_DECIMAL_PRECISION = "38";
+    // read_avro rejects decimals declaring precision > 38 (Firebolt's NUMERIC maximum), and AvroData
+    // declares 64 for every Connect Decimal that carries no precision. The writer schema's precision is
+    // capped at 38: it is metadata only (the unscaled bytes are unchanged), and a value that really has
+    // more digits is still rejected by the engine when it reads the row.
+    private static final int MAX_DECIMAL_PRECISION = 38;
 
     /** group key for schemaless records whose value is not a JSON object (reported as bad records) */
     private static final Object SCHEMALESS = new Object();
-
-    /**
-     * Group key for schemaless JSON objects: the set of top-level keys. {@code read_json} infers one
-     * schema per upload, so a key that is absent from one record but present in another surfaces as an
-     * explicit {@code NULL} for the former — overriding the column's {@code DEFAULT} (and failing a
-     * {@code NOT NULL DEFAULT} column). Uploading each key set separately keeps "absent" absent, so the
-     * column default applies exactly as it would for that record on its own.
-     */
-    private static final class JsonShape {
-        final Set<String> keys;
-
-        JsonShape(Map<?, ?> value) {
-            Set<String> keys = new HashSet<>();
-            value.keySet().forEach(key -> keys.add(String.valueOf(key)));
-            this.keys = keys;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            return o instanceof JsonShape && keys.equals(((JsonShape) o).keys);
-        }
-
-        @Override
-        public int hashCode() {
-            return keys.hashCode();
-        }
-    }
 
     private final Connection connection;
     private final String tableName;
@@ -177,12 +147,18 @@ public class UploadIngestionService implements IngestionService {
         }
     }
 
-    /** Avro files are grouped by value schema; schemaless JSON by top-level key set (see {@link JsonShape}). */
+    /**
+     * Avro files are grouped by value schema. Schemaless JSON objects are grouped by their set of
+     * top-level keys: {@code read_json} infers one schema per upload, so a key absent from one record but
+     * present in another would surface as an explicit {@code NULL} for the former — overriding the
+     * column's {@code DEFAULT}, or failing a {@code NOT NULL DEFAULT} column. Per key set, "absent" stays
+     * absent and the default applies exactly as it would for that record on its own.
+     */
     private static Object groupKey(SinkRecord record) {
         if (record.valueSchema() != null) {
             return record.valueSchema();
         }
-        return record.value() instanceof Map ? new JsonShape((Map<?, ?>) record.value()) : SCHEMALESS;
+        return record.value() instanceof Map ? new HashSet<>(((Map<?, ?>) record.value()).keySet()) : SCHEMALESS;
     }
 
     @Override
@@ -196,12 +172,7 @@ public class UploadIngestionService implements IngestionService {
 
     /** Schema-carrying records -> Avro -> read_avro. */
     private void ingestAvro(Schema connectSchema, List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
-        // Writer schema: default precision-less Decimals to NUMERIC(38, scale) so we don't emit Avro
-        // decimal precision 64 (which the engine rejects). Only the schema's precision metadata changes
-        // — record bytes are scale-encoded identically — so this is applied to the writer schema only;
-        // fromConnectData keeps the record's original schema (AvroData requires the value's schema to
-        // match). Identity-returns when there's no such Decimal, leaving the common path untouched.
-        org.apache.avro.Schema avroSchema = nonNullUnionBranch(avroData.fromConnectSchema(defaultDecimalPrecision(connectSchema)));
+        org.apache.avro.Schema avroSchema = capDecimalPrecision(nonNullUnionBranch(avroData.fromConnectSchema(connectSchema)));
         if (avroSchema.getType() != org.apache.avro.Schema.Type.RECORD) {
             for (SinkRecord record : records) {
                 handleBadRecord(record, new RecordConversionException("Record value schema is not a struct: " + connectSchema.type()));
@@ -276,78 +247,26 @@ public class UploadIngestionService implements IngestionService {
                 .orElse(schema);
     }
 
-    /**
-     * Returns a copy of {@code schema} where every Connect {@link Decimal} that declares no precision
-     * gets {@value #DECIMAL_PRECISION_PARAM}={@value #DEFAULT_DECIMAL_PRECISION} (Firebolt's NUMERIC
-     * default), recursing through structs/arrays/maps. AvroData would otherwise emit Avro decimal
-     * precision 64, which the engine rejects. Returns the same object when nothing needs defaulting, so
-     * the common case (no Decimal, or Decimals that already declare precision) is left untouched.
-     */
-    private Schema defaultDecimalPrecision(Schema schema) {
-        if (schema == null) {
-            return null;
+    /** Caps every decimal's declared precision at {@value #MAX_DECIMAL_PRECISION} (see the constant). */
+    private org.apache.avro.Schema capDecimalPrecision(org.apache.avro.Schema schema) {
+        String json = schema.toString();
+        if (!json.contains("\"decimal\"")) {
+            return schema;
         }
-        switch (schema.type()) {
-            case BYTES:
-                if (Decimal.LOGICAL_NAME.equals(schema.name())
-                        && (schema.parameters() == null || !schema.parameters().containsKey(DECIMAL_PRECISION_PARAM))) {
-                    SchemaBuilder builder = SchemaBuilder.bytes().name(schema.name());
-                    if (schema.parameters() != null) {
-                        schema.parameters().forEach(builder::parameter);
-                    }
-                    builder.parameter(DECIMAL_PRECISION_PARAM, DEFAULT_DECIMAL_PRECISION);
-                    return copyMeta(schema, builder);
-                }
-                return schema;
-            case STRUCT: {
-                boolean changed = false;
-                SchemaBuilder builder = SchemaBuilder.struct();
-                for (Field field : schema.fields()) {
-                    Schema fieldSchema = defaultDecimalPrecision(field.schema());
-                    changed |= fieldSchema != field.schema();
-                    builder.field(field.name(), fieldSchema);
-                }
-                return changed ? copyMeta(schema, builder) : schema;
-            }
-            case ARRAY: {
-                Schema value = defaultDecimalPrecision(schema.valueSchema());
-                return value == schema.valueSchema() ? schema : copyMeta(schema, SchemaBuilder.array(value));
-            }
-            case MAP: {
-                Schema key = defaultDecimalPrecision(schema.keySchema());
-                Schema value = defaultDecimalPrecision(schema.valueSchema());
-                return key == schema.keySchema() && value == schema.valueSchema()
-                        ? schema : copyMeta(schema, SchemaBuilder.map(key, value));
-            }
-            default:
-                return schema;
+        try {
+            JsonNode tree = objectMapper.readTree(json);
+            capDecimalPrecision(tree);
+            return new org.apache.avro.Schema.Parser().parse(tree.toString());
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to rewrite Avro schema " + json, e);
         }
     }
 
-    /** Copies name/version/doc/parameters and optional/default from {@code from} onto {@code builder}. */
-    private Schema copyMeta(Schema from, SchemaBuilder builder) {
-        if (from.type() == Schema.Type.STRUCT) {
-            // name/parameters for a STRUCT are copied here; for BYTES the caller already set them.
-            if (from.name() != null) {
-                builder.name(from.name());
-            }
-            if (from.parameters() != null) {
-                from.parameters().forEach(builder::parameter);
-            }
+    private static void capDecimalPrecision(JsonNode node) {
+        if ("decimal".equals(node.path("logicalType").asText()) && node.path("precision").asInt() > MAX_DECIMAL_PRECISION) {
+            ((ObjectNode) node).put("precision", MAX_DECIMAL_PRECISION);
         }
-        if (from.version() != null) {
-            builder.version(from.version());
-        }
-        if (from.doc() != null) {
-            builder.doc(from.doc());
-        }
-        if (from.defaultValue() != null) {
-            builder.defaultValue(from.defaultValue());
-        }
-        if (from.isOptional()) {
-            builder.optional();
-        }
-        return builder.build();
+        node.forEach(UploadIngestionService::capDecimalPrecision);
     }
 
     private byte[] writeAvro(org.apache.avro.Schema avroSchema, List<GenericRecord> records) throws SQLException {
@@ -379,14 +298,14 @@ public class UploadIngestionService implements IngestionService {
             log.debug("Ingesting {} record(s), {} bytes via {}", to - from, payload.length, tvf);
             execute(buildInsertSql(tvf, literalColumns), payload);
         } catch (SQLException e) {
-            if (!errorToleranceAll || to - from <= 1) {
-                if (errorToleranceAll && to - from == 1) {
-                    log.warn("Record at partition {} offset {} rejected by Firebolt; sending to the dead letter queue",
-                            records.get(from).kafkaPartition(), records.get(from).kafkaOffset(), e);
-                    errorReporter.report(records.get(from), e);
-                    return;
-                }
+            if (!errorToleranceAll) {
                 throw e;
+            }
+            if (to - from == 1) {
+                log.warn("Record at partition {} offset {} rejected by Firebolt; sending to the dead letter queue",
+                        records.get(from).kafkaPartition(), records.get(from).kafkaOffset(), e);
+                errorReporter.report(records.get(from), e);
+                return;
             }
             // Split and retry to isolate the offending record(s).
             int mid = (from + to) >>> 1;

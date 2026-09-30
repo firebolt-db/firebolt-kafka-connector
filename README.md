@@ -55,7 +55,7 @@ matrix. Primary mappings (full matrix and edge cases in
 | `BOOLEAN` | `BOOLEAN` |
 | `STRING` | `TEXT` (also → `INTEGER`/`BIGINT`/`REAL`/`DOUBLE`, and → `TIMESTAMP`/`TIMESTAMPTZ`/`DATE` from ISO-8601 strings) |
 | `BYTES` | `BYTEA` (Avro / JSON-Schema paths — not schemaless JSON) |
-| `Decimal` (logical) | `NUMERIC(p, s)` (precision defaults to 38 if the source declares none) |
+| `Decimal` (logical) | `NUMERIC(p, s)` (declared precision is capped at 38; values that don't fit are rejected) |
 | `Date` (logical) | `DATE` (Avro path; with JSON-Schema send an ISO-8601 date string) |
 | `Timestamp` (logical, millis) | `TIMESTAMP` / `TIMESTAMPTZ` |
 | `Array` | `ARRAY(...)` |

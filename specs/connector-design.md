@@ -134,7 +134,7 @@ Verified against `ghcr.io/firebolt-db/engine:dev` (`5.0.0-pre.0.20260930181618.8
 | `read_avro` rejects Avro **named-type references** ("Invalid Avro type : AVRO_NUM_TYPES") | Any Connect schema that reuses a named struct — e.g. an **unflattened Debezium envelope** (`before`/`after` share `Value`) — can't be ingested | Resolve named-type references in `read_avro` |
 | Avro `map` surfaces as `array(struct(key, value))`, not assignable to `JSON` | Connect `MAP` fields only land in an `ARRAY(STRUCT(key, value))` column | `map` → `json` assignment |
 | `text` → numeric / boolean / bytea and epoch `bigint` → timestamp / date are not assignment casts | Unchanged — see [cast-semantics.md](cast-semantics.md) | Product decision, not a bug |
-| `read_avro` rejects Avro `decimal` with precision > 38, even when the values fit | A second *connector-side* engine workaround: precision-less Connect `Decimal`s are given precision 38 on the writer schema (AvroData would emit 64) | Accept precision > 38 and cast on assignment (fail only on overflow) |
+| `read_avro` rejects Avro `decimal` *declaring* precision > 38, even when the values fit | A second *connector-side* engine workaround: the declared precision is capped at 38 on the writer schema (AvroData emits 64 for precision-less Decimals) | Accept precision > 38 and cast on assignment (fail only on overflow) |
 | `BY NAME` has no "ignore unmatched source columns" mode | A producer adding a field before its column exists fails the batch | Opt-in discard of unmatched source columns |
 
 ## Cast semantics (summary)
@@ -173,12 +173,8 @@ mirror that logic rather than re-implement coercion. Full matrix + runnable prob
    - `read_json` rejects arrays of timestamp strings carrying a numeric offset (`+02:00`); only `Z`
      (UTC) works inside arrays. Scalars accept any offset.
    - `read_json` rejects subnormal doubles (underflow).
-   - Confluent `AvroData` requires a `Decimal` value's scale to equal the schema scale. For
-     precision: the connector honors the *source* schema's precision and **defaults a precision-less
-     Decimal to 38** (Firebolt's `NUMERIC(38, scale)` default) instead of AvroData's 64, which the
-     engine (cap 38) would reject — done on the writer schema in `UploadIngestionService`. No
-     precision-narrowing engine cast is required. See
-     [format-benchmark-results.md](format-benchmark-results.md).
+   - Decimals: `AvroData` requires a value's scale to equal the schema scale, and the connector caps
+     the declared precision at 38 — see [cast-semantics.md](cast-semantics.md).
 5. **Decimal/timestamp precision.** Connect `Timestamp` is millisecond precision (Avro
    `timestamp-micros` degrades), and Firebolt timestamps are microsecond precision — sub-unit
    values truncate.
@@ -187,10 +183,10 @@ mirror that logic rather than re-implement coercion. Full matrix + runnable prob
 
 End-to-end coverage is heavy and is the main safety net for a server-parses-everything design.
 
-**Unit tests** — `src/test`, ~225 tests, no Docker, run on every build:
-- `UploadIngestionServiceTest` — the core: Avro & NDJSON round-trips, exact-name column matching,
-  split-and-retry isolation, multi-group atomic transactions, tombstone skipping, literal columns,
-  DLQ routing, empty-batch handling.
+**Unit tests** — `src/test`, ~220 tests, no Docker, run on every build:
+- `UploadIngestionServiceTest` — the core: Avro & NDJSON round-trips, the `BY NAME` SQL, per-key-set
+  JSON grouping, decimal precision cap, split-and-retry isolation, multi-group atomic transactions,
+  tombstone skipping, literal columns, DLQ routing.
 - Task/connector/services: `FireboltSinkTaskTest`, `FireboltSinkConnectorTest`,
   `AppendOnlyFireboltSinkServiceTest`, `FireboltDbServiceTest`, `FireboltMetadataServiceTest`,
   `TableWriterTest`.
@@ -207,10 +203,13 @@ Schema Registry), **every suite run on both KC 3.9.1 and KC 4.0**, sharded in CI
   - Schemaless JSON (`JsonConverter` → `read_json`): same set + `JsonColumnValue`,
     `JsonSchemalessIntegration`, `SchemalessWithTransforms`.
   - Each type test covers required/optional/null, arrays (nullable/non-null/empty/large/nested),
-    edge values, and split-retry/DLQ poison handling, across an `includeNulls` × ingestion-mode
-    parameter grid.
-- **connector (7):** `TableNameTest`, `ColumnNameTest`, `MultipleTopicsSerializerTest`,
-  `DlqReporterIntegrationTest`, `ConnectorConfigurationTest`, `PostProcessingScript{Configuration,File}Test`.
+    edge values, and split-retry/DLQ poison handling, with and without serialized nulls.
+- **connector (10):** `TableNameTest`, `ColumnNameTest`, `MultipleTopicsSerializerTest`,
+  `DlqReporterIntegrationTest`, `ConnectorConfigurationTest`, `PostProcessingScript{Configuration,File}Test`,
+  `SchemaEvolutionTest`, and `NameMatching{Schemaless,Avro}Test` — field ↔ column mismatches: extra
+  table columns (nullable / `DEFAULT` / `NOT NULL DEFAULT` / `CURRENT_TIMESTAMP`), mixed shapes in one
+  batch, explicit null vs absent, reordering, and extra / case-mismatched / missing-required fields
+  (DLQ with tolerance, task failure without).
 - **lifecycle (1):** `ConnectorManagementTest` (create/start/stop/restart/delete).
 - **stress (1):** `LargePayloadTest`.
 - **customer (1):** `Customer1IntegrationTest`.
@@ -220,38 +219,27 @@ Schema Registry), **every suite run on both KC 3.9.1 and KC 4.0**, sharded in CI
 **Performance:** a **Throughput Benchmark** CI job runs on every PR; `LoadTest`/`ScenarioLoadTest`
 are manual `./gradlew` harnesses. Coverage tooling: JaCoCo + SonarCloud.
 
-**Deliberately disabled (3), each a documented limitation:**
+**Deliberately disabled (2), each a documented limitation:**
 | Test | Reason | Re-enable when |
 |---|---|---|
 | `ByteaSchemalessSerializerTest` | bytea via schemaless JSON = base64 `text`→bytea (unsupported) | never needed (bytea via Avro is covered), or engine adds `text`→bytea |
-| `AvroJsonSerializerTest.testAvroJsonAsNestedRecordSerialization` | `struct`→json cast | the engine cast lands (in progress) |
 | `LargePayloadTest.willNotProcessSingleLargeMessage` | CI account 40 MB payload cap | run locally with a larger-limit account |
 
 ### Lines of code
 
-| Area | LOC | Notes |
-|---|---:|---|
-| **Production** (`src/main`) | **2,488** | 24 classes — the whole connector (down from 2,706 after removing schema discovery) |
-| **Unit tests** (`src/test`) | **3,826** | ~219 tests |
-| **Integration tests** (`src/integrationTest`) | **30,753** | full breakdown below |
-| &nbsp;&nbsp;json/schema (read_avro) | 7,470 | |
-| &nbsp;&nbsp;json/schemaless (read_json) | 6,870 | |
-| &nbsp;&nbsp;avro (read_avro) | 4,346 | |
-| &nbsp;&nbsp;integration/ (connector, lifecycle, stress, config, base classes) | 3,690 | |
-| &nbsp;&nbsp;load (manual perf harnesses) | 2,675 | not run in CI |
-| &nbsp;&nbsp;datatype fixtures (POJOs + serializers) | 1,587 | test data models |
-| &nbsp;&nbsp;e2e | 1,376 | |
-| &nbsp;&nbsp;customer | 179 | |
+| Area | LOC |
+|---|---:|
+| **Production** (`src/main`) | ~2,200 (25 classes) |
+| **Unit tests** (`src/test`) | ~3,900 |
+| **Integration tests** (`src/integrationTest`) | ~31,000 |
 
-**~34.5k test LOC against 2.5k production LOC (~14:1).** The integration matrix is intentionally the
-bulk: because all parsing/typing now happens server-side, behavior is only observable end-to-end,
-so the converter-path × data-type matrix is where correctness is actually pinned. Keep that
-structure when adding types.
+The integration matrix is intentionally the bulk: because all parsing/typing happens server-side,
+behavior is only observable end-to-end, so the converter-path × data-type matrix is where
+correctness is actually pinned. Keep that structure when adding types.
 
 ### Schema evolution
 Schema evolution is a headline property of the state-free design, so it has a dedicated IT:
 `integration/SchemaEvolutionTest` ingests into a table, runs `ALTER TABLE … ADD COLUMN`, then
 ingests records carrying the new field (and confirms older-shaped records still land with the new
 column defaulted) — all with no connector restart, since the connector never caches the schema.
-*Extensive* evolution coverage (drops, type widening, reordering across all converter paths) is a
-sensible follow-up PR.
+Field ↔ column mismatch coverage lives in `NameMatching{Schemaless,Avro}Test` (above).

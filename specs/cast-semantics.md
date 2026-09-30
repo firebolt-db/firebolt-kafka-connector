@@ -55,10 +55,12 @@ decision, not the connector's job to paper over).
 - **Subnormal doubles** are rejected by `read_json` ("Cannot read floating point value:
   underflow").
 - **Decimal scale** must match the source schema's declared scale (Confluent `AvroData`
-  requirement). **Decimal precision** comes from the source schema; the engine caps it at 38. When
-  the source declares no precision, the connector defaults it to **38** (Firebolt's `NUMERIC(38,
-  scale)` default) rather than AvroData's 64 — see the decimal note in
-  [format-benchmark-results.md](format-benchmark-results.md).
+  requirement). **Decimal precision:** `read_avro` rejects any Avro decimal *declaring* precision
+  > 38, and `AvroData` declares 64 for a Connect `Decimal` without a precision. The connector caps
+  the declared precision at **38** on the Avro writer schema. This is metadata only — the unscaled
+  bytes are untouched — so values that fit `NUMERIC(38, s)` land (including from a source declaring
+  e.g. `NUMERIC(50,2)`), and a value with more digits is still **rejected by the engine** when it
+  reads the row (verified: never truncated). This is the canonical description; other docs link here.
 - **`read_json` arrays of timestamps**: elements must be `Z`/UTC (or offset-less); a numeric
   offset like `+02:00` inside an array is rejected (scalars accept any offset).
 - **Connect `Timestamp` is millisecond precision**; Avro `timestamp-micros` degrades to a plain
