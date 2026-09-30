@@ -12,9 +12,11 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.file.CodecFactory;
 import org.apache.avro.file.DataFileWriter;
@@ -51,7 +53,8 @@ import org.apache.kafka.connect.sink.SinkRecord;
  *   one file per schema. {@code read_avro} honors Avro logical types, so Connect Timestamp/Date map
  *   to TIMESTAMP/DATE.</li>
  *   <li><b>Schemaless records</b> (JSON with {@code schemas.enable=false}, delivered as a
- *   {@link Map}) are serialized back to NDJSON and read with {@code read_json}.</li>
+ *   {@link Map}) are serialized back to NDJSON and read with {@code read_json}, one upload per
+ *   top-level key set so a key a record omits takes the column default rather than {@code NULL}.</li>
  * </ul>
  */
 @Slf4j
@@ -69,8 +72,35 @@ public class UploadIngestionService implements IngestionService {
     private static final String DECIMAL_PRECISION_PARAM = "connect.decimal.precision";
     private static final String DEFAULT_DECIMAL_PRECISION = "38";
 
-    /** group key for records without a value schema */
+    /** group key for schemaless records whose value is not a JSON object (reported as bad records) */
     private static final Object SCHEMALESS = new Object();
+
+    /**
+     * Group key for schemaless JSON objects: the set of top-level keys. {@code read_json} infers one
+     * schema per upload, so a key that is absent from one record but present in another surfaces as an
+     * explicit {@code NULL} for the former — overriding the column's {@code DEFAULT} (and failing a
+     * {@code NOT NULL DEFAULT} column). Uploading each key set separately keeps "absent" absent, so the
+     * column default applies exactly as it would for that record on its own.
+     */
+    private static final class JsonShape {
+        final Set<String> keys;
+
+        JsonShape(Map<?, ?> value) {
+            Set<String> keys = new HashSet<>();
+            value.keySet().forEach(key -> keys.add(String.valueOf(key)));
+            this.keys = keys;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof JsonShape && keys.equals(((JsonShape) o).keys);
+        }
+
+        @Override
+        public int hashCode() {
+            return keys.hashCode();
+        }
+    }
 
     private final Connection connection;
     private final String tableName;
@@ -103,8 +133,7 @@ public class UploadIngestionService implements IngestionService {
                         record.topic(), record.kafkaPartition(), record.kafkaOffset());
                 continue;
             }
-            groups.computeIfAbsent(record.valueSchema() == null ? SCHEMALESS : record.valueSchema(), k -> new ArrayList<>())
-                    .add(record);
+            groups.computeIfAbsent(groupKey(record), k -> new ArrayList<>()).add(record);
         }
 
         // A batch that mixes schemas (or schema'd + schemaless) becomes several INSERTs. Run them
@@ -119,10 +148,10 @@ public class UploadIngestionService implements IngestionService {
         }
         try {
             for (Map.Entry<Object, List<SinkRecord>> group : groups.entrySet()) {
-                if (group.getKey() == SCHEMALESS) {
-                    ingestJson(group.getValue(), literalColumns);
-                } else {
+                if (group.getKey() instanceof Schema) {
                     ingestAvro((Schema) group.getKey(), group.getValue(), literalColumns);
+                } else {
+                    ingestJson(group.getValue(), literalColumns);
                 }
             }
             if (manageTransaction) {
@@ -146,6 +175,14 @@ public class UploadIngestionService implements IngestionService {
                 }
             }
         }
+    }
+
+    /** Avro files are grouped by value schema; schemaless JSON by top-level key set (see {@link JsonShape}). */
+    private static Object groupKey(SinkRecord record) {
+        if (record.valueSchema() != null) {
+            return record.valueSchema();
+        }
+        return record.value() instanceof Map ? new JsonShape((Map<?, ?>) record.value()) : SCHEMALESS;
     }
 
     @Override

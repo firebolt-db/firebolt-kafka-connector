@@ -127,6 +127,7 @@ class UploadIngestionServiceTest {
         Map<String, Object> second = new LinkedHashMap<>();
         second.put("id", 2);
         second.put("name", "bob");
+        second.put("nested", null);
 
         service(false).addRecords(List.of(record(null, first, 0L), record(null, second, 1L)));
 
@@ -138,6 +139,45 @@ class UploadIngestionServiceTest {
         assertTrue(lines[0].contains("\"id\":1") && lines[0].contains("\"name\":\"alice\""));
         assertTrue(lines[0].contains("\"nested\":{\"k\":\"v\"}"));
         assertTrue(lines[1].contains("\"id\":2"));
+    }
+
+    @Test
+    void schemalessRecordsUploadOnePayloadPerKeySet() throws Exception {
+        // read_json infers one schema per upload: a key absent from one record but present in another
+        // would surface as NULL for the former, overriding the column DEFAULT. So each distinct key set
+        // (order-insensitive) is its own upload.
+        Map<String, Object> idOnly = Map.of("id", 1);
+        Map<String, Object> withScore = new LinkedHashMap<>();
+        withScore.put("id", 2);
+        withScore.put("score", 5);
+        Map<String, Object> withScoreReordered = new LinkedHashMap<>();
+        withScoreReordered.put("score", 6);
+        withScoreReordered.put("id", 3);
+
+        service(false).addRecords(List.of(
+                record(null, idOnly, 0L), record(null, withScore, 1L),
+                record(null, withScoreReordered, 2L), record(null, Map.of("id", 4), 3L)));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, byte[]>> files = ArgumentCaptor.forClass(Map.class);
+        verify(statement, times(2)).execute(anyString(), files.capture());
+        List<String> payloads = new ArrayList<>();
+        files.getAllValues().forEach(f -> payloads.add(new String(f.get("batch"), StandardCharsets.UTF_8)));
+        assertEquals("{\"id\":1}\n{\"id\":4}\n", payloads.get(0));
+        assertEquals(2, payloads.get(1).split("\n").length);
+        assertTrue(payloads.get(1).contains("\"score\":5") && payloads.get(1).contains("\"score\":6"));
+    }
+
+    @Test
+    void explicitNullKeepsRecordInSameShapeAsPresentValue() throws Exception {
+        // An explicit null is a present key (NULL is what the producer sent), unlike an absent key.
+        Map<String, Object> withNull = new LinkedHashMap<>();
+        withNull.put("id", 1);
+        withNull.put("score", null);
+
+        service(false).addRecords(List.of(record(null, withNull, 0L), record(null, Map.of("id", 2, "score", 3), 1L)));
+
+        verify(statement, times(1)).execute(anyString(), anyMap());
     }
 
     // ---- shared behavior ----

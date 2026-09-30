@@ -61,8 +61,9 @@ schema:
 | plain `JsonConverter`, `schemas.enable=false` | `Map` (no schema) | NDJSON | `read_json` |
 
 So **schema-carrying records go through Avro + `read_avro`; schemaless JSON goes through
-`read_json`.** A batch is grouped by value schema, so a mid-batch schema change yields one
-upload+INSERT per schema, run in a single transaction (see Risks).
+`read_json`.** A batch is grouped by value schema (schemaless JSON: by top-level key set, so a
+key a record omits takes the column default — see "Remaining engine gaps"); each group is one
+upload+INSERT, and multiple groups run in a single transaction (see Risks).
 
 Class chain:
 `FireboltSinkTask.put` → `AppendOnlyFireboltSinkService` → `TableWriter` (one per table) →
@@ -127,13 +128,13 @@ Verified against `ghcr.io/firebolt-db/engine:dev` (`5.0.0-pre.0.20260930181618.8
 |---|---|---|
 | `read_json` infers **one schema per upload** (a batch): a field whose JSON type differs across records (`1` vs `"x"`) fails the whole batch ("could not infer a consistent schema"), although each record alone would land | Batch fails; with DLQ on, split-and-retry lands every record individually (slow, but correct) | Type the reader by the `BY NAME` target (next row), or widen conflicting scalars to `text` |
 | `read_json` **unions object shapes** across a batch: `{"k":1}` + `{"z":"q"}` into a `JSON` column stores `{"k":1,"z":null}` | **Silent fidelity loss** for nested objects into `JSON` columns (keys the producer never sent appear as `null`) | Under `INSERT … BY NAME`, type the reader by the target column (a `JSON` target reads the raw sub-document — what `SCHEMA => 'j json'` already does on files) |
-| `read_json`: a field **absent** from one record but present in others surfaces as `NULL` for that record | That record gets `NULL`, not the column `DEFAULT` (a record alone, or via `read_avro`, gets the `DEFAULT`) | Same as above: target-typed reading with "absent" ≠ `null` |
+| `read_json`: a field **absent** from one record but present in others surfaces as `NULL` for that record — overriding a nullable column's `DEFAULT` silently, and failing the whole batch for a `NOT NULL DEFAULT` column | **Mitigated in the connector**: schemaless records are uploaded one payload per top-level key set, so an absent key stays absent and the `DEFAULT` applies. Costs one extra `INSERT` per distinct shape in a batch | Target-typed reading with "absent" ≠ `null`; then the per-shape grouping can be deleted |
 | `read_json(..., SCHEMA => …)` rejects `upload://` ("not supported for COPY FROM") | The explicit-schema escape hatch isn't usable on the upload path | Support `SCHEMA` on `upload://` (ideally derived from the `BY NAME` target) |
 | `read_json` nested object → `STRUCT` column must match the struct's fields **exactly** (a subset or extra keys fail) | Evolving nested objects fail; `read_avro` accepts a subset | Name-based, lenient struct assignment (missing → `NULL`) |
 | `read_avro` rejects Avro **named-type references** ("Invalid Avro type : AVRO_NUM_TYPES") | Any Connect schema that reuses a named struct — e.g. an **unflattened Debezium envelope** (`before`/`after` share `Value`) — can't be ingested | Resolve named-type references in `read_avro` |
 | Avro `map` surfaces as `array(struct(key, value))`, not assignable to `JSON` | Connect `MAP` fields only land in an `ARRAY(STRUCT(key, value))` column | `map` → `json` assignment |
 | `text` → numeric / boolean / bytea and epoch `bigint` → timestamp / date are not assignment casts | Unchanged — see [cast-semantics.md](cast-semantics.md) | Product decision, not a bug |
-| `read_avro` rejects Avro `decimal` with precision > 38, even when the values fit | This is the one remaining *connector-side* engine workaround: precision-less Connect `Decimal`s are given precision 38 on the writer schema (AvroData would emit 64) | Accept precision > 38 and cast on assignment (fail only on overflow) |
+| `read_avro` rejects Avro `decimal` with precision > 38, even when the values fit | A second *connector-side* engine workaround: precision-less Connect `Decimal`s are given precision 38 on the writer schema (AvroData would emit 64) | Accept precision > 38 and cast on assignment (fail only on overflow) |
 | `BY NAME` has no "ignore unmatched source columns" mode | A producer adding a field before its column exists fails the batch | Opt-in discard of unmatched source columns |
 
 ## Cast semantics (summary)
