@@ -204,7 +204,8 @@ Schema Registry), **every suite run on both KC 3.9.1 and KC 4.0**, sharded in CI
     `JsonSchemalessIntegration`, `SchemalessWithTransforms`.
   - Each type test covers required/optional/null, arrays (nullable/non-null/empty/large/nested),
     edge values, and split-retry/DLQ poison handling, with and without serialized nulls.
-- **connector (10):** `TableNameTest`, `ColumnNameTest`, `MultipleTopicsSerializerTest`,
+- **connector (12):** `TableNameTest`, `ColumnNameTest` (schemaless), `ColumnNameJsonSchemaTest` (names that
+  aren't Avro identifiers — dashes, dots, spaces, non-ASCII, nested STRUCT fields — through `read_avro`), `MultipleTopicsSerializerTest`,
   `DlqReporterIntegrationTest`, `ConnectorConfigurationTest`, `PostProcessingScript{Configuration,File}Test`,
   `SchemaEvolutionTest`, and `NameMatching{Schemaless,Avro}Test` — field ↔ column mismatches: extra
   table columns (nullable / `DEFAULT` / `NOT NULL DEFAULT` / `CURRENT_TIMESTAMP`), mixed shapes in one

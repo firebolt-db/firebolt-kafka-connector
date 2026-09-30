@@ -67,6 +67,13 @@ decision, not the connector's job to paper over).
   `bigint` through the converter→`AvroData` round-trip (→ unsupported). Firebolt timestamps are
   microsecond precision, so finer values truncate.
 
+## Field names on the Avro path
+
+Confluent `AvroData` must scrub field names that aren't Avro identifiers (`col-with-dashes` →
+`col_with_dashes`), which would break `BY NAME` matching. `read_avro` accepts any field name, so the
+connector writes the **original Connect field names** (recursively, including nested struct fields)
+into the Avro file header; records are written by position, so only the header differs.
+
 ## Converter-specific note: JSON-Schema `Date`
 
 `JsonSchemaConverter` builds a Connect `Date` logical type over a non-INT32 base (it defaults JSON

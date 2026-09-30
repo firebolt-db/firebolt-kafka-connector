@@ -19,11 +19,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.avro.NameValidator;
 import org.apache.avro.file.CodecFactory;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -183,7 +185,7 @@ public class UploadIngestionService implements IngestionService {
 
     /** Schema-carrying records -> Avro -> read_avro. */
     private void ingestAvro(Schema connectSchema, List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
-        org.apache.avro.Schema avroSchema = capDecimalPrecision(nonNullUnionBranch(avroData.fromConnectSchema(connectSchema)));
+        org.apache.avro.Schema avroSchema = writerSchema(connectSchema, nonNullUnionBranch(avroData.fromConnectSchema(connectSchema)));
         if (avroSchema.getType() != org.apache.avro.Schema.Type.RECORD) {
             for (SinkRecord record : records) {
                 handleBadRecord(record, new RecordConversionException("Record value schema is not a struct: " + connectSchema.type()));
@@ -258,18 +260,53 @@ public class UploadIngestionService implements IngestionService {
                 .orElse(schema);
     }
 
-    /** Caps every decimal's declared precision at {@value #MAX_DECIMAL_PRECISION} (see the constant). */
-    private org.apache.avro.Schema capDecimalPrecision(org.apache.avro.Schema schema) {
-        String json = schema.toString();
-        if (!json.contains("\"decimal\"")) {
-            return schema;
-        }
+    /**
+     * The Avro schema written into the file header: AvroData's schema with two adjustments. Field names
+     * are restored to the Connect names — AvroData must scrub names that aren't Avro identifiers
+     * ({@code col-with-dashes} -> {@code col_with_dashes}), but {@code read_avro} accepts any name and
+     * {@code BY NAME} has to see the real one. And decimal precision is capped (see
+     * {@link #MAX_DECIMAL_PRECISION}). Records are written by field position, so only the header changes.
+     */
+    private org.apache.avro.Schema writerSchema(Schema connectSchema, org.apache.avro.Schema avroSchema) {
+        String json = avroSchema.toString();
         try {
             JsonNode tree = objectMapper.readTree(json);
+            restoreFieldNames(connectSchema, tree);
             capDecimalPrecision(tree);
-            return new org.apache.avro.Schema.Parser().parse(tree.toString());
+            String rewritten = tree.toString();
+            return rewritten.equals(json) ? avroSchema
+                    : new org.apache.avro.Schema.Parser(NameValidator.NO_VALIDATION).parse(rewritten);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to rewrite Avro schema " + json, e);
+        }
+    }
+
+    /** Walks the Connect schema and AvroData's JSON schema in parallel, putting back each field's Connect name. */
+    private static void restoreFieldNames(Schema connectSchema, JsonNode avro) {
+        if (avro.isArray()) { // a [null, X] union for an optional field
+            avro.forEach(branch -> restoreFieldNames(connectSchema, branch));
+            return;
+        }
+        if (!avro.isObject()) {
+            return;
+        }
+        switch (connectSchema.type()) {
+            case STRUCT:
+                JsonNode fields = avro.path("fields");
+                for (int i = 0; i < connectSchema.fields().size() && i < fields.size(); i++) {
+                    Field field = connectSchema.fields().get(i);
+                    ((ObjectNode) fields.get(i)).put("name", field.name());
+                    restoreFieldNames(field.schema(), fields.get(i).path("type"));
+                }
+                break;
+            case ARRAY:
+                restoreFieldNames(connectSchema.valueSchema(), avro.path("items"));
+                break;
+            case MAP:
+                restoreFieldNames(connectSchema.valueSchema(), avro.path("values"));
+                break;
+            default:
+                break;
         }
     }
 

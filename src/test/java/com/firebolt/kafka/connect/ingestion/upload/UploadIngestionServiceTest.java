@@ -193,6 +193,32 @@ class UploadIngestionServiceTest {
     }
 
     @Test
+    void keepsConnectFieldNamesThatAreNotAvroIdentifiers() throws Exception {
+        // e.g. JSON-Schema / Protobuf property names; BY NAME must match the real column names.
+        Schema inner = SchemaBuilder.struct().name("Inner").field("a.b", Schema.STRING_SCHEMA).build();
+        Schema valueSchema = SchemaBuilder.struct().name("Event")
+                .field("col-with-dashes", Schema.STRING_SCHEMA)
+                .field("über", Schema.OPTIONAL_STRING_SCHEMA)
+                .field("nested struct", SchemaBuilder.struct().name("Outer").optional()
+                        .field("x y", SchemaBuilder.array(inner).build()).build())
+                .build();
+        Struct value = new Struct(valueSchema)
+                .put("col-with-dashes", "d")
+                .put("nested struct", new Struct(valueSchema.field("nested struct").schema())
+                        .put("x y", List.of(new Struct(inner).put("a.b", "v"))));
+
+        service(false).addRecords(List.of(record(valueSchema, value, 0L)));
+
+        // The container header is the writer schema as JSON text (Avro's own reader would reject these
+        // names; read_avro accepts them — verified against the engine).
+        String header = new String(captureSingleUpload().payload, StandardCharsets.UTF_8);
+        for (String name : List.of("col-with-dashes", "über", "nested struct", "x y", "a.b")) {
+            assertTrue(header.contains("\"name\":\"" + name + "\""), "missing field name " + name);
+        }
+        assertTrue(!header.contains("col_with_dashes") && !header.contains("x_y"), "scrubbed names leaked");
+    }
+
+    @Test
     void schemaRecordsSplitAvroFilePerSchema() throws Exception {
         Schema v1 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA).build();
         Schema v2 = SchemaBuilder.struct().name("Event").field("a", Schema.INT64_SCHEMA)
