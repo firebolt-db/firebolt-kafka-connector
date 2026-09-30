@@ -1,0 +1,7 @@
+# Structured engine config for `firebolt server`.
+# https://docs.firebolt.io/self-managed/engine-configuration
+schema_version: "1.0"
+
+engine:
+  nodes:
+    - host: firebolt-core

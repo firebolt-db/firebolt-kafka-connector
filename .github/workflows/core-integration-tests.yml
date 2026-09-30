@@ -60,8 +60,8 @@ on:
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
   # OSS Firebolt engine artefact. Overridable via the FIREBOLT_ENGINE_IMAGE repo
-  # variable; falls back to a pinned, validated tag.
-  FIREBOLT_ENGINE_IMAGE: ${{ vars.FIREBOLT_ENGINE_IMAGE || 'ghcr.io/firebolt-db/engine:release-5.0.1-0.20260615205019.4f5c69172cd3' }}
+  # variable; falls back to the `dev` tag (freshest build off the engine's master).
+  FIREBOLT_ENGINE_IMAGE: ${{ vars.FIREBOLT_ENGINE_IMAGE || 'ghcr.io/firebolt-db/engine:dev' }}
 
 jobs:
   integration-tests:
@@ -81,10 +81,10 @@ jobs:
         fi
 
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       
     - name: Set up JDK 11
-      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+      uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520
       with:
         java-version: '11'
         distribution: 'temurin'
