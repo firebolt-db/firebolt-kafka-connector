@@ -21,6 +21,11 @@ on:
         type: string
 
   workflow_call:
+    secrets:
+      FIREBOLT_CLIENT_ID_STG_NEW_IDN:
+        required: true
+      FIREBOLT_CLIENT_SECRET_STG_NEW_IDN:
+        required: true
     inputs:
       database:
         description: 'Database override'

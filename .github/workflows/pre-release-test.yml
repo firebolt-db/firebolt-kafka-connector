@@ -3,6 +3,11 @@ name: Pre Release Tests
 on:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      FIREBOLT_CLIENT_ID_STG_NEW_IDN:
+        required: true
+      FIREBOLT_CLIENT_SECRET_STG_NEW_IDN:
+        required: true
 
 jobs:
   build:
@@ -27,6 +32,8 @@ jobs:
     name: Cloud Integration Tests
     needs: build
     uses: ./.github/workflows/cloud-integration-tests.yml
-    secrets: inherit
+    secrets:
+      FIREBOLT_CLIENT_ID_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+      FIREBOLT_CLIENT_SECRET_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
 
 
