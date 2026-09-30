@@ -87,11 +87,8 @@ class UploadIngestionServiceTest {
         service(false).addRecords(List.of(record(valueSchema, value, 1L)));
 
         Upload upload = captureSingleUpload();
-        // columns come from the record's own fields, quoted on both sides (matched to the table
-        // column whose name equals the field exactly).
-        assertEquals("INSERT INTO \"t\" (\"id\", \"amount\", \"created_at\", \"tags\", \"address\") "
-                + "SELECT \"id\", \"amount\", \"created_at\", \"tags\", \"address\" "
-                + "FROM read_avro('upload://batch')", upload.sql);
+        // no column list: Firebolt matches the file's fields to the table's columns by name.
+        assertEquals("INSERT INTO \"t\" BY NAME SELECT * FROM read_avro('upload://batch')", upload.sql);
         List<GenericRecord> rows = readAvro(upload.payload);
         assertEquals(1, rows.size());
         assertEquals(7L, rows.get(0).get("id"));
@@ -134,8 +131,7 @@ class UploadIngestionServiceTest {
         service(false).addRecords(List.of(record(null, first, 0L), record(null, second, 1L)));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"id\", \"name\", \"nested\") "
-                + "SELECT \"id\", \"name\", \"nested\" FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" BY NAME SELECT * FROM read_json('upload://batch')", upload.sql);
         // payload is newline-delimited JSON, one object per record
         String[] lines = new String(upload.payload, StandardCharsets.UTF_8).split("\n");
         assertEquals(2, lines.length);
@@ -143,21 +139,6 @@ class UploadIngestionServiceTest {
         assertTrue(lines[0].contains("\"nested\":{\"k\":\"v\"}"));
         assertTrue(lines[1].contains("\"id\":2"));
     }
-
-    @Test
-    void projectsEveryRecordFieldByItsOwnName() throws Exception {
-        // No table lookup: all fields are projected. The table is the contract — a field that is not
-        // a column makes Firebolt reject the batch (not exercised here; the statement is mocked).
-        Map<String, Object> value = new LinkedHashMap<>();
-        value.put("UserId", 1);
-        value.put("extra", "x");
-
-        service(false).addRecords(List.of(record(null, value, 0L)));
-
-        Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"UserId\", \"extra\") SELECT \"UserId\", \"extra\" FROM read_json('upload://batch')", upload.sql);
-    }
-
 
     // ---- shared behavior ----
 
@@ -182,7 +163,7 @@ class UploadIngestionServiceTest {
                 Map.of("batch_id", "my-batch"));
 
         Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"id\", \"batch_id\") SELECT \"id\", 'my-batch' FROM read_json('upload://batch')", upload.sql);
+        assertEquals("INSERT INTO \"t\" BY NAME SELECT *, 'my-batch' AS \"batch_id\" FROM read_json('upload://batch')", upload.sql);
     }
 
     @Test
@@ -192,31 +173,18 @@ class UploadIngestionServiceTest {
     }
 
     @Test
-    void emptyJsonObjectThrowsWhenNotTolerant() throws Exception {
-        // A record with no fields can't be represented as an INSERT; rather than silently advance
-        // past it (dropping it with no trace), it fails the task when error tolerance is off.
-        org.junit.jupiter.api.Assertions.assertThrows(RecordConversionException.class,
-                () -> service(false).addRecords(List.of(record(null, Map.of(), 0L))));
-        verify(statement, never()).execute(anyString(), anyMap());
+    void emptyJsonObjectIsShippedAsIs() throws Exception {
+        // No connector-side field inspection: an empty object is uploaded like any other record and
+        // Firebolt decides (defaults fill every column when other records in the batch carry fields).
+        service(false).addRecords(List.of(record(null, Map.of(), 0L)));
+        assertEquals("{}", new String(captureSingleUpload().payload, StandardCharsets.UTF_8).trim());
     }
 
     @Test
-    void emptyJsonObjectGoesToDlqWhenTolerant() throws Exception {
-        service(true).addRecords(List.of(record(null, Map.of(), 0L)));
-        verify(statement, never()).execute(anyString(), anyMap());
-        verify(errorReporter, times(1)).report(any(SinkRecord.class), any(Exception.class));
-    }
-
-    @Test
-    void literalColumnCollidingWithFieldIsNotDuplicated() throws Exception {
-        Map<String, Object> value = new LinkedHashMap<>();
-        value.put("id", 1);
-        value.put("batch_id", "fromRecord");
-
-        service(false).addRecords(List.of(record(null, value, 0L)), Map.of("batch_id", "generated"));
-
-        Upload upload = captureSingleUpload();
-        assertEquals("INSERT INTO \"t\" (\"id\", \"batch_id\") SELECT \"id\", \"batch_id\" FROM read_json('upload://batch')", upload.sql);
+    void escapesLiteralColumnValuesAndNames() throws Exception {
+        service(false).addRecords(List.of(record(null, Map.of("id", 1), 0L)), Map.of("we\"ird", "it's"));
+        assertEquals("INSERT INTO \"t\" BY NAME SELECT *, 'it''s' AS \"we\"\"ird\" FROM read_json('upload://batch')",
+                captureSingleUpload().sql);
     }
 
     @Test

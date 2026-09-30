@@ -13,11 +13,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.file.CodecFactory;
 import org.apache.avro.file.DataFileWriter;
@@ -33,12 +30,12 @@ import org.apache.kafka.connect.sink.SinkRecord;
 
 /**
  * Ships Kafka records to Firebolt as-is and lets the server parse them: records are uploaded
- * over the {@code upload://} HTTP primitive and ingested with an
- * {@code INSERT INTO <table> (<record fields>) SELECT <record fields> FROM read_xxx('upload://batch')}.
+ * over the {@code upload://} HTTP primitive and ingested with
+ * {@code INSERT INTO <table> BY NAME SELECT * FROM read_xxx('upload://batch')}.
  *
- * <p>The connector holds <b>no table schema</b>: the column list is built from each record's own
- * field names, and Firebolt applies its assignment casts and resolves the columns. Consequences,
- * by design:
+ * <p>The connector knows <b>no column names at all</b> — neither the table's nor the record's.
+ * {@code BY NAME} makes Firebolt match each field the reader surfaces to the table column of the
+ * same name (exact, case-sensitive) and apply its assignment casts. Consequences, by design:
  * <ul>
  *   <li>A record may carry a subset of the table's columns — absent columns take their default.
  *       (Firebolt-side schema evolution therefore needs no connector handling.)</li>
@@ -60,7 +57,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
 @Slf4j
 public class UploadIngestionService implements IngestionService {
 
-    private static final String INSERT_SQL_TEMPLATE = "INSERT INTO \"%s\" (%s) SELECT %s FROM %s('upload://%s')";
+    private static final String INSERT_SQL_TEMPLATE = "INSERT INTO \"%s\" BY NAME SELECT *%s FROM %s('upload://%s')";
 
     // The multipart part name referenced by upload://. Must match [_0-9a-zA-Z.-]+ and be unique per request.
     private static final String MULTIPART_NAME = "batch";
@@ -193,18 +190,14 @@ public class UploadIngestionService implements IngestionService {
             return;
         }
 
-        List<String> fields = avroSchema.getFields().stream()
-                .map(org.apache.avro.Schema.Field::name).collect(Collectors.toList());
         uploadWithIsolation("read_avro", convertible, literalColumns,
-                (from, to) -> new Payload(writeAvro(avroSchema, avroRecords.subList(from, to)), fields),
-                0, convertible.size());
+                (from, to) -> writeAvro(avroSchema, avroRecords.subList(from, to)), 0, convertible.size());
     }
 
     /** Schemaless JSON records -> NDJSON -> read_json. */
     private void ingestJson(List<SinkRecord> records, Map<String, String> literalColumns) throws SQLException {
         List<SinkRecord> convertible = new ArrayList<>(records.size());
         List<byte[]> lines = new ArrayList<>(records.size());
-        List<Set<String>> keysPerRecord = new ArrayList<>(records.size());
         for (SinkRecord record : records) {
             if (!(record.value() instanceof Map)) {
                 handleBadRecord(record, new RecordConversionException("Schemaless record value is not a JSON object: " + record.value().getClass().getName()));
@@ -216,9 +209,6 @@ public class UploadIngestionService implements IngestionService {
                 handleBadRecord(record, new RecordConversionException("Failed to serialize record to JSON", e));
                 continue;
             }
-            Set<String> keys = new LinkedHashSet<>();
-            ((Map<?, ?>) record.value()).keySet().forEach(key -> keys.add(String.valueOf(key)));
-            keysPerRecord.add(keys);
             convertible.add(record);
         }
         if (convertible.isEmpty()) {
@@ -226,17 +216,15 @@ public class UploadIngestionService implements IngestionService {
         }
         uploadWithIsolation("read_json", convertible, literalColumns, (from, to) -> {
             ByteArrayOutputStream ndjson = new ByteArrayOutputStream();
-            Set<String> fields = new LinkedHashSet<>();
             try {
                 for (int i = from; i < to; i++) {
                     ndjson.write(lines.get(i));
                     ndjson.write('\n');
-                    fields.addAll(keysPerRecord.get(i));
                 }
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 throw new SQLException("Failed to assemble NDJSON batch", e);
             }
-            return new Payload(ndjson.toByteArray(), new ArrayList<>(fields));
+            return ndjson.toByteArray();
         }, 0, convertible.size());
     }
 
@@ -349,22 +337,10 @@ public class UploadIngestionService implements IngestionService {
      */
     private void uploadWithIsolation(String tvf, List<SinkRecord> records, Map<String, String> literalColumns,
                                      RangeAssembler assembler, int from, int to) throws SQLException {
-        Payload payload = assembler.assemble(from, to);
-        String sql = buildInsertSql(tvf, payload.fields, literalColumns);
-        if (sql == null) {
-            // No columns to insert — e.g. every record in this range is an empty object {}. We
-            // can't represent "insert a row with no fields", so don't silently advance past them
-            // (which would drop them with no trace): route each to the DLQ when error tolerance is
-            // on, or fail the task when it's off — same as any other unprocessable record.
-            for (int i = from; i < to; i++) {
-                handleBadRecord(records.get(i),
-                        new RecordConversionException("Record has no fields to ingest into table " + tableName));
-            }
-            return;
-        }
+        byte[] payload = assembler.assemble(from, to);
         try {
-            log.debug("Ingesting {} record(s), {} bytes via {}", to - from, payload.bytes.length, tvf);
-            execute(sql, payload.bytes);
+            log.debug("Ingesting {} record(s), {} bytes via {}", to - from, payload.length, tvf);
+            execute(buildInsertSql(tvf, literalColumns), payload);
         } catch (SQLException e) {
             if (!errorToleranceAll || to - from <= 1) {
                 if (errorToleranceAll && to - from == 1) {
@@ -383,53 +359,23 @@ public class UploadIngestionService implements IngestionService {
     }
 
     /**
-     * Builds {@code INSERT INTO t (<fields>) SELECT <fields> FROM <tvf>('upload://batch')} from the
-     * record's own field names. Identifiers are quoted on both sides, so a field is matched to the
-     * column whose name equals it exactly (case-sensitive) — the field name is the column name.
-     * {@code literalColumns} (e.g. a batch id) are appended as constants. Returns null when there is
-     * nothing to insert (e.g. all records in range were empty objects).
+     * Builds {@code INSERT INTO t BY NAME SELECT * FROM <tvf>('upload://batch')}. Firebolt matches the
+     * reader's columns to the table's by name, so the connector never lists a column. {@code literalColumns}
+     * (e.g. a batch id) are appended as named constants; a record that carries a field of the same name
+     * is rejected by Firebolt ("matches the target column more than once") rather than silently letting
+     * one value win.
      */
-    private String buildInsertSql(String tvf, List<String> fields, Map<String, String> literalColumns) {
-        List<String> insertColumns = new ArrayList<>();
-        List<String> selectExpressions = new ArrayList<>();
-
-        for (String field : fields) {
-            insertColumns.add(quoteIdentifier(field));
-            selectExpressions.add(quoteIdentifier(field));
-        }
-        literalColumns.forEach((name, value) -> {
-            // Don't emit a column twice if a record field collides with a literal (e.g. a record
-            // that already carries a "batch_id"); the record's own value wins.
-            if (fields.contains(name)) {
-                return;
-            }
-            insertColumns.add(quoteIdentifier(name));
-            selectExpressions.add("'" + value.replace("'", "''") + "'");
-        });
-
-        if (insertColumns.isEmpty()) {
-            log.warn("Skipping upload to {}: records have no fields to ingest", tableName);
-            return null;
-        }
-
-        return String.format(INSERT_SQL_TEMPLATE, tableName,
-                String.join(", ", insertColumns), String.join(", ", selectExpressions), tvf, MULTIPART_NAME);
+    private String buildInsertSql(String tvf, Map<String, String> literalColumns) {
+        StringBuilder literals = new StringBuilder();
+        literalColumns.forEach((name, value) -> literals.append(", '").append(value.replace("'", "''"))
+                .append("' AS ").append(quoteIdentifier(name)));
+        return String.format(INSERT_SQL_TEMPLATE, tableName, literals, tvf, MULTIPART_NAME);
     }
 
-    /** Assembles the upload payload + field list for a sub-range of the batch (used by split-and-retry). */
+    /** Assembles the upload payload for a sub-range of the batch (used by split-and-retry). */
     @FunctionalInterface
     private interface RangeAssembler {
-        Payload assemble(int from, int to) throws SQLException;
-    }
-
-    private static final class Payload {
-        final byte[] bytes;
-        final List<String> fields;
-
-        Payload(byte[] bytes, List<String> fields) {
-            this.bytes = bytes;
-            this.fields = fields;
-        }
+        byte[] assemble(int from, int to) throws SQLException;
     }
 
     private void handleBadRecord(SinkRecord record, RuntimeException cause) {

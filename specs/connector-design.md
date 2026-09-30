@@ -10,19 +10,17 @@ data parsing and no type coercion of its own — the set of conversions it suppo
 Firebolt's **assignment-cast** matrix (see [cast-semantics.md](cast-semantics.md)).
 
 ```
-INSERT INTO "<table>" (<record's own fields>)
-SELECT <record's own fields>
+INSERT INTO "<table>" BY NAME
+SELECT * [, '<batch id>' AS "batch_id"]
 FROM read_avro|read_json('upload://batch')
 ```
 
-The connector **never reads the target table's schema.** The column list above is built purely
-from **each record's own field names** — the names the worker's converter already attached to the
-record — quoted on both sides. It lists them only because Firebolt has no name-based `INSERT`: a
-bare `INSERT INTO t SELECT * FROM read_*(...)` maps the file's columns to the table's **by
-position** (verified), which is fragile, and `INSERT ... BY NAME` is not supported. Naming the
-record's own fields on both sides is how each field reliably lands in the column of the same name.
-Because the connector only ever knows the *record's* fields and nothing about the table, schema
-evolution is free — see "Record ↔ column matching" below. Type coercion is exactly Firebolt's
+The connector **names no columns at all** — neither the table's nor the record's. `BY NAME` makes
+Firebolt match each column the reader surfaces to the table column with the same name, so source
+order doesn't matter. (A plain `INSERT INTO t SELECT *` would map by *position*, which is why earlier
+revisions listed the record's fields on both sides; `BY NAME` removes that last piece of
+column awareness.) Because the connector knows nothing about the table, schema evolution is free —
+see "Record ↔ column matching" below. Type coercion is exactly Firebolt's
 assignment casts; the connector adds none.
 
 ## Kafka Connect background (for reviewers new to it)
@@ -94,13 +92,13 @@ per-task re-discovery. A table dropped while the connector runs surfaces as a no
 
 ## Record ↔ column matching
 
-Because the connector names the record's own fields on both sides of the INSERT, matching is
-**by name** and order-independent. The three cases (all verified against the engine):
+`INSERT … BY NAME` matches **by name** (exact, case-sensitive) and order-independently. The three
+cases (all verified against the engine):
 
 | Case | Result |
 |---|---|
 | Record carries a **subset** of the table's columns | Works. Unnamed columns take their `DEFAULT` (or `NULL`). This is what makes **schema evolution** free: add a column to the table and old records — which simply don't name it — keep ingesting. |
-| Record field name **matches** a column (any order) | Works. The field lands in the same-named column. |
+| Record field name **matches** a column (any order) | Works. The field lands in the same-named column. Matching is exact and case-sensitive (`userid` ≠ `UserId`). |
 | Record carries a field that is **not** a column | The batch **fails** with `Column '<x>' does not exist in the target INSERT table` — it is *not* silently discarded. |
 
 The third case is intentional ("the table is the contract") and fails *loudly* — there's no data
@@ -110,8 +108,32 @@ Firebolt feature that ignores unmatched source columns. So the one schema-evolut
 does *not* absorb is a producer adding a field **before** the column exists in Firebolt; that batch
 fails until the column is added (or, with `errors.tolerance=all`, the offending records go to the
 DLQ and the rest land). Tolerating that gracefully would need an engine-side name-based ingest
-(e.g. `INSERT … BY NAME` with unmatched-source-column discard) — a possible future ask, noted here
-for the reviewer.
+(an opt-in `BY NAME` mode that discards unmatched source columns) — a possible future ask, noted
+here for the reviewer.
+
+Two more `BY NAME` consequences:
+- A record that carries a field named like a **literal column** (post-processing's `batch_id`) is
+  rejected ("`BY NAME` matches the target column 'batch_id' more than once") — loudly, rather than
+  letting the record's value silently break the post-processing script's batch filter.
+- A batch consisting only of **empty JSON objects** `{}` is rejected by `read_json` (it can't infer a
+  schema); mixed with non-empty records, `{}` lands as an all-defaults row.
+
+## Remaining engine gaps
+
+Verified against `ghcr.io/firebolt-db/engine:dev` (`5.0.0-pre.0.20260930181618.87bb548743ac`) over
+`upload://`. None needs connector code; each is a server-side ask.
+
+| Gap | Effect on the connector | Engine ask |
+|---|---|---|
+| `read_json` infers **one schema per upload** (a batch): a field whose JSON type differs across records (`1` vs `"x"`) fails the whole batch ("could not infer a consistent schema"), although each record alone would land | Batch fails; with DLQ on, split-and-retry lands every record individually (slow, but correct) | Type the reader by the `BY NAME` target (next row), or widen conflicting scalars to `text` |
+| `read_json` **unions object shapes** across a batch: `{"k":1}` + `{"z":"q"}` into a `JSON` column stores `{"k":1,"z":null}` | **Silent fidelity loss** for nested objects into `JSON` columns (keys the producer never sent appear as `null`) | Under `INSERT … BY NAME`, type the reader by the target column (a `JSON` target reads the raw sub-document — what `SCHEMA => 'j json'` already does on files) |
+| `read_json`: a field **absent** from one record but present in others surfaces as `NULL` for that record | That record gets `NULL`, not the column `DEFAULT` (a record alone, or via `read_avro`, gets the `DEFAULT`) | Same as above: target-typed reading with "absent" ≠ `null` |
+| `read_json(..., SCHEMA => …)` rejects `upload://` ("not supported for COPY FROM") | The explicit-schema escape hatch isn't usable on the upload path | Support `SCHEMA` on `upload://` (ideally derived from the `BY NAME` target) |
+| `read_json` nested object → `STRUCT` column must match the struct's fields **exactly** (a subset or extra keys fail) | Evolving nested objects fail; `read_avro` accepts a subset | Name-based, lenient struct assignment (missing → `NULL`) |
+| `read_avro` rejects Avro **named-type references** ("Invalid Avro type : AVRO_NUM_TYPES") | Any Connect schema that reuses a named struct — e.g. an **unflattened Debezium envelope** (`before`/`after` share `Value`) — can't be ingested | Resolve named-type references in `read_avro` |
+| Avro `map` surfaces as `array(struct(key, value))`, not assignable to `JSON` | Connect `MAP` fields only land in an `ARRAY(STRUCT(key, value))` column | `map` → `json` assignment |
+| `text` → numeric / boolean / bytea and epoch `bigint` → timestamp / date are not assignment casts | Unchanged — see [cast-semantics.md](cast-semantics.md) | Product decision, not a bug |
+| `BY NAME` has no "ignore unmatched source columns" mode | A producer adding a field before its column exists fails the batch | Opt-in discard of unmatched source columns |
 
 ## Cast semantics (summary)
 

@@ -15,8 +15,9 @@ connector.) Each poll batch is serialized as-is and handed to Firebolt, which pa
 - **Schemaless JSON** — `org.apache.kafka.connect.json.JsonConverter` with `schemas.enable=false` —
   is written as NDJSON and ingested with `read_json`.
 
-The connector builds each `INSERT` from the **record's own field names**, so a field lands in the
-column of the same name. Because it never inspects the table definition, **Firebolt-side schema
+Every batch is ingested with `INSERT INTO <table> BY NAME SELECT * FROM read_avro|read_json(...)`:
+Firebolt matches each record field to the column of the same name (exact, case-sensitive), so the
+connector never lists a column. Because it never inspects the table definition, **Firebolt-side schema
 evolution needs no connector change**: add a column and records that don't carry it get the
 column's default, while records that do carry it populate it. (A record field with no matching
 column fails that batch — the table is the contract.)
