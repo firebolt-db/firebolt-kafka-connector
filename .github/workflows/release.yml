@@ -51,6 +51,8 @@ jobs:
   bump-version:
     needs: pre-release-testing
     runs-on: ubuntu-latest
+    # The app credentials live only in this environment, which is gated by required reviewers.
+    environment: release
     # Pushes use the GitHub App token below, not GITHUB_TOKEN.
     permissions: {}
     steps:
@@ -58,8 +60,8 @@ jobs:
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
-          client-id: ${{ secrets.GH_APP_FB_DB_CI_WRITER_CLIENT_ID }}
-          private-key: ${{ secrets.GH_APP_FB_DB_CI_WRITER_APP_KEY_PEM }}
+          client-id: ${{ secrets.GH_APP_FB_DB_CI_KAFKA_CONNECTOR_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_FB_DB_CI_KAFKA_CONNECTOR_KEY_PEM }}
           permission-contents: write
 
       - name: Check out code
