@@ -121,16 +121,6 @@ public class SinkConfig {
         throw new IllegalStateException("Neither script nor scriptFile is specified for table: " + mapping.getTable());
     }
 
-    // Utility method to get any config value
-    public String get(String key) {
-        return config.get(key);
-    }
-
-    // Utility method to get config map
-    public Map<String, String> getConfig() {
-        return config;
-    }
-
     public boolean isErrorToleranceAll() {
         String tol = config.get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG);
         return tol != null && tol.equalsIgnoreCase("all");
