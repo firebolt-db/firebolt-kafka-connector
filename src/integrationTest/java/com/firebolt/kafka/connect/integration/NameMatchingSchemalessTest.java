@@ -90,6 +90,21 @@ public class NameMatchingSchemalessTest extends SchemalessBaseIntegrationTest {
     }
 
     @Test
+    void consolidatedUploadsTradeDefaultsForFewerInserts() throws Exception {
+        // One batch straddling a producer-side schema change: v1 records lack opt_def, v2 records carry it.
+        publish("{\"id\":1}", "{\"id\":2,\"opt_def\":1}");
+
+        registerSchemalessJsonConnector(testConnectorName, TOPIC_NAME, TOPIC_NAME + ":" + TABLE_NAME,
+                Map.of("errors.tolerance", "none", "json.consolidate.uploads", "true"));
+        waitForDataInFirebolt(TABLE_NAME, 2, Duration.ofSeconds(60));
+
+        Map<Integer, List<Object>> rows = NameMatchingSupport.readRows(fireboltDefaultDbClient, TABLE_NAME);
+        // Documented trade-off: in one upload the v1 record's absent opt_def becomes NULL, not DEFAULT 7.
+        assertEquals(row(null, null, null, "rd"), rows.get(1));
+        assertEquals(row(null, null, 1, "rd"), rows.get(2));
+    }
+
+    @Test
     void unmatchedFieldsGoToDlqAndMatchingRecordsLand() throws Exception {
         publish(
                 "{\"id\":10,\"name\":\"ok\"}",

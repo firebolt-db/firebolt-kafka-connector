@@ -22,6 +22,29 @@ evolution needs no connector change**: add a column and records that don't carry
 column's default, while records that do carry it populate it. (A record field with no matching
 column fails that batch — the table is the contract.)
 
+### Schema evolution and column DEFAULTs
+
+A field a record **omits** takes the column's `DEFAULT` (or `NULL` if it has none); a field sent as
+an explicit **`null`** is stored as `NULL`. The connector keeps this true even when one batch mixes
+record shapes — which is exactly what happens around a producer-side schema change, when old- and
+new-shaped records arrive together:
+
+- **Avro / Protobuf / JSON-Schema:** each record schema is its own upload, so pre- and post-change
+  records never share one. Always correct; nothing to configure.
+- **Schemaless JSON:** `read_json` infers a single schema per upload, so a key that *any* record in
+  the upload carries becomes `NULL` for the records that omit it. The connector therefore uploads each
+  distinct set of top-level keys separately (one `INSERT` per shape; one transaction unless
+  `errors.tolerance=all`), so an
+  omitted key stays omitted and gets its `DEFAULT`.
+
+That costs one `INSERT` per distinct shape per batch. If your JSON is highly heterogeneous (many
+shapes per batch) and you don't rely on column defaults, set **`json.consolidate.uploads=true`** to
+send each batch as one upload. The trade-off: in a batch where some records carry a key and others
+don't, the ones that omit it get `NULL` instead of the column `DEFAULT` — and if the column is
+`NOT NULL`, the batch is rejected (with `errors.tolerance=all` it is then split and retried until the
+records land individually, with their defaults). Leave it off whenever defaults matter, and in
+particular while producers roll out a schema change.
+
 Type conversions are exactly Firebolt's **assignment casts** — the connector adds none.
 
 ### Delivery semantics
@@ -160,6 +183,7 @@ curl -X POST http://localhost:8083/connectors \
 | `tasks.max` | No | `1` | Maximum number of tasks |
 | `exactlyOnce` | No | `false` | When `true`, track ingested offsets in a Firebolt metadata table and skip re-delivered records (exactly-once); when `false`, at-least-once |
 | `ingestion.type` | No | | **Deprecated and ignored.** Records are always ingested server-side via `read_avro` / `read_json` over `upload://`. Accepted for backwards compatibility. |
+| `json.consolidate.uploads` | No | `false` | Schemaless JSON only: send each batch as a single upload instead of one per distinct key set. Faster for highly heterogeneous JSON, but omitted keys may become `NULL` instead of the column `DEFAULT` — see [Schema evolution and column DEFAULTs](#schema-evolution-and-column-defaults) |
 | `errors.tolerance` | No | `none` | Error tolerance: `none` (fail the task on error) or `all` (route bad records to the DLQ and continue) |
 | `post.processing.script` | No | | Optional post-processing SQL to run after each batch (JSON format) |
 

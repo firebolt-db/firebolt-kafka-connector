@@ -42,6 +42,10 @@ public class ConnectorConfigDefinition {
     public static final String EXACTLY_ONCE_MAPPING_DOC = "By default this will be set to false. When set to true, then the kafka message will be ingested exactly-once in Firebolt. When the flag is false, the kafka message will be ingested at least once";
     public static final Boolean EXACTLY_ONCE_MAPPING_DEFAULT = Boolean.FALSE;
 
+    public static final String JSON_CONSOLIDATE_UPLOADS_CONFIG = "json.consolidate.uploads";
+    public static final String JSON_CONSOLIDATE_UPLOADS_DOC = "Schemaless JSON only. By default (false) each distinct set of top-level keys in a batch is uploaded separately, so a key a record omits takes the column's DEFAULT. When true, the whole batch is one upload (faster for highly heterogeneous JSON), but read_json infers one schema per upload: a key present in any record of the batch is NULL for records that omit it, overriding the column DEFAULT, and fails the batch for a NOT NULL column.";
+    public static final Boolean JSON_CONSOLIDATE_UPLOADS_DEFAULT = Boolean.FALSE;
+
     // =========================
     // INGESTION MODE
     // =========================
@@ -91,6 +95,11 @@ public class ConnectorConfigDefinition {
                         EXACTLY_ONCE_MAPPING_DEFAULT,
                         ConfigDef.Importance.HIGH,
                         EXACTLY_ONCE_MAPPING_DOC)
+                .define(JSON_CONSOLIDATE_UPLOADS_CONFIG,
+                        ConfigDef.Type.BOOLEAN,
+                        JSON_CONSOLIDATE_UPLOADS_DEFAULT,
+                        ConfigDef.Importance.LOW,
+                        JSON_CONSOLIDATE_UPLOADS_DOC)
                 .define(INGESTION_TYPE_CONFIG,
                         ConfigDef.Type.STRING,
                         INGESTION_TYPE_DEFAULT,

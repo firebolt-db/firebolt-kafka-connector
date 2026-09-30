@@ -56,8 +56,12 @@ class UploadIngestionServiceTest {
     }
 
     private UploadIngestionService service(boolean errorToleranceAll) {
+        return service(errorToleranceAll, false);
+    }
+
+    private UploadIngestionService service(boolean errorToleranceAll, boolean jsonConsolidateUploads) {
         errorReporter = mock(ErrorReporter.class);
-        return new UploadIngestionService(connection, errorReporter, errorToleranceAll, "t");
+        return new UploadIngestionService(connection, errorReporter, errorToleranceAll, "t", jsonConsolidateUploads);
     }
 
     private SinkRecord record(Schema valueSchema, Object value, long offset) {
@@ -184,6 +188,15 @@ class UploadIngestionServiceTest {
         assertEquals("{\"id\":1}\n{\"id\":4}\n", payloads.get(0));
         assertEquals(2, payloads.get(1).split("\n").length);
         assertTrue(payloads.get(1).contains("\"score\":5") && payloads.get(1).contains("\"score\":6"));
+    }
+
+    @Test
+    void consolidatedJsonUploadsTheWholeBatchOnce() throws Exception {
+        service(false, true).addRecords(List.of(
+                record(null, Map.of("id", 1), 0L), record(null, Map.of("id", 2, "score", 5), 1L)));
+
+        String payload = new String(captureSingleUpload().payload, StandardCharsets.UTF_8);
+        assertEquals(2, payload.split("\n").length);
     }
 
     @Test

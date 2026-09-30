@@ -72,18 +72,24 @@ public class UploadIngestionService implements IngestionService {
     /** group key for schemaless records whose value is not a JSON object (reported as bad records) */
     private static final Object SCHEMALESS = new Object();
 
+    /** group key for all schemaless JSON objects when uploads are consolidated */
+    private static final Object JSON = new Object();
+
     private final Connection connection;
     private final String tableName;
     private final ErrorReporter errorReporter;
     private final boolean errorToleranceAll;
+    private final boolean jsonConsolidateUploads;
     private final AvroData avroData;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public UploadIngestionService(Connection connection, ErrorReporter errorReporter, boolean errorToleranceAll, String tableName) {
+    public UploadIngestionService(Connection connection, ErrorReporter errorReporter, boolean errorToleranceAll, String tableName,
+                                  boolean jsonConsolidateUploads) {
         this.connection = connection;
         this.errorReporter = errorReporter;
         this.errorToleranceAll = errorToleranceAll;
         this.tableName = tableName;
+        this.jsonConsolidateUploads = jsonConsolidateUploads;
         this.avroData = new AvroData(new AvroDataConfig(Map.of(
                 AvroDataConfig.SCRUB_INVALID_NAMES_CONFIG, true,
                 AvroDataConfig.CONNECT_META_DATA_CONFIG, false)));
@@ -152,13 +158,18 @@ public class UploadIngestionService implements IngestionService {
      * top-level keys: {@code read_json} infers one schema per upload, so a key absent from one record but
      * present in another would surface as an explicit {@code NULL} for the former — overriding the
      * column's {@code DEFAULT}, or failing a {@code NOT NULL DEFAULT} column. Per key set, "absent" stays
-     * absent and the default applies exactly as it would for that record on its own.
+     * absent and the default applies exactly as it would for that record on its own. This matters most
+     * across a schema change, when one batch mixes pre- and post-change record shapes.
+     * {@code json.consolidate.uploads=true} trades that correctness for one upload per batch.
      */
-    private static Object groupKey(SinkRecord record) {
+    private Object groupKey(SinkRecord record) {
         if (record.valueSchema() != null) {
             return record.valueSchema();
         }
-        return record.value() instanceof Map ? new HashSet<>(((Map<?, ?>) record.value()).keySet()) : SCHEMALESS;
+        if (!(record.value() instanceof Map)) {
+            return SCHEMALESS;
+        }
+        return jsonConsolidateUploads ? JSON : new HashSet<>(((Map<?, ?>) record.value()).keySet());
     }
 
     @Override

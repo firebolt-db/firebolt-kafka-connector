@@ -13,7 +13,8 @@ public class IngestionServiceProvider {
 
     public IngestionService get(Connection connection, String tableName, ErrorReporter errorReporter, SinkConfig sinkConfig) {
         IngestionService ingestionService =
-                new UploadIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableName);
+                new UploadIngestionService(connection, errorReporter, sinkConfig.isErrorToleranceAll(), tableName,
+                        sinkConfig.isJsonConsolidateUploads());
 
         Optional<String> postProcessingScript = sinkConfig.getPostProcessingScript(tableName);
         return postProcessingScript == null || postProcessingScript.isEmpty() ? ingestionService

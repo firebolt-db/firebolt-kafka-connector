@@ -133,4 +133,9 @@ public class SinkConfig {
         return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
     }
 
+    /** See {@link ConnectorConfigDefinition#JSON_CONSOLIDATE_UPLOADS_DOC}. */
+    public boolean isJsonConsolidateUploads() {
+        return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.JSON_CONSOLIDATE_UPLOADS_CONFIG));
+    }
+
 }
