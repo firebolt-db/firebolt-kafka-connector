@@ -133,6 +133,7 @@ Verified against `ghcr.io/firebolt-db/engine:dev` (`5.0.0-pre.0.20260930181618.8
 | `read_avro` rejects Avro **named-type references** ("Invalid Avro type : AVRO_NUM_TYPES") | Any Connect schema that reuses a named struct — e.g. an **unflattened Debezium envelope** (`before`/`after` share `Value`) — can't be ingested | Resolve named-type references in `read_avro` |
 | Avro `map` surfaces as `array(struct(key, value))`, not assignable to `JSON` | Connect `MAP` fields only land in an `ARRAY(STRUCT(key, value))` column | `map` → `json` assignment |
 | `text` → numeric / boolean / bytea and epoch `bigint` → timestamp / date are not assignment casts | Unchanged — see [cast-semantics.md](cast-semantics.md) | Product decision, not a bug |
+| `read_avro` rejects Avro `decimal` with precision > 38, even when the values fit | This is the one remaining *connector-side* engine workaround: precision-less Connect `Decimal`s are given precision 38 on the writer schema (AvroData would emit 64) | Accept precision > 38 and cast on assignment (fail only on overflow) |
 | `BY NAME` has no "ignore unmatched source columns" mode | A producer adding a field before its column exists fails the batch | Opt-in discard of unmatched source columns |
 
 ## Cast semantics (summary)
