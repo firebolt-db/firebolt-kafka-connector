@@ -30,10 +30,21 @@ jobs:
             exit 1
           fi
 
+      - name: Validate tag name
+        run: |
+          # Only allow plain version tags (e.g. v1.2.3, v1.2.3-rc.1). The tag is used in
+          # sed, git and shell commands later on, so anything else is rejected here.
+          if ! [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "Invalid tag name: '$RELEASE_TAG'. Expected a tag like v1.2.3"
+            exit 1
+          fi
+
   pre-release-testing:
      needs: validation
      uses: ./.github/workflows/pre-release-test.yml
-     secrets: inherit
+     secrets:
+       FIREBOLT_CLIENT_ID_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+       FIREBOLT_CLIENT_SECRET_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
 
   bump-version:
     needs: pre-release-testing
@@ -55,7 +66,7 @@ jobs:
 
       - name: Bump version in gradle.properties
         run: |
-          newVersion=$(echo $RELEASE_TAG | sed 's/^v//')
+          newVersion="${RELEASE_TAG#v}"
           sed -i.bak "s/^version=.*/version=$newVersion/" gradle.properties
           rm gradle.properties.bak
 
@@ -71,13 +82,13 @@ jobs:
 
       - name: Create tag version
         run: |
-          git tag ${RELEASE_TAG}
+          git tag "${RELEASE_TAG}"
 
       - name: Push changes
         run: |
           git push origin main
           # push tag
-          git push origin ${RELEASE_TAG}
+          git push origin "refs/tags/${RELEASE_TAG}"
 
   build:
     needs: bump-version
@@ -141,7 +152,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const tag = `${{ env.RELEASE_TAG }}`;
+            const tag = process.env.RELEASE_TAG;
             const { owner, repo } = context.repo;
             // Fetch existing release by tag (created earlier by upload step)
             const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
