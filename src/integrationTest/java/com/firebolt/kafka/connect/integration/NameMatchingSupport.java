@@ -98,6 +98,29 @@ public final class NameMatchingSupport {
                 .until(() -> "FAILED".equals(taskState(http, mapper, connectHost, connector)));
     }
 
+    /**
+     * Pauses the connector and waits until its task is paused, so records produced next are delivered
+     * together — in one poll batch — after {@link #resume}.
+     */
+    public static void pause(OkHttpClient http, ObjectMapper mapper, String connectHost, String connector) throws IOException {
+        put(http, connectHost + "/connectors/" + connector + "/pause");
+        await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofSeconds(1))
+                .until(() -> "PAUSED".equals(taskState(http, mapper, connectHost, connector)));
+    }
+
+    public static void resume(OkHttpClient http, String connectHost, String connector) throws IOException {
+        put(http, connectHost + "/connectors/" + connector + "/resume");
+    }
+
+    private static void put(OkHttpClient http, String url) throws IOException {
+        Request request = new Request.Builder().url(url).put(okhttp3.RequestBody.create(new byte[0])).build();
+        try (Response response = http.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("PUT " + url + " failed: " + response.code());
+            }
+        }
+    }
+
     private static String taskState(OkHttpClient http, ObjectMapper mapper, String connectHost, String connector) throws IOException {
         Request request = new Request.Builder().url(connectHost + "/connectors/" + connector + "/status").get().build();
         try (Response response = http.newCall(request).execute()) {

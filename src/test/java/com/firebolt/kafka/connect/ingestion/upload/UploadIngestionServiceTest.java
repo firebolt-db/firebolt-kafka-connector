@@ -3,6 +3,7 @@ package com.firebolt.kafka.connect.ingestion.upload;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -122,6 +123,73 @@ class UploadIngestionServiceTest {
                 org.apache.avro.LogicalTypes.fromSchema(row.getSchema().getField("amount").schema());
         assertEquals(38, amountType.getPrecision());
         assertEquals(2, amountType.getScale());
+    }
+
+    @Test
+    void optionalStructValueSchemaIsWrittenAsItsRecordBranch() throws Exception {
+        // AvroData maps an optional struct to a [null, record] union; the file needs the record schema.
+        Schema valueSchema = SchemaBuilder.struct().name("Event").optional().field("id", Schema.INT64_SCHEMA).build();
+
+        service(false).addRecords(List.of(record(valueSchema, new Struct(valueSchema).put("id", 5L), 0L)));
+
+        GenericRecord row = readAvro(captureSingleUpload().payload).get(0);
+        assertEquals(org.apache.avro.Schema.Type.RECORD, row.getSchema().getType());
+        assertEquals(5L, row.get("id"));
+    }
+
+    @Test
+    void capsDecimalPrecisionInsideNestedStructsAndArrays() throws Exception {
+        Schema decimal = Decimal.schema(2); // no precision -> AvroData would declare 64
+        Schema line = SchemaBuilder.struct().name("Line").field("price", decimal).build();
+        Schema valueSchema = SchemaBuilder.struct().name("Order")
+                .field("lines", SchemaBuilder.array(line).build())
+                .build();
+        Struct value = new Struct(valueSchema)
+                .put("lines", List.of(new Struct(line).put("price", new BigDecimal("9.99"))));
+
+        service(false).addRecords(List.of(record(valueSchema, value, 0L)));
+
+        org.apache.avro.Schema price = readAvro(captureSingleUpload().payload).get(0).getSchema()
+                .getField("lines").schema().getElementType().getField("price").schema();
+        assertEquals(38, ((org.apache.avro.LogicalTypes.Decimal) org.apache.avro.LogicalTypes.fromSchema(price)).getPrecision());
+    }
+
+    @Test
+    void nonStructValueSchemaIsABadRecord() throws Exception {
+        service(true).addRecords(List.of(record(Schema.STRING_SCHEMA, "plain string", 0L)));
+
+        verify(statement, never()).execute(anyString(), anyMap());
+        verify(errorReporter).report(any(SinkRecord.class), any(RecordConversionException.class));
+        org.junit.jupiter.api.Assertions.assertThrows(RecordConversionException.class,
+                () -> service(false).addRecords(List.of(record(Schema.STRING_SCHEMA, "plain string", 0L))));
+    }
+
+    @Test
+    void recordThatAvroDataCannotConvertIsABadRecordAndTheRestLand() throws Exception {
+        // AvroData requires a Decimal value's scale to equal the schema's scale.
+        Schema valueSchema = SchemaBuilder.struct().name("Event").field("amount", Decimal.schema(2)).build();
+
+        service(true).addRecords(List.of(
+                record(valueSchema, new Struct(valueSchema).put("amount", new BigDecimal("1.234")), 0L),
+                record(valueSchema, new Struct(valueSchema).put("amount", new BigDecimal("1.23")), 1L)));
+
+        verify(errorReporter).report(any(SinkRecord.class), any(RecordConversionException.class));
+        assertEquals(1, readAvro(captureSingleUpload().payload).size());
+    }
+
+    @Test
+    void multiGroupBatchDefersToAnOuterTransaction() throws Exception {
+        // The post-processing decorator turns auto-commit off and owns commit/rollback.
+        when(connection.getAutoCommit()).thenReturn(false);
+        Schema vs = SchemaBuilder.struct().name("Event").field("id", Schema.INT64_SCHEMA).build();
+
+        service(false).addRecords(List.of(
+                record(vs, new Struct(vs).put("id", 1L), 0L),
+                record(null, Map.of("id", 2), 1L)));
+
+        verify(statement, times(2)).execute(anyString(), anyMap());
+        verify(connection, never()).setAutoCommit(anyBoolean());
+        verify(connection, never()).commit();
     }
 
     @Test

@@ -482,40 +482,26 @@ dependencies {
     integrationTestImplementation "org.kohsuke:github-api:${githubApiVersion}"
 }
 
-// Create a fat JAR that includes all runtime dependencies
+// The shipped connector jar is the shaded fat jar below; the plain `jar` holds only our classes.
 jar {
+    archiveClassifier = 'plain'
+}
+
+// Shaded fat jar — the one artifact that ships (GitHub release, Confluent Hub archive, local plugin
+// deploys). io.confluent.* is relocated so the bundled Connect<->Avro classes can't shadow the Kafka
+// Connect runtime's own Confluent converter classes (which differ by version across KC 3.9.1 / 4.0).
+shadowJar {
     archiveBaseName = project.property('archivesBaseName')
     archiveVersion = project.version
+    archiveClassifier = ''
 
     manifest {
         attributes(
             'Implementation-Title': project.property('description'),
             'Implementation-Version': project.version,
-            'Implementation-Vendor': 'Firebolt',
-            'Built-By': System.getProperty('user.name'),
-            'Built-Date': new Date().toString(),
-            'Built-JDK': System.getProperty('java.version')
+            'Implementation-Vendor': 'Firebolt'
         )
     }
-    
-    from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-    
-    // Exclude files that might cause conflicts
-    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
-    exclude 'META-INF/MANIFEST.MF'
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
-// Shaded fat jar: same contents as `jar`, but io.confluent.* is relocated so the bundled
-// Connect<->Avro classes can't shadow the Kafka Connect runtime's own Confluent converter classes
-// (which differ by version across KC 3.9.1 / 4.0). This is the artifact deployed as the plugin.
-shadowJar {
-    archiveBaseName = project.property('archivesBaseName')
-    archiveVersion = project.version
-    archiveClassifier = 'shaded'
 
     relocate 'io.confluent', 'com.firebolt.shaded.io.confluent'
 
@@ -660,35 +646,6 @@ tasks.withType(Jar) {
     }
 }
 
-// Create a fat JAR with all dependencies for Confluent Hub
-tasks.register('confluentJar', Jar) {
-    archiveClassifier.set("confluent")
-
-    from sourceSets.main.output
-
-    // Include all runtime dependencies
-    from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-
-    // Exclude files that might cause conflicts
-    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
-    exclude 'META-INF/MANIFEST.MF'
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    manifest {
-        attributes([
-                "Implementation-Title"  : "Firebolt-Kafka-Connect",
-                "Implementation-Version": project.version.toString(),
-                "Implementation-Vendor" : "Firebolt",
-                "Built-By"              : System.getProperty('user.name'),
-                "Built-Date"            : new Date().toString(),
-                "Built-JDK"             : System.getProperty('java.version')
-        ])
-    }
-}
-
 // Confluent Archive preparation
 def releaseDate = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE.format(java.time.LocalDateTime.now())
 def archiveFilename = "firebolt-db-firebolt-kafka-connect"
@@ -696,7 +653,7 @@ def archiveFilename = "firebolt-db-firebolt-kafka-connect"
 tasks.register('prepareConfluentArchive', Copy) {
     group = "Confluent"
     description = "Prepares the Confluent Archive ready for the hub"
-    dependsOn "confluentJar"
+    dependsOn tasks.named('shadowJar')
 
     def baseDir = "${archiveFilename}-${project.version}"
     
@@ -713,7 +670,7 @@ tasks.register('prepareConfluentArchive', Copy) {
     }
 
     from(layout.buildDirectory.dir("libs")) {
-        include("${project.name}-${project.version}-confluent.jar")
+        include("${project.property('archivesBaseName')}-${project.version}.jar")
         into("lib")
     }
 

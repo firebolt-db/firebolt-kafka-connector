@@ -30,7 +30,10 @@ record shapes — which is exactly what happens around a producer-side schema ch
 new-shaped records arrive together:
 
 - **Avro / Protobuf / JSON-Schema:** each record schema is its own upload, so pre- and post-change
-  records never share one. Always correct; nothing to configure.
+  records never share one. Always correct; nothing to configure. A field that is *in* a record's
+  writer schema but `null` is an explicit `NULL`; only a field absent from the writer schema takes
+  the column `DEFAULT`. (Verified with the converter's default `use.latest.version=false`, where each
+  record keeps its own writer schema.)
 - **Schemaless JSON:** `read_json` infers a single schema per upload, so a key that *any* record in
   the upload carries becomes `NULL` for the records that omit it. The connector therefore uploads each
   distinct set of top-level keys separately (one `INSERT` per shape; one transaction unless

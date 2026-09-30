@@ -238,8 +238,18 @@ behavior is only observable end-to-end, so the converter-path × data-type matri
 correctness is actually pinned. Keep that structure when adding types.
 
 ### Schema evolution
-Schema evolution is a headline property of the state-free design, so it has a dedicated IT:
-`integration/SchemaEvolutionTest` ingests into a table, runs `ALTER TABLE … ADD COLUMN`, then
-ingests records carrying the new field (and confirms older-shaped records still land with the new
-column defaulted) — all with no connector restart, since the connector never caches the schema.
-Field ↔ column mismatch coverage lives in `NameMatching{Schemaless,Avro}Test` (above).
+Schema evolution is a headline property of the state-free design. Two ITs evolve the table **and** the
+producers mid-stream with no connector restart, and pause the connector while producing so that one
+poll batch mixes pre- and post-change records (the case where defaults can go wrong):
+
+- `integration/SchemaEvolutionTest` (schemaless JSON): `ADD COLUMN … NULL DEFAULT 7`,
+  `ADD COLUMN … NOT NULL DEFAULT 'free'` and `DROP COLUMN` while running; old-shaped records get the
+  defaults, new-shaped records their values, a producer that stops sending a field gets `NULL`, and a
+  straggler still sending the dropped column goes to the DLQ.
+- `integration/avro/SchemaEvolutionAvroTest` (Avro + Schema Registry): writer schemas v1 → v2 (adds an
+  optional field, widens `int` → `long` into a `BIGINT` column) → v3 (drops a field) interleaved in one
+  batch; a column absent from a record's writer schema takes its `DEFAULT`, while a field present in the
+  schema with a `null` value is stored as `NULL`.
+
+Firebolt has no `ALTER COLUMN … TYPE`, so type widening is covered on the producer side only. Field ↔
+column mismatches outside evolution are in `NameMatching{Schemaless,Avro}Test` (above).

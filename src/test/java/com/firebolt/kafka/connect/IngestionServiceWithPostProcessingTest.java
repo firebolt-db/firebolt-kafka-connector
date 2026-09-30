@@ -141,6 +141,30 @@ public class IngestionServiceWithPostProcessingTest {
     }
 
     @Test
+    void keepsTheOriginalFailureWhenRollbackAlsoFails() throws Exception {
+        SQLException original = new SQLException("ingest failed");
+        doThrow(original).when(mockIngestionService).addRecords(anyList(), anyMap());
+        Mockito.doThrow(new SQLException("rollback failed")).when(mockConnection).rollback();
+        IngestionServiceWithPostProcessing subject = new IngestionServiceWithPostProcessing(
+                mockIngestionService, mockConnection, "SELECT 1");
+
+        SQLException thrown = assertThrows(SQLException.class,
+                () -> subject.addRecords(List.of(new SinkRecord("topic", 0, null, null, null, null, 1L))));
+
+        org.junit.jupiter.api.Assertions.assertSame(original, thrown);
+        org.junit.jupiter.api.Assertions.assertEquals("rollback failed", thrown.getSuppressed()[0].getMessage());
+    }
+
+    @Test
+    void closeClosesTheWrappedServiceAndTheConnectionEvenIfOneFails() throws Exception {
+        Mockito.doThrow(new RuntimeException("boom")).when(mockIngestionService).close();
+        new IngestionServiceWithPostProcessing(mockIngestionService, mockConnection, "SELECT 1").close();
+
+        verify(mockIngestionService).close();
+        verify(mockConnection).close();
+    }
+
+    @Test
     void processScriptShouldReplaceBatchId() {
         IngestionServiceWithPostProcessing subject = new IngestionServiceWithPostProcessing(
                 mockIngestionService, mockConnection, ""

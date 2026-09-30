@@ -1,14 +1,19 @@
 package com.firebolt.kafka.connect.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.firebolt.kafka.connect.utils.TestTag;
 import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
@@ -18,11 +23,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 
 /**
- * Verifies Firebolt-side schema evolution is absorbed with no connector restart and no connector
- * awareness of the table schema: after {@code ALTER TABLE … ADD COLUMN}, records carrying the new
- * field land in the new column, while older-shaped records (without it) keep landing with the
- * column defaulted. Because the connector builds each INSERT from the record's own field names and
- * never caches the table schema, the ALTER takes effect on the very next batch.
+ * Schema evolution on the schemaless JSON path ({@code read_json}), with no connector restart: the
+ * table evolves while the connector runs, and one batch mixes records from before and after the change
+ * (the connector is paused while they are produced, so they arrive in a single poll). Covers
+ * {@code ADD COLUMN} with a nullable {@code DEFAULT} and a {@code NOT NULL DEFAULT}, {@code DROP COLUMN},
+ * a producer that stops sending a field, and a straggler that still sends the dropped column.
  */
 @Slf4j
 @Tag(TestTag.CONNECTOR)
@@ -30,8 +35,10 @@ public class SchemaEvolutionTest extends SchemalessBaseIntegrationTest {
 
     private final String TABLE_NAME = generateTableName("schema_evolution_table");
     private final String TOPIC_NAME = generateTopicName("schema-evolution-topic");
+    private final String DLQ_TOPIC = TOPIC_NAME + "-dlq";
 
     private Producer<String, String> producer;
+    private KafkaConsumer<byte[], byte[]> dlqConsumer;
 
     @BeforeEach
     protected void setUp(TestInfo testInfo) {
@@ -44,55 +51,69 @@ public class SchemaEvolutionTest extends SchemalessBaseIntegrationTest {
         if (producer != null) {
             producer.close();
         }
+        if (dlqConsumer != null) {
+            dlqConsumer.close();
+        }
         cleanupSchemalessTestResources(TABLE_NAME, TOPIC_NAME);
+        safelyDeleteKafkaTopic(DLQ_TOPIC);
         super.tearDown();
     }
 
     @Test
-    void absorbsAddColumnMidStreamWithoutRestart() throws Exception {
+    void evolvesTableAndProducersMidStreamWithoutRestart() throws Exception {
         Supplier<String> tableSchema = () -> "CREATE TABLE \"%s\" ("
-                + "\"id\" INTEGER NOT NULL, "
-                + "\"name\" TEXT NULL)";
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, tableSchema);
+                + "\"id\" INTEGER NOT NULL, \"name\" TEXT NULL, \"legacy\" TEXT NULL)";
+        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, tableSchema, Map.of(
+                "errors.tolerance", "all",
+                "errors.deadletterqueue.topic.name", DLQ_TOPIC,
+                "errors.deadletterqueue.topic.replication.factor", "1"));
         producer = initializeSchemalessJsonProducer();
 
-        // Phase 1: ingest records shaped to the original (id, name) schema.
-        publish("k1", "{\"id\":1,\"name\":\"alice\"}");
-        publish("k2", "{\"id\":2,\"name\":\"bob\"}");
-        waitForDataInFirebolt(TABLE_NAME, 2);
+        publish("{\"id\":1,\"name\":\"a\",\"legacy\":\"l\"}");
+        waitForDataInFirebolt(TABLE_NAME, 1);
 
-        // Evolve the table while the connector keeps running. It caches no schema, so no restart.
-        fireboltDefaultDbClient.executeUpdate(
-                String.format("ALTER TABLE \"%s\" ADD COLUMN \"score\" INTEGER NULL", TABLE_NAME));
+        NameMatchingSupport.pause(httpClient, objectMapper, KAFKA_CONNECT_HOST, testConnectorName);
+        fireboltDefaultDbClient.executeUpdate(String.format(
+                "ALTER TABLE \"%s\" ADD COLUMN \"score\" INTEGER NULL DEFAULT 7", TABLE_NAME));
+        fireboltDefaultDbClient.executeUpdate(String.format(
+                "ALTER TABLE \"%s\" ADD COLUMN \"tier\" TEXT NOT NULL DEFAULT 'free'", TABLE_NAME));
+        fireboltDefaultDbClient.executeUpdate(String.format(
+                "ALTER TABLE \"%s\" DROP COLUMN \"legacy\"", TABLE_NAME));
+        // One batch straddling the change: old-shaped, new-shaped, and trimmed records, plus a straggler.
+        publish(
+                "{\"id\":2,\"name\":\"b\"}",                               // old shape, legacy no longer sent
+                "{\"id\":3,\"name\":\"c\",\"score\":42,\"tier\":\"pro\"}", // new shape
+                "{\"id\":4,\"score\":5}",                                  // producer dropped "name"
+                "{\"id\":5,\"name\":\"e\",\"legacy\":\"l\"}");             // straggler: dropped column
+        NameMatchingSupport.resume(httpClient, KAFKA_CONNECT_HOST, testConnectorName);
+        waitForDataInFirebolt(TABLE_NAME, 4, Duration.ofSeconds(60));
 
-        // Phase 2: one record carrying the NEW field, and one still in the old shape (no score).
-        publish("k3", "{\"id\":3,\"name\":\"carol\",\"score\":42}");
-        publish("k4", "{\"id\":4,\"name\":\"dave\"}");
-        waitForDataInFirebolt(TABLE_NAME, 4);
-
-        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(
-                String.format("SELECT \"id\", \"name\", \"score\" FROM \"%s\" ORDER BY \"id\"", TABLE_NAME))) {
-            assertRow(rs, 1, "alice", null); // ingested before the column existed -> NULL
-            assertRow(rs, 2, "bob", null);
-            assertRow(rs, 3, "carol", 42);   // carried the new field -> lands in the new column
-            assertRow(rs, 4, "dave", null);  // old-shaped after the ALTER -> column defaulted
+        Map<Integer, List<Object>> rows = new HashMap<>();
+        try (ResultSet rs = fireboltDefaultDbClient.executeQuery(String.format(
+                "SELECT \"id\", \"name\", \"score\", \"tier\" FROM \"%s\"", TABLE_NAME))) {
+            while (rs.next()) {
+                Object score = rs.getObject("score");
+                rows.put(rs.getInt("id"), Arrays.asList(rs.getString("name"),
+                        score == null ? null : ((Number) score).intValue(), rs.getString("tier")));
+            }
         }
+        assertEquals(4, rows.size(), "the straggler must not land: " + rows);
+        assertEquals(Arrays.asList("a", 7, "free"), rows.get(1)); // ingested before ADD COLUMN: backfilled defaults
+        assertEquals(Arrays.asList("b", 7, "free"), rows.get(2)); // old shape after the change: defaults
+        assertEquals(Arrays.asList("c", 42, "pro"), rows.get(3));
+        assertEquals(Arrays.asList(null, 5, "free"), rows.get(4));
+
+        dlqConsumer = NameMatchingSupport.dlqConsumer(KAFKA_BOOTSTRAP_SERVERS);
+        dlqConsumer.subscribe(Collections.singletonList(DLQ_TOPIC));
+        assertEquals(1, NameMatchingSupport.drainDlq(dlqConsumer, 1, Duration.ofSeconds(60)),
+                "the record still carrying the dropped column goes to the DLQ");
+        assertTrue(rows.values().stream().noneMatch(r -> "e".equals(r.get(0))));
     }
 
-    private void publish(String key, String json) throws Exception {
-        producer.send(new ProducerRecord<>(TOPIC_NAME, key, json)).get();
+    private void publish(String... values) throws Exception {
+        for (int i = 0; i < values.length; i++) {
+            producer.send(new ProducerRecord<>(TOPIC_NAME, "k" + i, values[i])).get();
+        }
         producer.flush();
-    }
-
-    private void assertRow(ResultSet rs, int expectedId, String expectedName, Integer expectedScore) throws SQLException {
-        assertTrue(rs.next(), "Expected a row for id=" + expectedId);
-        assertEquals(expectedId, rs.getInt("id"));
-        assertEquals(expectedName, rs.getString("name"));
-        Object score = rs.getObject("score");
-        if (expectedScore == null) {
-            assertNull(score, "score should be NULL for id=" + expectedId);
-        } else {
-            assertEquals(expectedScore.intValue(), ((Number) score).intValue(), "score mismatch for id=" + expectedId);
-        }
     }
 }
