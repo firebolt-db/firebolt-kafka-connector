@@ -6,6 +6,7 @@ import com.firebolt.kafka.connect.service.exception.ConnectionFailedException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigValue;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,10 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Test class for FireboltSinkConnector.
@@ -207,6 +210,32 @@ public class FireboltSinkConnectorTest {
             connectorWithMock.validate(configWithNullUrl);
             
             verify(mockFireboltDbService, never()).testConnection(any(JdbcConfig.class));
+        }
+
+        @Test
+        void shouldReportMissingMappedAndPostProcessingTables() throws ConnectionFailedException {
+            FireboltSinkConnector connectorWithMock = new FireboltSinkConnector(mockFireboltDbService);
+            when(mockFireboltDbService.findNonExistentTables(any(JdbcConfig.class), eq(Set.of("table1", "table2"))))
+                    .thenReturn(Set.of("table2"));
+            when(mockFireboltDbService.findNonExistentTables(any(JdbcConfig.class), eq(Set.of("pp_table"))))
+                    .thenReturn(Set.of("pp_table"));
+
+            Map<String, String> config = new HashMap<>(properties);
+            config.put(ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG, "topic1:table1, topic2:table2");
+            config.put(ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG,
+                    "{\"mappings\":[{\"table\":\"pp_table\",\"script\":\"SELECT 1\"}]}");
+
+            Config result = connectorWithMock.validate(config);
+
+            assertEquals(List.of("Tables referenced by topic.to.table.mapping do not exist in the database: [table2]"),
+                    errorsFor(result, ConnectorConfigDefinition.TOPIC_TO_TABLE_MAPPING_CONFIG));
+            assertEquals(List.of("Tables referenced by post.processing.script do not exist in the database: [pp_table]"),
+                    errorsFor(result, ConnectorConfigDefinition.POST_PROCESSING_SCRIPT_CONFIG));
+        }
+
+        private List<String> errorsFor(Config result, String name) {
+            return result.configValues().stream().filter(v -> v.name().equals(name))
+                    .findFirst().map(ConfigValue::errorMessages).orElseThrow();
         }
     }
 }

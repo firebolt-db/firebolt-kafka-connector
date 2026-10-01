@@ -83,14 +83,21 @@ jobs:
         timeout 60 bash -c 'until curl -sf http://localhost:8083/connectors; do sleep 2; done'
         echo "Kafka Connect is ready!"
 
-    - name: Run benchmark (10s produce window, JSON / {at_least_once,exactly_once} / sql)
+    # Fixed workload: 2M records are produced while the connector is paused, then the drain is timed
+    # (first row landed -> last), so producer speed and poll timing don't leak into the result. The
+    # consumer overrides are the README's recommended batch sizes; Kafka Connect's default of 500
+    # records per put() makes per-INSERT overhead dominate.
+    - name: Run benchmark (2M records drained, JSON / {at_least_once,exactly_once})
       run: |
         ./gradlew integrationTest \
           -Djunit.jupiter.includeTags=e2e \
           -De2e.singleIngestion=sql \
-          -De2e.duration=PT10S \
           -De2e.ingestionTimeout=PT10M \
           -De2e.benchmark=true \
+          -De2e.benchmark.records=2000000 \
+          -De2e.connector.consumer.override.max.poll.records=10000 \
+          -De2e.connector.consumer.override.max.partition.fetch.bytes=52428800 \
+          -De2e.connector.consumer.override.fetch.max.bytes=52428800 \
           --no-daemon \
           --tests "com.firebolt.kafka.connect.e2e.E2EMessageTypeTest.testIngestion"
       env:

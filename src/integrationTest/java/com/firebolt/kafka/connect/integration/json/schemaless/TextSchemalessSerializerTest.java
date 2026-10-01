@@ -298,8 +298,11 @@ public class TextSchemalessSerializerTest extends SchemalessBaseIntegrationTest 
                 assertEquals(String.valueOf(expected.getRequiredBoolean()), actualRequiredBoolean);
                 assertEquals(expected.getRequiredBigDecimal().toPlainString(), actualRequiredBigDecimal);
 
-                // LocalDate and LocalDateTime serialized; compare string forms
-                assertEquals("2024-01-15", actualRequiredLocalDate);
+                // LocalDate and LocalDateTime serialized; compare string forms.
+                // read_json auto-detects the date-only string "2024-01-15" as a temporal value and
+                // normalizes it to "2024-01-15 00:00:00" when materialized into the TEXT column (the
+                // full date-time string below is preserved as-is).
+                assertEquals("2024-01-15 00:00:00", actualRequiredLocalDate);
                 assertEquals("2024-01-15T14:30:45.123", actualRequiredLocalDateTime);
                 assertEquals("2024-01-15T14:30:45.123456Z", actualRequiredTimestamptz);
                 
