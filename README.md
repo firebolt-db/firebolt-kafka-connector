@@ -173,6 +173,23 @@ curl -X POST http://localhost:8083/connectors \
   }'
 ```
 
+### Performance tuning
+
+Each `put()` from Kafka Connect becomes one upload + `INSERT` per record shape, so throughput is
+dominated by batch size. Kafka Connect's consumer defaults (`max.poll.records=500`, 1 MB per
+partition fetch) make batches small enough that per-`INSERT` overhead dominates. Raise them per
+connector (the worker's default client override policy allows this):
+
+```json
+"consumer.override.max.poll.records": "10000",
+"consumer.override.max.partition.fetch.bytes": "52428800",
+"consumer.override.fetch.max.bytes": "52428800"
+```
+
+In a local benchmark (256-byte JSON records) this raised ingestion roughly 6–7× over the defaults.
+Size `max.poll.records` to your record size — aim for batches of tens of MB, since each batch is held
+in worker memory and sent as one upload.
+
 ### Configuration Properties
 
 | Property | Required | Default | Description |
