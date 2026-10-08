@@ -1,25 +1,16 @@
 package com.firebolt.kafka.connect;
 
-import com.firebolt.kafka.connect.convert.exception.RecordConversionException;
-import com.firebolt.kafka.connect.datatype.converter.exception.RecordConversionFailedException;
-import com.firebolt.kafka.connect.service.FireboltDbService;
 import com.firebolt.kafka.connect.service.FireboltSinkService;
 import com.firebolt.kafka.connect.service.FireboltSinkServiceProvider;
-import com.google.common.collect.Sets;
 import com.firebolt.jdbc.exception.ExceptionType;
 import com.firebolt.jdbc.exception.FireboltException;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
@@ -39,30 +30,17 @@ public class FireboltSinkTask extends SinkTask {
 
     public static final String TASK_ID_ATTRIBUTE = "task.id";
 
+    private static final Set<ExceptionType> RETRIABLE_ERRORS = EnumSet.of(TOO_MANY_REQUESTS, CANCELED, ERROR, CONFLICT);
+
     private FireboltSinkService fireboltSinkService;
     private SinkConfig sinkConfig;
-    private Set<String> assignedTopics;
-    private Map<String, String> topicToTableMapping;
-    private Map<String, TableSchema> tableSchemas;
     private Map<String, Set<Integer>> assignedTopicPartitions;
-    private FireboltDbService fireboltDbService;
     private ErrorReporter errorReporter;
     private boolean errorToleranceAll;
 
     @Override
     public String version() {
-        try {
-            Properties properties = new Properties();
-            try (InputStream input = getClass().getClassLoader().getResourceAsStream("version.properties")) {
-                if (input != null) {
-                    properties.load(input);
-                    return properties.getProperty("version", "unknown");
-                }
-            }
-        } catch (IOException e) {
-            log.warn("Failed to load version from properties file", e);
-        }
-        return "unknown";
+        return Version.get();
     }
 
     @Override
@@ -72,17 +50,10 @@ public class FireboltSinkTask extends SinkTask {
         try {
             this.sinkConfig = new SinkConfig(props);
 
-            // Initialize collections
-            this.assignedTopics = new HashSet<>();
-            this.topicToTableMapping = new HashMap<>();
-            this.tableSchemas = new HashMap<>();
             this.assignedTopicPartitions = new HashMap<>();
 
             this.errorToleranceAll = this.sinkConfig.isErrorToleranceAll();
             createAndSetErrorReporter();
-
-            // Initialize services
-            this.fireboltDbService = new FireboltDbService();
 
             log.info("Firebolt Sink Task started successfully");
 
@@ -113,14 +84,10 @@ public class FireboltSinkTask extends SinkTask {
         log.info("Opening Firebolt Sink Task for {} partitions", partitions.size());
 
         try {
-            // Extract unique topics from the assigned partitions
-            extractAssignedTopics(partitions);
-
-            // Map topics to table names
-            buildTopicToTableMapping();
-
-            // Discover table schemas from Firebolt
-            discoverTableSchemas();
+            assignedTopicPartitions.clear();
+            for (TopicPartition partition : partitions) {
+                assignedTopicPartitions.computeIfAbsent(partition.topic(), t -> new HashSet<>()).add(partition.partition());
+            }
 
             // open method might get called on partition rebalancing. It might be that start method does not get called.
             // We need to move the firebolSinkService creation here, since we need to know which partitions will the service handle
@@ -130,8 +97,7 @@ public class FireboltSinkTask extends SinkTask {
 
             this.fireboltSinkService = FireboltSinkServiceProvider.getInstance().getService(sinkConfig, this.assignedTopicPartitions, this.errorReporter, this.errorToleranceAll);
 
-            log.info("Successfully opened Firebolt Sink Task for topics: {} mapped to tables: {}",
-                    assignedTopics, topicToTableMapping.values());
+            log.info("Opened Firebolt Sink Task for topic partitions: {}", assignedTopicPartitions);
 
         } catch (Exception e) {
             log.error("Failed to open Firebolt Sink Task", e);
@@ -149,25 +115,11 @@ public class FireboltSinkTask extends SinkTask {
         log.info("Received {} records for processing", records.size());
         try {
             // Delegate to the appropriate service
-            fireboltSinkService.processRecord(records, tableSchemas);
+            fireboltSinkService.processRecord(records);
             log.debug("DEBUG: fireboltSinkService.processRecord() completed successfully");
         } catch (Exception batchException) {
             log.error("Error processing records", batchException);
             handleError(batchException, records);
-        }
-    }
-
-    @Override
-    public void flush(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
-        log.debug("Flushing records with offsets: {}", currentOffsets);
-
-        try {
-            // The service should handle flushing internally
-            // For now, we don't need to do anything extra here
-            log.debug("Flush completed");
-        } catch (Exception e) {
-            log.error("Error flushing records", e);
-            throw new RuntimeException("Error flushing records", e);
         }
     }
 
@@ -186,74 +138,6 @@ public class FireboltSinkTask extends SinkTask {
         }
     }
 
-    /**
-     * Extracts unique topic names from the assigned topic partitions.
-     *
-     * @param partitions the collection of topic partitions assigned to this task
-     */
-    private void extractAssignedTopics(Collection<TopicPartition> partitions) {
-        assignedTopics.clear();
-        assignedTopicPartitions.clear();
-
-        for (TopicPartition partition : partitions) {
-            assignedTopics.add(partition.topic());
-            assignedTopicPartitions
-                    .computeIfAbsent(partition.topic(), t -> new HashSet<>())
-                    .add(partition.partition());
-
-        }
-
-        log.info("Extracted {} unique topics from {} partitions: {}",
-                assignedTopics.size(), partitions.size(), assignedTopics);
-    }
-
-    /**
-     * Builds the mapping from topics to table names using the configuration.
-     */
-    private void buildTopicToTableMapping() {
-        topicToTableMapping.clear();
-
-        for (String topic : assignedTopics) {
-            String tableName = sinkConfig.getTableNameForTopic(topic);
-            if (tableName != null) {
-                topicToTableMapping.put(topic, tableName);
-                log.info("Mapped topic '{}' to table '{}'", topic, tableName);
-            } else {
-                topicToTableMapping.put(topic, topic);
-                log.info("No table mapping found for topic '{}', so mapping it to table '{}'", topic, topic);
-            }
-        }
-    }
-
-    /**
-     * Discovers table schemas from Firebolt for all mapped tables.
-     */
-    private void discoverTableSchemas() {
-        tableSchemas.clear();
-
-        if (topicToTableMapping.isEmpty()) {
-            log.info("No table mappings available, skipping schema discovery");
-            return;
-        }
-
-        Set<String> uniqueTableNames = new HashSet<>(topicToTableMapping.values());
-        try {
-            JdbcConfig jdbcConfig = sinkConfig.getJdbcConfig();
-            this.tableSchemas = fireboltDbService.discoverTableSchemas(jdbcConfig, uniqueTableNames);
-            log.info("Successfully discovered schemas for {} tables", tableSchemas.size());
-        } catch (Exception e) {
-            log.error("Failed to discover table schemas", e);
-            throw new RuntimeException("Failed to discover table schemas", e);
-        }
-
-        // if we did not find all the tables names from the mapping then throw an exception
-        Set<String> tablesNotFoundInFirebolt = Sets.difference(uniqueTableNames, tableSchemas.entrySet().stream().map(Map.Entry::getKey).collect(Collectors.toSet()));
-        if (!tablesNotFoundInFirebolt.isEmpty()) {
-            log.error("The following tables were not found in firebolt: {}", tablesNotFoundInFirebolt);
-            throw new RuntimeException("The following tables were not found in Firebolt:" + tablesNotFoundInFirebolt.stream().collect(Collectors.joining(",")));
-        }
-    }
-
     private void handleError(Exception batchException, Collection<SinkRecord> records) {
         if (errorToleranceAll) {
             log.info("Errors tolerance is enabled, reporting to DLQ and continuing: {}", batchException.getLocalizedMessage());
@@ -266,40 +150,12 @@ public class FireboltSinkTask extends SinkTask {
         }
 
         log.error("Non-retriable error encountered; failing the task: {}", batchException.getLocalizedMessage());
-        if (records != null) {
-            throw new RuntimeException(String.format("Number of records that failed: %d", records.size()), batchException);
-        } else {
-            throw new RuntimeException("Records were null", batchException);
-        }
+        throw new RuntimeException(String.format("Number of records that failed: %d", records.size()), batchException);
     }
 
-    /**
-     * Determines whether an exception is likely transient and thus retriable by Kafka Connect.
-     */
-    private boolean isRetriable(Throwable throwable) {
-        if (throwable == null) {
-            return false;
-        }
-
-        if (throwable instanceof RecordConversionException || throwable instanceof RecordConversionFailedException) {
-            return false;
-        }
-
-        if (throwable instanceof FireboltException) {
-            FireboltException fe = (FireboltException) throwable;
-            ExceptionType type = fe.getType();
-            final List<ExceptionType> retriableExceptions = List.of(TOO_MANY_REQUESTS, CANCELED, ERROR, CONFLICT);
-            final List<ExceptionType> nonRetriableExceptions = List.of(UNAUTHORIZED, TYPE_NOT_SUPPORTED, TYPE_TRANSFORMATION_ERROR, REQUEST_BODY_TOO_LARGE, INVALID_REQUEST, RESOURCE_NOT_FOUND);
-
-            if (nonRetriableExceptions.contains(type)) {
-                return false;
-            }
-            if (retriableExceptions.contains(type)) {
-                return true;
-            }
-        }
-
-        return false;
+    /** Transient Firebolt failures are retried by Kafka Connect; everything else fails the task. */
+    private static boolean isRetriable(Throwable throwable) {
+        return throwable instanceof FireboltException
+                && RETRIABLE_ERRORS.contains(((FireboltException) throwable).getType());
     }
-
 }

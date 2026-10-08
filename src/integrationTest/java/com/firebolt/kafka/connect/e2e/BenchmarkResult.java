@@ -45,4 +45,10 @@ public class BenchmarkResult {
 
     @JsonProperty("record_size_bytes")
     private int recordSizeBytes;
+    /** Measurement method; results are only compared against a baseline measured the same way. */
+    @JsonProperty("method")
+    private String method;
+    /** Connector property overrides the run used (e.g. consumer batch sizes). */
+    @JsonProperty("connector_overrides")
+    private java.util.Map<String, String> connectorOverrides;
 }
