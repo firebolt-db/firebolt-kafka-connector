@@ -23,6 +23,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,6 +98,61 @@ public class SchemaArrayDataTypeConverterTest {
         converter.convertAndSet(mockStatement, 1, kafkaValue, integerArrayColumn);
 
         verify(mockConnection).createArrayOf(eq("integer"), eq(arrayValues.toArray()));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithNestedIntegerArrayFromProtobufWrapperStructs() throws SQLException {
+        org.apache.kafka.connect.data.Schema nestedSchema = org.apache.kafka.connect.data.SchemaBuilder.struct()
+                .field("values", org.apache.kafka.connect.data.SchemaBuilder.array(Schema.OPTIONAL_INT32_SCHEMA).build())
+                .build();
+        org.apache.kafka.connect.data.Struct first = new org.apache.kafka.connect.data.Struct(nestedSchema)
+                .put("values", Arrays.asList(1, 2));
+        org.apache.kafka.connect.data.Struct second = new org.apache.kafka.connect.data.Struct(nestedSchema)
+                .put("values", Arrays.asList(3, null, 4));
+        List<Object> arrayValues = Arrays.asList(first, second);
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(arrayValues)
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRUCT)
+                .build();
+        TableSchema.Column nestedArrayColumn = new TableSchema.Column("test_column", "array(array(integer))", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, nestedArrayColumn);
+
+        Object[] expected = new Object[] {
+                new Object[] {1, 2},
+                new Object[] {3, null, 4}
+        };
+        verify(mockConnection).createArrayOf(eq("integer"), argThat(actual -> Arrays.deepEquals(expected, actual)));
+        verify(mockStatement).setArray(1, mockArray);
+    }
+
+    @Test
+    void testConvertAndSetWithNestedIntegerArrayProtobufWrapperWithNullInnerArrayDoesNotNPE() throws SQLException {
+        // Regression test for the NPE called out in PR review: when a Protobuf wrapper Struct's
+        // repeated `values` field is explicitly null (which surfaces from ProtobufConverter when the
+        // wrapper message was sent with the inner repeated field cleared), extractArrayField returns
+        // null. asNestedArrayElement must propagate the null instead of dereferencing it inside
+        // toObjectArray.
+        org.apache.kafka.connect.data.Schema nestedSchema = org.apache.kafka.connect.data.SchemaBuilder.struct()
+                .field("values", org.apache.kafka.connect.data.SchemaBuilder.array(Schema.OPTIONAL_INT32_SCHEMA).optional().build())
+                .build();
+        org.apache.kafka.connect.data.Struct nullInner = new org.apache.kafka.connect.data.Struct(nestedSchema);
+        nullInner.put("values", null);
+        org.apache.kafka.connect.data.Struct populated = new org.apache.kafka.connect.data.Struct(nestedSchema)
+                .put("values", Arrays.asList(7, 8));
+        SchemaKafkaMessageColumnValue kafkaValue = SchemaKafkaMessageColumnValue.builder()
+                .value(Arrays.asList(nullInner, populated))
+                .schemaType(Schema.Type.ARRAY)
+                .schemaSubType(Schema.Type.STRUCT)
+                .build();
+        TableSchema.Column nestedArrayColumn = new TableSchema.Column("test_column", "array(array(integer))", 2003, true);
+
+        converter.convertAndSet(mockStatement, 1, kafkaValue, nestedArrayColumn);
+
+        Object[] expected = new Object[] { null, new Object[] {7, 8} };
+        verify(mockConnection).createArrayOf(eq("integer"), argThat(actual -> Arrays.deepEquals(expected, actual)));
         verify(mockStatement).setArray(1, mockArray);
     }
 
