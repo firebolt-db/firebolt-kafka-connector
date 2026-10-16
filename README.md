@@ -85,6 +85,93 @@ curl -X POST http://localhost:8083/connectors \
   }'
 ```
 
+### Working with message formats
+
+The connector can ingest schemaless JSON and schema-based messages that Kafka Connect
+converters turn into Connect records. Schema-based formats supported by the connector
+include JSON Schema, Avro, and Protobuf (`proto`).
+
+Configure the Kafka Connect `value.converter` for the format on your topic:
+
+| Message format | Value converter | Notes |
+|----------------|-----------------|-------|
+| Schemaless JSON | `org.apache.kafka.connect.json.JsonConverter` with `value.converter.schemas.enable=false` | Message fields are read from the JSON object directly. |
+| JSON with schemas | `io.confluent.connect.json.JsonSchemaConverter` | Requires Schema Registry. |
+| Avro | `io.confluent.connect.avro.AvroConverter` | Requires Schema Registry. |
+| Protobuf / proto | `io.confluent.connect.protobuf.ProtobufConverter` | Requires Schema Registry. |
+
+For schema-based formats, set the Schema Registry URL on the converter:
+
+```properties
+value.converter.schema.registry.url=http://schema-registry:8081
+```
+
+Protobuf works through Confluent's `ProtobufConverter`; no connector-specific proto
+compilation is required. Define proto fields with names that match the Firebolt table
+columns, for example:
+
+```proto
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+message OrderEvent {
+  int32 id = 1;
+  string amount = 2;
+  google.protobuf.Timestamp created_at = 3;
+  repeated string tags = 4;
+  optional string comment = 5;
+}
+```
+
+`amount` is a string here because `.proto` has no built-in decimal scalar.
+Firebolt `NUMERIC` supports precision up to 38 digits and defaults to
+`NUMERIC(38,9)`. For decimal values where that precision matters, send a decimal
+literal string such as `"12345678901234567890.123456789"`; using proto `float` or
+`double` can lose precision before the connector sees the value. Integer proto
+scalars and floating-point scalars can also be mapped to `NUMERIC` when their
+range and precision are sufficient for your data.
+
+Proto3 scalar fields without `optional` have default values rather than nulls. If
+an `optional` field is absent, the connector treats it as null. That works for
+nullable Firebolt columns; if the target column is `NOT NULL` and has no default,
+producers must set the field or ingestion will fail for that record. Use
+`google.protobuf.Timestamp` for Firebolt `TIMESTAMP` and `TIMESTAMPTZ`; repeated
+fields map to Firebolt arrays.
+
+#### `oneof` support
+
+Protobuf `oneof` is supported by flattening each branch into its own Firebolt
+column, mirroring [ClickHouse's behaviour](https://clickhouse.com/docs/integrations/kafka/clickhouse-kafka-connect-sink#protobuf-schema-support).
+You must opt in to flattening on the Kafka Connect converter:
+
+```properties
+value.converter.flatten.unions=true
+```
+
+Each `oneof` member then becomes a top-level field that maps 1:1 to a
+nullable Firebolt column of the matching scalar type. Only the wire-set member
+receives a value per record; the other branches land as SQL NULL. Without
+`flatten.unions=true`, Confluent's converter wraps the union in a Connect
+Struct that the connector currently cannot ingest, leading to silent loss of
+the branch data — use the flag.
+
+#### Limits today
+
+These shapes are **not yet supported** end-to-end and are documented with
+negative integration tests under `ProtobufUnsupportedShapesIntegrationTest`:
+
+- **Plain (non-`oneof`) nested messages** targeting Firebolt `STRUCT` columns —
+  there is no schema-based STRUCT converter yet. Records fail conversion and
+  flow to the DLQ when `errors.tolerance=all`.
+- **Triple-or-deeper nested arrays** (e.g., `array(array(array(integer)))`) —
+  only `array(array(integer))` round-trips today.
+- **Nested arrays whose inner element type isn't `integer`** when the proto
+  shape requires the wrapper-message form.
+- **Nested `oneof` of message-typed branches** — only the outer scalar branches
+  flatten; an inner `oneof` inside a message-typed outer branch is silently
+  dropped with `flatten.unions=true`.
+
 ### Configuration Properties
 
 | Property | Required | Default | Description |
