@@ -41,6 +41,7 @@ on:
         required: false
         type: string
 
+permissions: {}
 
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
@@ -48,11 +49,13 @@ env:
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Validate database and engine
         if: ${{ (inputs.database == '') != (inputs.engine == '') }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             core.setFailed("Database and Engine parameters should be provided simultaneously")
@@ -60,20 +63,25 @@ jobs:
       - name: Resolve account
         id: set-account
         shell: bash  # use bash across all OSs
+        env:
+          INPUT_ACCOUNT: ${{ inputs.account }}
+          VAR_FIREBOLT_ACCOUNT: ${{ vars.FIREBOLT_ACCOUNT }}
         run: |
-          if ! [[ -z "${{ inputs.account }}" ]]; then
-            echo "account=${{ inputs.account }}" >> $GITHUB_OUTPUT
-            echo "account=${{ inputs.account }}"
+          if ! [[ -z "${INPUT_ACCOUNT}" ]]; then
+            echo "account=${INPUT_ACCOUNT}" >> "$GITHUB_OUTPUT"
+            echo "account=${INPUT_ACCOUNT}"
           else
-            echo "account=${{ vars.FIREBOLT_ACCOUNT }}" >> $GITHUB_OUTPUT
-            echo "account=${{ vars.FIREBOLT_ACCOUNT }}"
+            echo "account=${VAR_FIREBOLT_ACCOUNT}" >> "$GITHUB_OUTPUT"
+            echo "account=${VAR_FIREBOLT_ACCOUNT}"
           fi
 
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 11
-        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '11'
           distribution: 'temurin'
@@ -83,12 +91,12 @@ jobs:
         id: dbsuffix
         shell: bash
         run: |
-          echo "db_suffix=kafka" >> $GITHUB_OUTPUT
+          echo "db_suffix=kafka" >> "$GITHUB_OUTPUT"
 
       - name: Setup database and engine
         id: setup
         if: ${{ inputs.database == '' }}
-        uses: firebolt-db/integration-testing-setup@813c4835ef38adcba3f8760e7afc21a3c7248023
+        uses: firebolt-db/integration-testing-setup@813c4835ef38adcba3f8760e7afc21a3c7248023 # v2.6.2
         with:
           firebolt-client-id: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
           firebolt-client-secret: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
@@ -99,25 +107,31 @@ jobs:
       - name: Determine database name
         id: find-database-name
         shell: bash  # use bash across all OSs
+        env:
+          INPUT_DATABASE: ${{ inputs.database }}
+          SETUP_DATABASE_NAME: ${{ steps.setup.outputs.database_name }}
         run: |
-          if ! [[ -z "${{ inputs.database }}" ]]; then
-             echo "database_name=${{ inputs.database }}" >> $GITHUB_OUTPUT
+          if ! [[ -z "${INPUT_DATABASE}" ]]; then
+             echo "database_name=${INPUT_DATABASE}" >> "$GITHUB_OUTPUT"
           else
-             echo "database_name=${{ steps.setup.outputs.database_name }}" >> $GITHUB_OUTPUT
+             echo "database_name=${SETUP_DATABASE_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Determine engine name
         id: find-engine-name
         shell: bash  # use bash across all OSs
+        env:
+          INPUT_ENGINE: ${{ inputs.engine }}
+          SETUP_ENGINE_NAME: ${{ steps.setup.outputs.engine_name }}
         run: |
-          if ! [[ -z "${{ inputs.engine }}" ]]; then
-             echo "engine_name=${{ inputs.engine }}" >> $GITHUB_OUTPUT
+          if ! [[ -z "${INPUT_ENGINE}" ]]; then
+             echo "engine_name=${INPUT_ENGINE}" >> "$GITHUB_OUTPUT"
           else
-             echo "engine_name=${{ steps.setup.outputs.engine_name }}" >> $GITHUB_OUTPUT
+             echo "engine_name=${SETUP_ENGINE_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -132,16 +146,27 @@ jobs:
         run: |
           COMPOSE_FILE_DIR="src/integrationTest/docker/kafka-connect-cloud"
           COMPOSE_FILE="$COMPOSE_FILE_DIR/docker-compose.yml"
-          echo "COMPOSE_FILE_DIR=$COMPOSE_FILE_DIR" >> $GITHUB_ENV
-          echo "COMPOSE_FILE=$COMPOSE_FILE" >> $GITHUB_ENV
+          {
+            echo "COMPOSE_FILE_DIR=$COMPOSE_FILE_DIR"
+            echo "COMPOSE_FILE=$COMPOSE_FILE"
+          } >> "$GITHUB_ENV"
           echo "Using docker-compose file: $COMPOSE_FILE"
 
       - name: Replace secrets in properties file
+        env:
+          FIREBOLT_CLIENT_ID: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+          FIREBOLT_CLIENT_SECRET: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
         run: |
           SECRETS_FILE="src/integrationTest/docker/kafka-connect-cloud/secrets/secrets.properties"
           echo "Replacing placeholders in $SECRETS_FILE"
-          sed -i "s/\${clientId}/${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}/g" "$SECRETS_FILE"
-          sed -i "s/\${clientSecret}/${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}/g" "$SECRETS_FILE"
+          # Substitute with bash builtins rather than sed so the secrets are
+          # never part of a process's command line. The placeholders are literal.
+          # shellcheck disable=SC2016
+          id_placeholder='${clientId}' secret_placeholder='${clientSecret}'
+          content="$(<"$SECRETS_FILE")"
+          content="${content//"$id_placeholder"/"$FIREBOLT_CLIENT_ID"}"
+          content="${content//"$secret_placeholder"/"$FIREBOLT_CLIENT_SECRET"}"
+          printf '%s\n' "$content" > "$SECRETS_FILE"
           echo "Secrets replaced successfully"
 
       - name: Start Docker services
@@ -159,8 +184,15 @@ jobs:
           echo "Kafka Connect is ready!"
 
       - name: Run integration tests (excluding NOT_IMPLEMENTED and E2E)
-        run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,e2e --no-daemon -Djdbc.connection.url="jdbc:firebolt:${{ steps.find-database-name.outputs.database_name }}?account=${{ steps.set-account.outputs.account }}&engine=${{ steps.find-engine-name.outputs.engine_name }}&env=staging" -DclientId="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" -DclientSecret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}"
+        # The credentials reach the test JVM as the clientId/clientSecret system
+        # properties via the IT_* env vars (see build.gradle), not as -D arguments.
+        run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,e2e --no-daemon -Djdbc.connection.url="jdbc:firebolt:${DATABASE_NAME}?account=${ACCOUNT_NAME}&engine=${ENGINE_NAME}&env=staging"
         env:
+          DATABASE_NAME: ${{ steps.find-database-name.outputs.database_name }}
+          ACCOUNT_NAME: ${{ steps.set-account.outputs.account }}
+          ENGINE_NAME: ${{ steps.find-engine-name.outputs.engine_name }}
+          IT_FIREBOLT_CLIENT_ID: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+          IT_FIREBOLT_CLIENT_SECRET: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
           KAFKA_BOOTSTRAP_SERVERS: localhost:9092
           SCHEMA_REGISTRY_URL: http://localhost:8081
           KAFKA_CONNECT_URL: http://localhost:8083
@@ -193,6 +225,26 @@ jobs:
           
           echo "Docker logs collected successfully"
 
+      - name: Scrub credentials from logs and reports
+        # The connector was configured with the Firebolt credentials (see
+        # secrets.properties), so mask them in everything uploaded below.
+        if: always()
+        env:
+          SCRUB_CLIENT_ID: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+          SCRUB_CLIENT_SECRET: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
+        run: |
+          # perl reads the values from the environment, so they stay off the command line.
+          # shellcheck disable=SC2016
+          for dir in docker-logs logs build/test-results build/reports; do
+            [ -d "$dir" ] || continue
+            find "$dir" -type f -print0 | xargs -0 -r perl -pi -e '
+              for my $name ("SCRUB_CLIENT_SECRET", "SCRUB_CLIENT_ID") {
+                my $value = $ENV{$name};
+                s/\Q$value\E/***/g if defined $value && length $value;
+              }'
+          done
+          echo "Credentials scrubbed"
+
       - name: Stop Docker services
         if: always()
         run: |
@@ -201,7 +253,7 @@ jobs:
           echo "Docker services stopped"
 
       - name: Upload test results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: integration-test-results-cloud
@@ -211,14 +263,14 @@ jobs:
             logs/
 
       - name: Upload test reports
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: integration-test-reports-cloud
           path: build/reports/
 
       - name: Upload Docker logs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: docker-logs-cloud

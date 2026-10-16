@@ -66,57 +66,77 @@ on:
         required: false
         default: '60'
 
+permissions: {}
+
 jobs:
   scenario-load-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 600
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92
-        with:
-          cache-read-only: false
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Run Scenario Load Test
+        # Credentials reach the test JVM via the LT_* env vars below (see
+        # build.gradle), not as -D arguments on the command line.
         run: |
           ./gradlew runScenarioLoadTest \
-            -Dfirebolt.jdbc.url="${{ github.event.inputs.firebolt_jdbc_url }}" \
-            -Dfirebolt.client.id="${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}" \
-            -Dfirebolt.client.secret="${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}" \
-            -Dconfluent.environment.id="${{ github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}" \
-            -Dconfluent.cluster.id="${{ github.event.inputs.confluent_cluster_id || vars.CONFLUENT_CLUSTER_ID }}" \
-            -Dconfluent.firebolt.connector.plugin.id="${{ github.event.inputs.connector_plugin_id || vars.CONFLUENT_CONNECTOR_PLUGIN_ID }}" \
-            -Dconfluent.kafka.api.key="${{ secrets.CONFLUENT_KAFKA_API_KEY }}" \
-            -Dconfluent.kafka.api.secret="${{ secrets.CONFLUENT_KAFKA_API_SECRET }}" \
-            -Dconfluent.schema.registry.api.key="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_KEY }}" \
-            -Dconfluent.schema.registry.api.secret="${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}" \
-            -Dconfluent.cloud.resource.api.key="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}" \
-            -Dconfluent.cloud.resource.api.secret="${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}" \
-            -Dloadtest.scenario.name="${{ github.event.inputs.scenario_name || 'scenario1' }}" \
-            -Dloadtest.message.count="${{ github.event.inputs.message_count || '20000' }}" \
-            -Dloadtest.ingestion.type="${{ github.event.inputs.ingestion_type || 'sql' }}" \
-            -Dloadtest.message.type="${{ github.event.inputs.message_type || 'json' }}" \
-            -Dloadtest.fetch.min.megabytes="${{ github.event.inputs.min_fetch_megabytes || '20' }}" \
-            -Dloadtest.fetch.max.wait.ms="${{ github.event.inputs.max_wait_time_ms || '2000' }}" \
-            -Dloadtest.max.poll.records="${{ github.event.inputs.max_records_poll || '10000' }}" \
-            -Dloadtest.continuous.publishing="${{ github.event.inputs.continuous_publishing || 'false' }}" \
-            -Dloadtest.message.batch.size="${{ github.event.inputs.message_batch_size || '1000' }}" \
-            -Dloadtest.firebolt.ingestion.wait.minutes="${{ github.event.inputs.firebolt_ingestion_wait_time_in_minutes || '60' }}"
+            -Dfirebolt.jdbc.url="${LT_FIREBOLT_JDBC_URL}" \
+            -Dconfluent.environment.id="${LT_CONFLUENT_ENVIRONMENT_ID}" \
+            -Dconfluent.cluster.id="${LT_CONFLUENT_CLUSTER_ID}" \
+            -Dconfluent.firebolt.connector.plugin.id="${LT_CONFLUENT_FIREBOLT_CONNECTOR_PLUGIN_ID}" \
+            -Dloadtest.scenario.name="${LT_LOADTEST_SCENARIO_NAME}" \
+            -Dloadtest.message.count="${LT_LOADTEST_MESSAGE_COUNT}" \
+            -Dloadtest.ingestion.type="${LT_LOADTEST_INGESTION_TYPE}" \
+            -Dloadtest.message.type="${LT_LOADTEST_MESSAGE_TYPE}" \
+            -Dloadtest.fetch.min.megabytes="${LT_LOADTEST_FETCH_MIN_MEGABYTES}" \
+            -Dloadtest.fetch.max.wait.ms="${LT_LOADTEST_FETCH_MAX_WAIT_MS}" \
+            -Dloadtest.max.poll.records="${LT_LOADTEST_MAX_POLL_RECORDS}" \
+            -Dloadtest.continuous.publishing="${LT_LOADTEST_CONTINUOUS_PUBLISHING}" \
+            -Dloadtest.message.batch.size="${LT_LOADTEST_MESSAGE_BATCH_SIZE}" \
+            -Dloadtest.firebolt.ingestion.wait.minutes="${LT_LOADTEST_FIREBOLT_INGESTION_WAIT_MINUTES}"
         env:
+          LT_FIREBOLT_JDBC_URL: ${{ github.event.inputs.firebolt_jdbc_url }}
+          LT_FIREBOLT_CLIENT_ID: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+          LT_FIREBOLT_CLIENT_SECRET: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
+          LT_CONFLUENT_ENVIRONMENT_ID: ${{ github.event.inputs.confluent_environment_id || vars.CONFLUENT_ENVIRONMENT_ID }}
+          LT_CONFLUENT_CLUSTER_ID: ${{ github.event.inputs.confluent_cluster_id || vars.CONFLUENT_CLUSTER_ID }}
+          LT_CONFLUENT_FIREBOLT_CONNECTOR_PLUGIN_ID: ${{ github.event.inputs.connector_plugin_id || vars.CONFLUENT_CONNECTOR_PLUGIN_ID }}
+          LT_CONFLUENT_KAFKA_API_KEY: ${{ secrets.CONFLUENT_KAFKA_API_KEY }}
+          LT_CONFLUENT_KAFKA_API_SECRET: ${{ secrets.CONFLUENT_KAFKA_API_SECRET }}
+          LT_CONFLUENT_SCHEMA_REGISTRY_API_KEY: ${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_KEY }}
+          LT_CONFLUENT_SCHEMA_REGISTRY_API_SECRET: ${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}
+          LT_CONFLUENT_CLOUD_RESOURCE_API_KEY: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}
+          LT_CONFLUENT_CLOUD_RESOURCE_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}
+          LT_LOADTEST_SCENARIO_NAME: ${{ github.event.inputs.scenario_name || 'scenario1' }}
+          LT_LOADTEST_MESSAGE_COUNT: ${{ github.event.inputs.message_count || '20000' }}
+          LT_LOADTEST_INGESTION_TYPE: ${{ github.event.inputs.ingestion_type || 'sql' }}
+          LT_LOADTEST_MESSAGE_TYPE: ${{ github.event.inputs.message_type || 'json' }}
+          LT_LOADTEST_FETCH_MIN_MEGABYTES: ${{ github.event.inputs.min_fetch_megabytes || '20' }}
+          LT_LOADTEST_FETCH_MAX_WAIT_MS: ${{ github.event.inputs.max_wait_time_ms || '2000' }}
+          LT_LOADTEST_MAX_POLL_RECORDS: ${{ github.event.inputs.max_records_poll || '10000' }}
+          LT_LOADTEST_CONTINUOUS_PUBLISHING: ${{ github.event.inputs.continuous_publishing || 'false' }}
+          LT_LOADTEST_MESSAGE_BATCH_SIZE: ${{ github.event.inputs.message_batch_size || '1000' }}
+          LT_LOADTEST_FIREBOLT_INGESTION_WAIT_MINUTES: ${{ github.event.inputs.firebolt_ingestion_wait_time_in_minutes || '60' }}
           GRADLE_OPTS: "-Xmx2g"
 
       - name: Upload Test Results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: scenario-load-test-results-${{ github.run_number }}
           path: |

@@ -19,8 +19,12 @@ on:
         type: string
         default: '10000'
 
+permissions: {}
+
 jobs:
   benchmark:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -38,6 +42,14 @@ jobs:
       min_fetch_megabytes: ${{ inputs.min_fetch_megabytes }}
       max_wait_time_ms: ${{ inputs.max_wait_time_ms }}
       max_records_poll: ${{ inputs.max_records_poll }}
-    secrets: inherit
+    secrets:
+      FIREBOLT_CLIENT_ID_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+      FIREBOLT_CLIENT_SECRET_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
+      CONFLUENT_KAFKA_API_KEY: ${{ secrets.CONFLUENT_KAFKA_API_KEY }}
+      CONFLUENT_KAFKA_API_SECRET: ${{ secrets.CONFLUENT_KAFKA_API_SECRET }}
+      CONFLUENT_SCHEMA_REGISTRY_API_KEY: ${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_KEY }}
+      CONFLUENT_SCHEMA_REGISTRY_API_SECRET: ${{ secrets.CONFLUENT_SCHEMA_REGISTRY_API_SECRET }}
+      CONFLUENT_CLOUD_RESOURCE_API_KEY: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_KEY }}
+      CONFLUENT_CLOUD_RESOURCE_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_RESOURCE_API_SECRET }}
 
 

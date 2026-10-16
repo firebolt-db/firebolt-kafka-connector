@@ -30,12 +30,16 @@ on:
         value: ${{ jobs.build.outputs.confluent-archive }}
   push:
 
+permissions: {}
+
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       uber-jar: ${{ steps.artifact_names.outputs.uber_name }}
       sources-jar: ${{ steps.artifact_names.outputs.sources_name }}
@@ -47,25 +51,30 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ inputs.branch }}
+        persist-credentials: false
       
     - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520
+      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
       with:
         java-version: ${{ matrix.java }}
         distribution: 'temurin'
-        cache: gradle
+        # No dependency caching for release builds (buildArtifacts), to avoid cache poisoning.
+        cache: ${{ !inputs.buildArtifacts && 'gradle' || '' }}
         
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92
+      uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      with:
+        cache-disabled: ${{ inputs.buildArtifacts == true }}
         
     - name: Make gradlew executable
       run: chmod +x ./gradlew
         
     - name: Cache Gradle packages
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      if: ${{ !inputs.buildArtifacts }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.gradle/caches
@@ -90,15 +99,17 @@ jobs:
       run: |
         BASE=$(grep '^archivesBaseName=' gradle.properties | sed 's/archivesBaseName=//')
         VERSION=$(grep '^version=' gradle.properties | sed 's/version=//')
-        echo "uber_name=${BASE}-${VERSION}.jar" >> $GITHUB_OUTPUT
-        echo "sources_name=${BASE}-${VERSION}-sources.jar" >> $GITHUB_OUTPUT
-        echo "uber_path=build/libs/${BASE}-${VERSION}.jar" >> $GITHUB_OUTPUT
-        echo "sources_path=build/libs/${BASE}-${VERSION}-sources.jar" >> $GITHUB_OUTPUT
-        echo "confluent_name=firebolt-db-firebolt-kafka-connect-${VERSION}.zip" >> $GITHUB_OUTPUT
-        echo "confluent_path=build/confluent/firebolt-db-firebolt-kafka-connect-${VERSION}.zip" >> $GITHUB_OUTPUT
+        {
+          echo "uber_name=${BASE}-${VERSION}.jar"
+          echo "sources_name=${BASE}-${VERSION}-sources.jar"
+          echo "uber_path=build/libs/${BASE}-${VERSION}.jar"
+          echo "sources_path=build/libs/${BASE}-${VERSION}-sources.jar"
+          echo "confluent_name=firebolt-db-firebolt-kafka-connect-${VERSION}.zip"
+          echo "confluent_path=build/confluent/firebolt-db-firebolt-kafka-connect-${VERSION}.zip"
+        } >> "$GITHUB_OUTPUT"
               
     - name: Upload test results
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       if: always()
       with:
         name: test-results-${{ matrix.java }}
@@ -109,7 +120,7 @@ jobs:
         
     - name: Upload uber JAR artifact
       if: ${{ inputs.buildArtifacts }}
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ steps.artifact_names.outputs.uber_name }}
         path: ${{ steps.artifact_names.outputs.uber_path }}
@@ -117,7 +128,7 @@ jobs:
 
     - name: Upload sources JAR artifact
       if: ${{ inputs.buildArtifacts }}
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ steps.artifact_names.outputs.sources_name }}
         path: ${{ steps.artifact_names.outputs.sources_path }}
@@ -129,14 +140,14 @@ jobs:
 
     - name: Upload Confluent Hub archive
       if: ${{ inputs.buildConfluentArchive }}
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ steps.artifact_names.outputs.confluent_name }}
         path: ${{ steps.artifact_names.outputs.confluent_path }}
         if-no-files-found: error
           
     - name: Upload build reports
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       if: always()
       with:
         name: build-reports-${{ matrix.java }}
