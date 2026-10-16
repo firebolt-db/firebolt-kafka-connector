@@ -80,43 +80,6 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
         verifyNumericRecordsInFirebolt(testRecords);
     }
 
-    @ParameterizedTest
-    @MethodSource("ingestionTypes")
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
-        // Setup test resources using centralized method
-        setupTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                numericTableSchema(), jsonNumericSchema(), connectorOverrides);
-
-        producer = initializeJsonProducer();
-
-        NumericTestRecord validRecord1 = aValidTestRecord(301)
-                .bigDecimalFromString("42.42")
-                .build();
-        NumericTestRecord validRecord2 = aValidTestRecord(302)
-                .bigDecimalFromString("-17.5")
-                .build();
-        NumericTestRecord invalidRecord1 = aValidTestRecord(303)
-                .bigDecimalFromString("abc")
-                .build();
-        NumericTestRecord invalidRecord2 = aValidTestRecord(304)
-                .bigDecimalFromString("1,23")
-                .build();
-
-        List<NumericTestRecord> testRecords = List.of(
-                validRecord1,
-                invalidRecord1,
-                validRecord2,
-                invalidRecord2
-        );
-
-        publishMessages(testRecords);
-
-        List<NumericTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
-        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
-
-        verifyNumericRecordsInFirebolt(expectedRecords);
-    }
-
     /**
      * Creates test records covering all numeric scenarios including edge cases.
      */
@@ -143,10 +106,12 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalNumeric(null)
                 .build(),
 
-            // Record with zero values
+            // Record with zero values. NB: Confluent AvroData requires the Connect Decimal's
+            // BigDecimal scale to match the schema scale (9), so use scale-9 zeros rather than
+            // BigDecimal.ZERO (scale 0), which throws "Decimal value has mismatching scale".
             aValidTestRecord(5)
-                .requiredNumeric(BigDecimal.ZERO)
-                .optionalNumeric(BigDecimal.ZERO)
+                .requiredNumeric(new BigDecimal("0.000000000"))
+                .optionalNumeric(new BigDecimal("0.000000000"))
                 .build(),
 
             // Record with large numbers (within NUMERIC(38,9) limits)
@@ -216,7 +181,6 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 "\"optionalLong\" NUMERIC(38,9) NULL, " +
                 "\"optionalReal\" NUMERIC(38,9) NULL, " +
                 "\"optionalDouble\" NUMERIC(38,9) NULL, " +
-                "\"bigDecimalFromString\" NUMERIC(38,9) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(NUMERIC(38,9) NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(NUMERIC(38,9) NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(NUMERIC(38,9) NULL) NULL, " +
@@ -284,13 +248,6 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 "        {\"type\": \"number\", \"connect.type\": \"float64\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional double mapped to NUMERIC in Firebolt\"\n" +
-                "    },\n" +
-                "    \"bigDecimalFromString\": {\n" +
-                "      \"oneOf\": [\n" +
-                "        {\"type\": \"null\", \"title\": \"Not included\"},\n" +
-                "        {\"type\": \"string\"}\n" +
-                "      ],\n" +
-                "      \"description\": \"BigDecimal represented as string; mapped to NUMERIC in Firebolt\"\n" +
                 "    },\n" +
                 "    \"optionalNumeric\": {\n" +
                 "      \"oneOf\": [\n" +
@@ -544,7 +501,6 @@ public class NumericSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalLong((long) recordId * 100)
                 .optionalReal(12.5f)
                 .optionalDouble(123.456)
-                .bigDecimalFromString("123456.789123456")
                 .requiredListWithNullableElements(Arrays.asList(
                     new BigDecimal("1.111111111"), 
                     null, 

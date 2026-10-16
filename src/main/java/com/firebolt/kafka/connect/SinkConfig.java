@@ -121,16 +121,6 @@ public class SinkConfig {
         throw new IllegalStateException("Neither script nor scriptFile is specified for table: " + mapping.getTable());
     }
 
-    // Utility method to get any config value
-    public String get(String key) {
-        return config.get(key);
-    }
-
-    // Utility method to get config map
-    public Map<String, String> getConfig() {
-        return config;
-    }
-
     public boolean isErrorToleranceAll() {
         String tol = config.get(ConnectorConfigDefinition.ERROR_TOLERANCE_CONFIG);
         return tol != null && tol.equalsIgnoreCase("all");
@@ -143,15 +133,9 @@ public class SinkConfig {
         return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.EXACTLY_ONCE_MAPPING_CONFIG));
     }
 
-    public IngestionType getIngestionType() {
-        String value = config.get(ConnectorConfigDefinition.INGESTION_TYPE_CONFIG);
-        if (StringUtils.isBlank(value)) {
-            // by default ingestion type should be sql if not passed in
-            return IngestionType.SQL;
-        } else {
-            return IngestionType.fromValue(value);
-        }
-
-
+    /** See {@link ConnectorConfigDefinition#JSON_CONSOLIDATE_UPLOADS_DOC}. */
+    public boolean isJsonConsolidateUploads() {
+        return Boolean.parseBoolean(config.get(ConnectorConfigDefinition.JSON_CONSOLIDATE_UPLOADS_CONFIG));
     }
+
 }

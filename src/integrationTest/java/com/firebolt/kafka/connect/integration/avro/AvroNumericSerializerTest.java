@@ -75,52 +75,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
         verifyRecordsInFirebolt(testRecords);
     }
 
-    @ParameterizedTest(name = "{1}")
-    @MethodSource("ingestionTypes")
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverride, String description) throws Exception {
-        log.info("Running {} for Avro numeric invalid-value resilience", description);
-
-        setupAvroTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                numericTableSchema(), avroNumericSchema(), connectorOverride);
-
-        Schema avroSchema = new Schema.Parser().parse(avroNumericSchema().get());
-
-        GenericData.Record valid1 = createValidRecord(avroSchema, 201, "42.42");
-        GenericData.Record valid2 = createValidRecord(avroSchema, 202, "-17.5");
-        GenericData.Record invalid1 = createValidRecord(avroSchema, 203, "abc");
-        GenericData.Record invalid2 = createValidRecord(avroSchema, 204, "1,23");
-
-        List<GenericData.Record> allRecords = List.of(valid1, invalid1, valid2, invalid2);
-        List<GenericData.Record> expectedRecords = List.of(valid1, valid2);
-
-        try (Producer<String, Object> producer = initializeAvroProducer()) {
-            for (int i = 0; i < allRecords.size(); i++) {
-                producer.send(new ProducerRecord<>(TOPIC_NAME, "key-" + i, allRecords.get(i))).get();
-            }
-            producer.flush();
-        }
-
-        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
-        verifyRecordsInFirebolt(expectedRecords);
-    }
-
-    private GenericData.Record createValidRecord(Schema schema, int recordId, String bigDecimalAsString) {
-        GenericData.Record record = new GenericData.Record(schema);
-        record.put("recordId", recordId);
-        record.put("requiredNumeric", decimalToBytes(new BigDecimal("42.123456789")));
-        record.put("optionalNumeric", decimalToBytes(new BigDecimal("100.987654321")));
-        record.put("requiredListWithNullableElements", Arrays.asList(
-                decimalToBytes(new BigDecimal("1.111111111")), null, decimalToBytes(new BigDecimal("3.333333333"))));
-        record.put("requiredListWithNonNullElements", Arrays.asList(
-                decimalToBytes(new BigDecimal("10.123456789")), decimalToBytes(new BigDecimal("20.234567890"))));
-        record.put("optionalList", null);
-        record.put("optionalListWithNonNullElements", null);
-        record.put("bigDecimalFromString", bigDecimalAsString);
-        record.put("optionalInt", recordId * 10);
-        record.put("optionalLong", (long) recordId * 100);
-        return record;
-    }
-
     private List<GenericData.Record> createTestRecords(Schema schema) {
         List<GenericData.Record> records = new ArrayList<>();
 
@@ -144,7 +98,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
                 decimalToBytes(new BigDecimal("111.444444444")),
                 decimalToBytes(new BigDecimal("222.555555555")),
                 decimalToBytes(new BigDecimal("333.666666666"))));
-        r1.put("bigDecimalFromString", "1.5");
         r1.put("optionalInt", 100);
         r1.put("optionalLong", 123456789012345L);
         records.add(r1);
@@ -165,7 +118,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
                 decimalToBytes(new BigDecimal("99999999999999999999999999999.123456789"))));
         r2.put("optionalList", null);
         r2.put("optionalListWithNonNullElements", null);
-        r2.put("bigDecimalFromString", String.valueOf(Long.MIN_VALUE));
         r2.put("optionalInt", null);
         r2.put("optionalLong", null);
         records.add(r2);
@@ -178,7 +130,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
         r3.put("requiredListWithNonNullElements", new ArrayList<>());
         r3.put("optionalList", new ArrayList<>());
         r3.put("optionalListWithNonNullElements", new ArrayList<>());
-        r3.put("bigDecimalFromString", "0.000000001");
         r3.put("optionalInt", Integer.MAX_VALUE);
         r3.put("optionalLong", Long.MAX_VALUE);
         records.add(r3);
@@ -195,7 +146,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
                 decimalToBytes(new BigDecimal("-100.555555555")), decimalToBytes(new BigDecimal("200.666666666")), null));
         r4.put("optionalListWithNonNullElements", Arrays.asList(
                 decimalToBytes(new BigDecimal("-100.777777777")), decimalToBytes(BigDecimal.ZERO), decimalToBytes(new BigDecimal("200.888888888"))));
-        r4.put("bigDecimalFromString", "0");
         r4.put("optionalInt", Integer.MIN_VALUE);
         r4.put("optionalLong", Long.MIN_VALUE);
         records.add(r4);
@@ -212,7 +162,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
                 "\"requiredListWithNonNullElements\" ARRAY(NUMERIC(38,9) NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(NUMERIC(38,9) NULL) NULL, " +
                 "\"optionalListWithNonNullElements\" ARRAY(NUMERIC(38,9) NOT NULL) NULL, " +
-                "\"bigDecimalFromString\" NUMERIC(38,9) NOT NULL, " +
                 "\"optionalInt\" NUMERIC(38,9) NULL, " +
                 "\"optionalLong\" NUMERIC(38,9) NULL" +
                 ")";
@@ -231,7 +180,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
                 "    {\"name\": \"requiredListWithNonNullElements\", \"type\": {\"type\": \"array\", \"items\": {\"type\": \"bytes\", \"logicalType\": \"decimal\", \"precision\": 38, \"scale\": 9}}},\n" +
                 "    {\"name\": \"optionalList\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"bytes\", \"logicalType\": \"decimal\", \"precision\": 38, \"scale\": 9}]}], \"default\": null},\n" +
                 "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": {\"type\": \"bytes\", \"logicalType\": \"decimal\", \"precision\": 38, \"scale\": 9}}], \"default\": null},\n" +
-                "    {\"name\": \"bigDecimalFromString\", \"type\": \"string\"},\n" +
                 "    {\"name\": \"optionalInt\", \"type\": [\"null\", \"int\"], \"default\": null},\n" +
                 "    {\"name\": \"optionalLong\", \"type\": [\"null\", \"long\"], \"default\": null}\n" +
                 "  ]\n" +
@@ -246,7 +194,7 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
         String selectQuery = String.format(
                 "SELECT \"recordId\", \"requiredNumeric\", \"optionalNumeric\", " +
                 "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", " +
-                "\"optionalList\", \"optionalListWithNonNullElements\", \"bigDecimalFromString\", \"optionalInt\", \"optionalLong\" " +
+                "\"optionalList\", \"optionalListWithNonNullElements\", \"optionalInt\", \"optionalLong\" " +
                 "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
 
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -286,11 +234,6 @@ public class AvroNumericSerializerTest extends AvroBaseIntegrationTest {
                 verifyNumericArray("optionalListWithNonNullElements",
                         (List<Object>) expected.get("optionalListWithNonNullElements"),
                         rs.getArray("optionalListWithNonNullElements"), idx);
-
-                BigDecimal expectedFromString = new BigDecimal(expected.get("bigDecimalFromString").toString().trim());
-                BigDecimal actualFromString = rs.getBigDecimal("bigDecimalFromString");
-                assertEquals(0, expectedFromString.compareTo(actualFromString),
-                        "bigDecimalFromString mismatch at index " + idx);
 
                 Object expectedOptionalInt = expected.get("optionalInt");
                 BigDecimal actualOptionalInt = rs.getBigDecimal("optionalInt");

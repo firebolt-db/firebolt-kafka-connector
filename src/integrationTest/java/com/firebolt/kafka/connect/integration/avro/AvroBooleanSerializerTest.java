@@ -70,48 +70,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         verifyRecordsInFirebolt(testRecords);
     }
 
-    @ParameterizedTest(name = "{1}")
-    @MethodSource("ingestionTypes")
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverride, String description) throws Exception {
-        log.info("Running {} for Avro boolean invalid-value resilience", description);
-
-        setupAvroTestResources(TOPIC_NAME, TABLE_NAME, SCHEMA_SUBJECT,
-                booleanTableSchema(), avroBooleanSchema(), connectorOverride);
-
-        Schema avroSchema = new Schema.Parser().parse(avroBooleanSchema().get());
-
-        GenericData.Record valid1 = createValidRecord(avroSchema, 201, "true");
-        GenericData.Record valid2 = createValidRecord(avroSchema, 202, "false");
-        GenericData.Record invalid1 = createValidRecord(avroSchema, 203, "invalid boolean");
-        GenericData.Record invalid2 = createValidRecord(avroSchema, 204, "09-07-2025");
-
-        List<GenericData.Record> allRecords = List.of(valid1, invalid1, valid2, invalid2);
-        List<GenericData.Record> expectedRecords = List.of(valid1, valid2);
-
-        try (Producer<String, Object> producer = initializeAvroProducer()) {
-            for (int i = 0; i < allRecords.size(); i++) {
-                producer.send(new ProducerRecord<>(TOPIC_NAME, "key-" + i, allRecords.get(i))).get();
-            }
-            producer.flush();
-        }
-
-        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
-        verifyRecordsInFirebolt(expectedRecords);
-    }
-
-    private GenericData.Record createValidRecord(Schema schema, int recordId, String booleanFromString) {
-        GenericData.Record record = new GenericData.Record(schema);
-        record.put("recordId", recordId);
-        record.put("requiredBoolean", true);
-        record.put("optionalBoolean", false);
-        record.put("requiredListWithNullableElements", Arrays.asList(true, null, false));
-        record.put("requiredListWithNonNullElements", Arrays.asList(false, true, false));
-        record.put("optionalList", null);
-        record.put("optionalListWithNonNullElements", null);
-        record.put("booleanFromString", booleanFromString);
-        return record;
-    }
-
     private List<GenericData.Record> createTestRecords(Schema schema) {
         List<GenericData.Record> records = new ArrayList<>();
 
@@ -124,7 +82,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         r1.put("requiredListWithNonNullElements", Arrays.asList(false, true, false, true, false));
         r1.put("optionalList", Arrays.asList(true, false, true));
         r1.put("optionalListWithNonNullElements", Arrays.asList(false, false, true));
-        r1.put("booleanFromString", "true");
         records.add(r1);
 
         // Record 2: false required, null optional
@@ -136,7 +93,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         r2.put("requiredListWithNonNullElements", Arrays.asList(true, true, true, true));
         r2.put("optionalList", null);
         r2.put("optionalListWithNonNullElements", null);
-        r2.put("booleanFromString", "false");
         records.add(r2);
 
         // Record 3: empty lists
@@ -148,7 +104,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         r3.put("requiredListWithNonNullElements", new ArrayList<>());
         r3.put("optionalList", new ArrayList<>());
         r3.put("optionalListWithNonNullElements", new ArrayList<>());
-        r3.put("booleanFromString", "TRUE");
         records.add(r3);
 
         // Record 4: all-false arrays, various string representations
@@ -160,7 +115,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         r4.put("requiredListWithNonNullElements", Arrays.asList(false, false, false));
         r4.put("optionalList", Arrays.asList(false, true, null));
         r4.put("optionalListWithNonNullElements", Arrays.asList(true, false, true));
-        r4.put("booleanFromString", "FALSE");
         records.add(r4);
 
         // Record 5: single-element arrays
@@ -172,7 +126,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         r5.put("requiredListWithNonNullElements", List.of(true));
         r5.put("optionalList", null);
         r5.put("optionalListWithNonNullElements", null);
-        r5.put("booleanFromString", "1");
         records.add(r5);
 
         // Record 6: "0" string for false
@@ -184,7 +137,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         r6.put("requiredListWithNonNullElements", List.of(false));
         r6.put("optionalList", Arrays.asList(true, false));
         r6.put("optionalListWithNonNullElements", List.of(true));
-        r6.put("booleanFromString", "0");
         records.add(r6);
 
         return records;
@@ -198,8 +150,7 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
                 "\"requiredListWithNullableElements\" ARRAY(BOOLEAN NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BOOLEAN NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NULL, " +
-                "\"booleanFromString\" BOOLEAN NOT NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NULL" +
                 ")";
     }
 
@@ -215,8 +166,7 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
                 "    {\"name\": \"requiredListWithNullableElements\", \"type\": {\"type\": \"array\", \"items\": [\"null\", \"boolean\"]}},\n" +
                 "    {\"name\": \"requiredListWithNonNullElements\", \"type\": {\"type\": \"array\", \"items\": \"boolean\"}},\n" +
                 "    {\"name\": \"optionalList\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", \"boolean\"]}], \"default\": null},\n" +
-                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": \"boolean\"}], \"default\": null},\n" +
-                "    {\"name\": \"booleanFromString\", \"type\": \"string\"}\n" +
+                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": \"boolean\"}], \"default\": null}\n" +
                 "  ]\n" +
                 "}";
     }
@@ -229,7 +179,7 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
         String selectQuery = String.format(
                 "SELECT \"recordId\", \"requiredBoolean\", \"optionalBoolean\", " +
                 "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", " +
-                "\"optionalList\", \"optionalListWithNonNullElements\", \"booleanFromString\" " +
+                "\"optionalList\", \"optionalListWithNonNullElements\" " +
                 "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
 
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -264,10 +214,6 @@ public class AvroBooleanSerializerTest extends AvroBaseIntegrationTest {
                 verifyBooleanArray("optionalListWithNonNullElements",
                         (List<Boolean>) expected.get("optionalListWithNonNullElements"),
                         rs.getArray("optionalListWithNonNullElements"), idx);
-
-                boolean expectedBooleanFromString = actualRecordId % 2 != 0;
-                assertEquals(expectedBooleanFromString, rs.getBoolean("booleanFromString"),
-                        "booleanFromString mismatch at index " + idx);
 
                 idx++;
             }

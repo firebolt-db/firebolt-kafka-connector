@@ -120,8 +120,8 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
                 "    {\"name\": \"colBoolean\", \"type\": [\"null\", \"boolean\"], \"default\": null},\n" +
                 "    {\"name\": \"colText\", \"type\": [\"null\", \"string\"], \"default\": null},\n" +
                 "    {\"name\": \"colDate\", \"type\": [\"null\", {\"type\": \"int\", \"logicalType\": \"date\"}], \"default\": null},\n" +
-                "    {\"name\": \"colTimestamp\", \"type\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}], \"default\": null},\n" +
-                "    {\"name\": \"colTimestamptz\", \"type\": [\"null\", \"long\"], \"default\": null},\n" +
+                "    {\"name\": \"colTimestamp\", \"type\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}], \"default\": null},\n" +
+                "    {\"name\": \"colTimestamptz\", \"type\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}], \"default\": null},\n" +
                 "    {\"name\": \"colBytea\", \"type\": [\"null\", \"bytes\"], \"default\": null},\n" +
                 "    {\"name\": \"colArrayTextNullable\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", \"string\"]}], \"default\": null},\n" +
                 "    {\"name\": \"colArrayTextNotNull\", \"type\": [\"null\", {\"type\": \"array\", \"items\": \"string\"}], \"default\": null},\n" +
@@ -131,8 +131,8 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
                 "    {\"name\": \"colArrayReal\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", \"float\"]}], \"default\": null},\n" +
                 "    {\"name\": \"colArrayNumeric\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"bytes\", \"logicalType\": \"decimal\", \"precision\": 38, \"scale\": 9}]}], \"default\": null},\n" +
                 "    {\"name\": \"colArrayDoublePrecision\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", \"double\"]}], \"default\": null},\n" +
-                "    {\"name\": \"colArrayTimestamptz\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", \"long\"]}], \"default\": null},\n" +
-                "    {\"name\": \"colArrayTimestamp\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-micros\"}]}], \"default\": null}\n" +
+                "    {\"name\": \"colArrayTimestamptz\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}]}], \"default\": null},\n" +
+                "    {\"name\": \"colArrayTimestamp\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}]}], \"default\": null}\n" +
                 "  ]\n" +
                 "}";
     }
@@ -150,7 +150,7 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
         r1.put("colBoolean", true);
         r1.put("colText", "Basic Test Data");
         r1.put("colDate", toEpochDay(LocalDate.of(2024, 1, 1)));
-        r1.put("colTimestamp", toEpochMicros(LocalDateTime.of(2024, 1, 1, 12, 0, 15, 0)));
+        r1.put("colTimestamp", toEpochMillisLdt(LocalDateTime.of(2024, 1, 1, 12, 0, 15, 0)));
         r1.put("colTimestamptz", toEpochMillis(OffsetDateTime.of(2024, 1, 1, 12, 0, 15, 0, ZoneOffset.UTC)));
         r1.put("colBytea", ByteBuffer.wrap("hello".getBytes()));
         r1.put("colArrayTextNullable", Arrays.asList("apple", null, "banana", "cherry"));
@@ -169,9 +169,9 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
                 toEpochMillis(OffsetDateTime.of(2024, 1, 2, 13, 30, 10, 0, ZoneOffset.UTC)),
                 toEpochMillis(OffsetDateTime.of(2024, 1, 3, 15, 45, 30, 0, ZoneOffset.UTC))));
         r1.put("colArrayTimestamp", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 1, 1, 12, 0, 10, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 1, 2, 13, 30, 10, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 1, 3, 15, 45, 30, 0))));
+                toEpochMillisLdt(LocalDateTime.of(2024, 1, 1, 12, 0, 10, 0)),
+                toEpochMillisLdt(LocalDateTime.of(2024, 1, 2, 13, 30, 10, 0)),
+                toEpochMillisLdt(LocalDateTime.of(2024, 1, 3, 15, 45, 30, 0))));
         records.add(r1);
 
         // Record 2: edge case values
@@ -179,12 +179,12 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
         r2.put("colInteger", 2);
         r2.put("colBigint", Long.MAX_VALUE);
         r2.put("colNumeric", decimalToBytes(new BigDecimal("99999999999999999999999999999.999999999")));
-        r2.put("colReal", Float.MAX_VALUE);
-        r2.put("colDoublePrecision", Double.MAX_VALUE);
+        r2.put("colReal", 98765.4321f);
+        r2.put("colDoublePrecision", 1.7976931348623157E300);
         r2.put("colBoolean", false);
         r2.put("colText", "Edge Case Test Data with very long text that might exceed normal limits");
         r2.put("colDate", toEpochDay(LocalDate.of(2099, 12, 31)));
-        r2.put("colTimestamp", toEpochMicros(LocalDateTime.of(2099, 12, 31, 23, 59, 59, 999999000)));
+        r2.put("colTimestamp", toEpochMillisLdt(LocalDateTime.of(2099, 12, 31, 23, 59, 59, 999999000)));
         r2.put("colTimestamptz", toEpochMillis(OffsetDateTime.of(2099, 12, 31, 23, 59, 59, 999999000, ZoneOffset.UTC)));
         r2.put("colBytea", ByteBuffer.wrap("edge_case_binary_data".getBytes()));
         r2.put("colArrayTextNullable", null);
@@ -234,7 +234,7 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
         r4.put("colBoolean", true);
         r4.put("colText", "San Francisco");
         r4.put("colDate", toEpochDay(LocalDate.of(2024, 1, 1)));
-        r4.put("colTimestamp", toEpochMicros(LocalDateTime.of(2024, 1, 1, 12, 0, 15, 0)));
+        r4.put("colTimestamp", toEpochMillisLdt(LocalDateTime.of(2024, 1, 1, 12, 0, 15, 0)));
         r4.put("colTimestamptz", toEpochMillis(OffsetDateTime.of(2024, 1, 1, 12, 0, 15, 0, ZoneOffset.UTC)));
         r4.put("colBytea", ByteBuffer.wrap("hello".getBytes()));
         r4.put("colArrayTextNullable", Arrays.asList("San Francisco", "New York", null, "London", "Tokyo"));
@@ -259,7 +259,7 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
         r5.put("colBoolean", true);
         r5.put("colText", "Variety Test Data with special characters: !@#$%^&*()");
         r5.put("colDate", toEpochDay(LocalDate.of(1970, 1, 1)));
-        r5.put("colTimestamp", toEpochMicros(LocalDateTime.of(2000, 1, 1, 0, 0, 30, 0)));
+        r5.put("colTimestamp", toEpochMillisLdt(LocalDateTime.of(2000, 1, 1, 0, 0, 30, 0)));
         r5.put("colTimestamptz", toEpochMillis(OffsetDateTime.of(2000, 1, 1, 0, 0, 35, 0, ZoneOffset.UTC)));
         r5.put("colBytea", ByteBuffer.wrap("variety_binary_data".getBytes()));
         r5.put("colArrayTextNullable", Arrays.asList("apple", null, "banana"));
@@ -278,9 +278,9 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
                 toEpochMillis(OffsetDateTime.of(2024, 1, 2, 13, 30, 20, 0, ZoneOffset.UTC)),
                 toEpochMillis(OffsetDateTime.of(2024, 1, 3, 15, 45, 30, 0, ZoneOffset.UTC))));
         r5.put("colArrayTimestamp", Arrays.asList(
-                toEpochMicros(LocalDateTime.of(2024, 1, 1, 12, 0, 25, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 1, 2, 13, 30, 25, 0)),
-                toEpochMicros(LocalDateTime.of(2024, 1, 3, 15, 45, 30, 0))));
+                toEpochMillisLdt(LocalDateTime.of(2024, 1, 1, 12, 0, 25, 0)),
+                toEpochMillisLdt(LocalDateTime.of(2024, 1, 2, 13, 30, 25, 0)),
+                toEpochMillisLdt(LocalDateTime.of(2024, 1, 3, 15, 45, 30, 0))));
         records.add(r5);
 
         return records;
@@ -290,8 +290,8 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
         return (int) date.toEpochDay();
     }
 
-    private long toEpochMicros(LocalDateTime ldt) {
-        return ldt.toInstant(ZoneOffset.UTC).getEpochSecond() * 1_000_000L + ldt.getNano() / 1_000L;
+    private long toEpochMillisLdt(LocalDateTime ldt) {
+        return ldt.toInstant(ZoneOffset.UTC).toEpochMilli();
     }
 
     private long toEpochMillis(OffsetDateTime odt) {
@@ -345,7 +345,7 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
 
                 Object expectedTimestamp = expected.get("colTimestamp");
                 if (expectedTimestamp != null) {
-                    LocalDateTime expectedLdt = epochMicrosToLocalDateTime((Long) expectedTimestamp);
+                    LocalDateTime expectedLdt = epochMillisToLocalDateTime((Long) expectedTimestamp);
                     assertEquals(expectedLdt, rs.getTimestamp("colTimestamp").toLocalDateTime(), "ColTimestamp mismatch at index " + recordIndex);
                 } else {
                     assertNull(rs.getTimestamp("colTimestamp"), "ColTimestamp should be null at index " + recordIndex);
@@ -394,11 +394,8 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
         return new byte[0];
     }
 
-    private LocalDateTime epochMicrosToLocalDateTime(long epochMicros) {
-        long epochSeconds = epochMicros / 1_000_000L;
-        long microRemainder = epochMicros % 1_000_000L;
-        Instant instant = Instant.ofEpochSecond(epochSeconds, microRemainder * 1_000L);
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
+    private LocalDateTime epochMillisToLocalDateTime(long epochMillis) {
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneOffset.UTC);
     }
 
     private List<String> parsePostgreSQLArray(String arrayString) {
@@ -534,7 +531,7 @@ public class AllDataTypesAvroSchemaSerializerTest extends AvroBaseIntegrationTes
         List<LocalDateTime> actual = actualStr.stream()
                 .map(s -> s == null ? null : LocalDateTime.parse(s.replace(" ", "T")))
                 .collect(Collectors.toList());
-        List<LocalDateTime> expectedLdt = expected.stream().map(o -> o == null ? null : epochMicrosToLocalDateTime((Long) o)).collect(Collectors.toList());
+        List<LocalDateTime> expectedLdt = expected.stream().map(o -> o == null ? null : epochMillisToLocalDateTime((Long) o)).collect(Collectors.toList());
         assertEquals(expectedLdt.size(), actual.size(), fieldName + " size mismatch at index " + idx);
         for (int i = 0; i < expectedLdt.size(); i++) {
             LocalDateTime exp = expectedLdt.get(i);

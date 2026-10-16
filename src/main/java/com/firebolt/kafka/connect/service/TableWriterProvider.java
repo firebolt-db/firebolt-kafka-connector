@@ -3,7 +3,6 @@ package com.firebolt.kafka.connect.service;
 import com.firebolt.kafka.connect.IngestionService;
 import com.firebolt.kafka.connect.IngestionServiceProvider;
 import com.firebolt.kafka.connect.SinkConfig;
-import com.firebolt.kafka.connect.TableSchema;
 import com.firebolt.kafka.connect.TableWriter;
 import com.firebolt.kafka.connect.reporter.ErrorReporter;
 import com.google.common.annotations.VisibleForTesting;
@@ -27,8 +26,8 @@ public class TableWriterProvider {
         this.ingestionServiceProvider = ingestionServiceProvider;
     }
 
-    public TableWriter get(TableSchema tableSchema, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, SinkConfig sinkConfig) {
-        IngestionService ingestionService = ingestionServiceProvider.get(connectionSupplier.get(), tableSchema, errorReporter, sinkConfig);
-        return new TableWriter(tableSchema, fireboltMetadataService, topicName, processedPartitionOffsets, ingestionService);
+    public TableWriter get(String tableName, Supplier<Connection> connectionSupplier, FireboltMetadataService fireboltMetadataService, String topicName, Map<Integer, Long> processedPartitionOffsets, ErrorReporter errorReporter, SinkConfig sinkConfig) {
+        IngestionService ingestionService = ingestionServiceProvider.get(connectionSupplier.get(), tableName, errorReporter, sinkConfig);
+        return new TableWriter(tableName, fireboltMetadataService, topicName, processedPartitionOffsets, ingestionService);
     }
 }

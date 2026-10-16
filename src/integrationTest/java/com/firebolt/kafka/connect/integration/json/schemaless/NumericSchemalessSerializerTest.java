@@ -79,42 +79,6 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         verifyNumericRecordsInFirebolt(testRecords);
     }
 
-    @ParameterizedTest
-    @MethodSource("ingestionTypes")
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, numericTableSchema(), connectorOverrides);
-
-        producer = initializeSchemalessJsonProducer();
-
-        NumericTestRecord validRecord1 = aValidTestRecord(301)
-                .bigDecimalFromString("42.42")
-                .build();
-        NumericTestRecord validRecord2 = aValidTestRecord(302)
-                .bigDecimalFromString("-17.5")
-                .build();
-        NumericTestRecord invalidRecord1 = aValidTestRecord(303)
-                .bigDecimalFromString("abc")
-                .build();
-        NumericTestRecord invalidRecord2 = aValidTestRecord(304)
-                .bigDecimalFromString("1,23")
-                .build();
-
-        List<NumericTestRecord> testRecords = List.of(
-                validRecord1,
-                invalidRecord1,
-                validRecord2,
-                invalidRecord2
-        );
-
-        publishMessages(testRecords);
-
-        List<NumericTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
-        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
-
-        verifyNumericRecordsInFirebolt(expectedRecords);
-    }
-
     /**
      * Creates test records covering all numeric scenarios including edge cases.
      */
@@ -125,13 +89,10 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .build(),
 
             // Record with maximum precision and scale (38,9) - 29 digits before decimal, 9 after
-            // use it as string as it loses precision when deserialized in Kafka Connect
             aValidTestRecord(2)
-                .bigDecimalFromString("99999999999999999999999999999.123456789")// 29 digits before decimal
                 .build(),
 
             aValidTestRecord(3)
-                .bigDecimalFromString("-99999999999999999999999999999.987654321") // 29 digits before decimal
                 .build(),
 
             // Record with minimum precision and scale
@@ -153,12 +114,10 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
 
             // Record with large numbers (within NUMERIC(38,9) limits)
             aValidTestRecord(7)
-                .bigDecimalFromString("12345678901234567890123456789.123456789") // 29 digits before decimal
                 .build(),
 
             // Record with large numbers (within NUMERIC(38,9) limits)
             aValidTestRecord(8)
-                .bigDecimalFromString("-98765432109876543210987654321.987654321") // 29 digits before decimal
                 .build(),
 
             // Record with common decimal constants (truncated to 9 decimal places)
@@ -204,12 +163,7 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .requiredListWithNonNullElements(createLargeNumericListWithoutNulls(100))
                 .optionalList(createOptionalLargeNumericList(100))
                 .optionalListWithNonNullElements(createOptionalLargeNumericList(50))
-                .build(),
-                // Record with large numbers (within NUMERIC(38,9) limits)
-
-            aValidTestRecord(14)
-                    .bigDecimalFromString("1234.123456789012345678901234567890123") // 33 digits after the  decimal
-                    .build()
+                .build()
             );
     }
     
@@ -227,7 +181,6 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 "\"optionalLong\" NUMERIC(38,9) NULL, " +
                 "\"optionalReal\" NUMERIC(38,9) NULL, " +
                 "\"optionalDouble\" NUMERIC(38,9) NULL, " +
-                "\"bigDecimalFromString\" NUMERIC(38,9) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(NUMERIC(38,9) NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(NUMERIC(38,9) NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(NUMERIC(38,9) NULL) NULL, " +
@@ -435,7 +388,6 @@ public class NumericSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .optionalLong((long) recordId * 100)
                 .optionalReal(12.5f)
                 .optionalDouble(123.456)
-                .bigDecimalFromString("123456.789123456")
                 .requiredListWithNullableElements(Arrays.asList(
                     new BigDecimal("1.111111111"), 
                     null, 

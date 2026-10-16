@@ -65,10 +65,4 @@ public class BooleanTestRecord {
      * Record ID for test identification and ordering.
      */
     private Integer recordId;
-
-    /**
-     * Boolean value represented as a string in JSON ("true"/"false").
-     * Mapped to a BOOLEAN column in the database.
-     */
-    private String booleanFromString;
-} 
+}

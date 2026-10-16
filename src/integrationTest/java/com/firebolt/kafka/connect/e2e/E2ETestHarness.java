@@ -103,6 +103,19 @@ public class E2ETestHarness {
     /** Batch size for streaming record production. */
     private static final int PRODUCE_BATCH_SIZE = 1_000;
 
+    /**
+     * Benchmark mode ({@code -De2e.benchmark=true}) measures connector + engine throughput on a fixed
+     * workload: {@code e2e.benchmark.records} records are produced while the connector is paused, then
+     * the connector is resumed and the drain is timed — from the first row landing (so consumer rejoin
+     * after the resume isn't counted) to the last. Producer speed and the produce window therefore don't
+     * affect the result.
+     */
+    private static final boolean BENCHMARK = Boolean.getBoolean("e2e.benchmark");
+    private static final long BENCHMARK_RECORDS = Long.getLong("e2e.benchmark.records", 2_000_000L);
+    private static final Duration BENCHMARK_POLL_INTERVAL = Duration.ofMillis(250);
+    /** Bump when the measurement changes, so results aren't compared across methods. */
+    static final String BENCHMARK_METHOD = "fixed-drain-v1";
+
     /** Total records produced (set after production completes). */
     private volatile long totalProduced;
 
@@ -112,6 +125,8 @@ public class E2ETestHarness {
 
     private volatile double produceDurationSeconds;
     private volatile double ingestDurationSeconds;
+    /** Rows measured by {@link #ingestDurationSeconds} (benchmark mode excludes the rows already landed at the first poll). */
+    private volatile long ingestMeasuredRows;
 
     /** Log production progress every N batches. */
     private static final int PROGRESS_LOG_INTERVAL_BATCHES = 10;
@@ -133,11 +148,14 @@ public class E2ETestHarness {
                 topic, config.getMessageType(), targetDuration,
                 PRODUCE_BATCH_SIZE, MAX_PRODUCER_LEAD_ROWS);
 
+        if (BENCHMARK) {
+            setConnectorPaused(true);
+        }
         long startNanos = System.nanoTime();
         long deadlineNanos = startNanos + targetDuration.toNanos();
         long produced = 0;
         int batchesSinceLog = 0;
-        while (System.nanoTime() < deadlineNanos) {
+        while (BENCHMARK ? produced < BENCHMARK_RECORDS : System.nanoTime() < deadlineNanos) {
             List<E2ETestRecord> batch = new ArrayList<>(PRODUCE_BATCH_SIZE);
             for (int i = 0; i < PRODUCE_BATCH_SIZE; i++) {
                 batch.add(E2ETestRecord.forSequenceId(produced + i + 1, config.getRecordSizeBytes()));
@@ -205,17 +223,27 @@ public class E2ETestHarness {
     public void waitForIngestion() {
         String table = config.resolvedTableName();
         long expected = totalProduced;
-        long startNanos = System.nanoTime();
+        if (BENCHMARK) {
+            setConnectorPaused(false);
+        }
+        long waitStartNanos = System.nanoTime();
+        long[] clock = {waitStartNanos, 0}; // [start nanos, rows already landed at start]
+        boolean[] started = {!BENCHMARK};
         log.warn("[INGEST] Waiting for {} rows in table '{}' (timeout={})...",
                 expected, table, config.getIngestionTimeout());
 
         await()
                 .atMost(config.getIngestionTimeout())
-                .pollInterval(config.getPollInterval())
+                .pollInterval(BENCHMARK ? BENCHMARK_POLL_INTERVAL : config.getPollInterval())
                 .until(() -> {
                     try {
                         long count = fireboltClient.countRows(table);
-                        double elapsedSec = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+                        if (!started[0] && count > 0) {
+                            clock[0] = System.nanoTime();
+                            clock[1] = count;
+                            started[0] = true;
+                        }
+                        double elapsedSec = (System.nanoTime() - waitStartNanos) / 1_000_000_000.0;
                         int pct = expected > 0 ? (int) (100L * count / expected) : 100;
                         log.info("[INGEST] {}/{} rows ({}%) — {}s elapsed",
                                 count, expected, pct,
@@ -227,7 +255,8 @@ public class E2ETestHarness {
                     }
                 });
 
-        ingestDurationSeconds = (System.nanoTime() - startNanos) / 1_000_000_000.0;
+        ingestDurationSeconds = (System.nanoTime() - clock[0]) / 1_000_000_000.0;
+        ingestMeasuredRows = expected - clock[1];
         log.warn("[INGEST] Done: {} rows landed in {}s",
                 expected, String.format("%.1f", ingestDurationSeconds));
     }
@@ -238,7 +267,7 @@ public class E2ETestHarness {
      * so that metrics are only persisted when the test fully passes.
      */
     public void writeBenchmarkResult() {
-        if (!Boolean.getBoolean("e2e.benchmark")) {
+        if (!BENCHMARK) {
             return;
         }
         try {
@@ -248,9 +277,9 @@ public class E2ETestHarness {
                     ? (totalProduced * (double) config.getRecordSizeBytes()) / (1024.0 * 1024.0 * produceDurationSeconds)
                     : 0;
             long ingestRate = ingestDurationSeconds > 0
-                    ? (long) (totalProduced / ingestDurationSeconds) : 0;
+                    ? (long) (ingestMeasuredRows / ingestDurationSeconds) : 0;
             double ingestThroughputMb = ingestDurationSeconds > 0
-                    ? (totalProduced * (double) config.getRecordSizeBytes()) / (1024.0 * 1024.0 * ingestDurationSeconds)
+                    ? (ingestMeasuredRows * (double) config.getRecordSizeBytes()) / (1024.0 * 1024.0 * ingestDurationSeconds)
                     : 0;
 
             BenchmarkResult result = BenchmarkResult.builder()
@@ -264,6 +293,8 @@ public class E2ETestHarness {
                     .ingestRateRecordsPerSec(ingestRate)
                     .ingestThroughputMbPerSec(round1(ingestThroughputMb))
                     .recordSizeBytes(config.getRecordSizeBytes())
+                    .method(BENCHMARK_METHOD)
+                    .connectorOverrides(connectorOverrides())
                     .build();
 
             java.io.File outputDir = new java.io.File("build/reports/benchmark");
@@ -445,6 +476,40 @@ public class E2ETestHarness {
         }
     }
 
+    /** {@code -De2e.connector.<key>=<value>} overrides any connector property (e.g. consumer batch sizes). */
+    private static Map<String, String> connectorOverrides() {
+        Map<String, String> overrides = new java.util.TreeMap<>();
+        System.getProperties().stringPropertyNames().stream()
+                .filter(key -> key.startsWith("e2e.connector."))
+                .forEach(key -> overrides.put(key.substring("e2e.connector.".length()), System.getProperty(key)));
+        return overrides;
+    }
+
+    /** Pauses (and waits until the task is PAUSED) or resumes the connector. */
+    private void setConnectorPaused(boolean paused) {
+        String name = connectorName(config);
+        Request request = new Request.Builder()
+                .url(connectUrl + "/connectors/" + name + (paused ? "/pause" : "/resume"))
+                .put(RequestBody.create(new byte[0], JSON_MEDIA))
+                .build();
+        try (Response response = HTTP.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Failed to " + (paused ? "pause" : "resume") + " '" + name + "': HTTP " + response.code());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        if (paused) {
+            await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(500)).until(() -> {
+                Request status = new Request.Builder().url(connectUrl + "/connectors/" + name + "/status").get().build();
+                try (Response resp = HTTP.newCall(status).execute()) {
+                    String body = resp.body().string();
+                    return body.contains("\"tasks\"") && !body.contains("\"RUNNING\"");
+                }
+            });
+        }
+    }
+
     private void awaitConnectorRunning(String connectorName) throws IOException {
         log.info("[E2E] Waiting for connector '{}' to reach RUNNING state...", connectorName);
         await()
@@ -495,10 +560,7 @@ public class E2ETestHarness {
             props.put("exactlyOnce", "true");
         }
 
-        // Ingestion type
-        if (config.getIngestionType() == IngestionType.BINARY) {
-            props.put("ingestion.type", "binary");
-        }
+        props.putAll(connectorOverrides());
 
         return props;
     }

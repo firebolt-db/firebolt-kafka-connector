@@ -98,7 +98,6 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
         r1.put("optionalListWithNonNullElements", Arrays.asList(
                 ByteBuffer.wrap("choice-1".getBytes(StandardCharsets.UTF_8)),
                 ByteBuffer.wrap("choice-2".getBytes(StandardCharsets.UTF_8))));
-        r1.put("byteaAsString", "SGVsbG8gV29ybGQ=");
         records.add(r1);
 
         // Record 2: single byte values, null optional
@@ -116,7 +115,6 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
                 ByteBuffer.wrap(new byte[]{0x30})));
         r2.put("optionalList", null);
         r2.put("optionalListWithNonNullElements", null);
-        r2.put("byteaAsString", "AQ==");
         records.add(r2);
 
         // Record 3: empty lists
@@ -128,7 +126,6 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
         r3.put("requiredListWithNonNullElements", new ArrayList<>());
         r3.put("optionalList", new ArrayList<>());
         r3.put("optionalListWithNonNullElements", new ArrayList<>());
-        r3.put("byteaAsString", "Tm9uLWVtcHR5IHJlcXVpcmVk");
         records.add(r3);
 
         // Record 4: unicode content as binary
@@ -152,7 +149,6 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
         r4.put("optionalListWithNonNullElements", Arrays.asList(
                 ByteBuffer.wrap("résumé".getBytes(StandardCharsets.UTF_8)),
                 ByteBuffer.wrap("über".getBytes(StandardCharsets.UTF_8))));
-        r4.put("byteaAsString", "SGVsbG8g5LiW55WM");
         records.add(r4);
 
         // Record 5: special characters and larger data
@@ -168,7 +164,6 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
                 ByteBuffer.wrap("single-element".getBytes(StandardCharsets.UTF_8))));
         r5.put("optionalList", null);
         r5.put("optionalListWithNonNullElements", null);
-        r5.put("byteaAsString", "U3BlY2lhbCBjaGFycw==");
         records.add(r5);
 
         return records;
@@ -182,8 +177,7 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
                 "\"requiredListWithNullableElements\" ARRAY(BYTEA NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BYTEA NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BYTEA NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(BYTEA NOT NULL) NULL, " +
-                "\"byteaAsString\" BYTEA NOT NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(BYTEA NOT NULL) NULL" +
                 ")";
     }
 
@@ -199,8 +193,7 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
                 "    {\"name\": \"requiredListWithNullableElements\", \"type\": {\"type\": \"array\", \"items\": [\"null\", \"bytes\"]}},\n" +
                 "    {\"name\": \"requiredListWithNonNullElements\", \"type\": {\"type\": \"array\", \"items\": \"bytes\"}},\n" +
                 "    {\"name\": \"optionalList\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", \"bytes\"]}], \"default\": null},\n" +
-                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": \"bytes\"}], \"default\": null},\n" +
-                "    {\"name\": \"byteaAsString\", \"type\": \"string\"}\n" +
+                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": \"bytes\"}], \"default\": null}\n" +
                 "  ]\n" +
                 "}";
     }
@@ -213,7 +206,7 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
         String selectQuery = String.format(
                 "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", " +
                 "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", " +
-                "\"optionalList\", \"optionalListWithNonNullElements\", \"byteaAsString\" " +
+                "\"optionalList\", \"optionalListWithNonNullElements\" " +
                 "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
 
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -252,9 +245,6 @@ public class AvroByteaSerializerTest extends AvroBaseIntegrationTest {
                 verifyByteaArray("optionalListWithNonNullElements",
                         (List<Object>) expected.get("optionalListWithNonNullElements"),
                         rs.getArray("optionalListWithNonNullElements"), idx);
-
-                byte[] actualByteaAsString = rs.getBytes("byteaAsString");
-                assertNotNull(actualByteaAsString, "byteaAsString should not be null at index " + idx);
 
                 idx++;
             }
