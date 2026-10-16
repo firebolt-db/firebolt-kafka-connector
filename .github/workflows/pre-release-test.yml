@@ -9,15 +9,21 @@ on:
       FIREBOLT_CLIENT_SECRET_STG_NEW_IDN:
         required: true
 
+permissions: {}
+
 jobs:
   build:
     name: Build and Unit Tests
     uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
 
   core-integration-3-9-1:
     name: Core Integration Tests (3.9.1)
     needs: build
     uses: ./.github/workflows/core-integration-tests.yml
+    permissions:
+      contents: read
     with:
       kafka_connect_version: '3.9.1'
 
@@ -25,6 +31,8 @@ jobs:
     name: Core Integration Tests (4.0)
     needs: build
     uses: ./.github/workflows/core-integration-tests.yml
+    permissions:
+      contents: read
     with:
       kafka_connect_version: '4.0'
 
@@ -32,6 +40,8 @@ jobs:
     name: Cloud Integration Tests
     needs: build
     uses: ./.github/workflows/cloud-integration-tests.yml
+    permissions:
+      contents: read
     secrets:
       FIREBOLT_CLIENT_ID_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
       FIREBOLT_CLIENT_SECRET_STG_NEW_IDN: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
