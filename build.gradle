@@ -46,6 +46,33 @@ repositories {
     }
 }
 
+// Credentials the integration and load tests read as system properties. CI
+// passes them as environment variables instead of -D arguments so they don't
+// show up on the command line (process list, Gradle debug output). An explicit
+// -D value still takes precedence.
+def secretSystemPropertiesFromEnv = { Map<String, String> propertyToEnv, task ->
+    propertyToEnv.each { property, envName ->
+        def value = System.getenv(envName)
+        if (value && System.getProperty(property) == null) {
+            task.systemProperty property, value
+        }
+    }
+}
+def loadTestSecretsFromEnv = [
+    'firebolt.client.id'                  : 'LT_FIREBOLT_CLIENT_ID',
+    'firebolt.client.secret'              : 'LT_FIREBOLT_CLIENT_SECRET',
+    'confluent.kafka.api.key'             : 'LT_CONFLUENT_KAFKA_API_KEY',
+    'confluent.kafka.api.secret'          : 'LT_CONFLUENT_KAFKA_API_SECRET',
+    'confluent.schema.registry.api.key'   : 'LT_CONFLUENT_SCHEMA_REGISTRY_API_KEY',
+    'confluent.schema.registry.api.secret': 'LT_CONFLUENT_SCHEMA_REGISTRY_API_SECRET',
+    'confluent.cloud.resource.api.key'    : 'LT_CONFLUENT_CLOUD_RESOURCE_API_KEY',
+    'confluent.cloud.resource.api.secret' : 'LT_CONFLUENT_CLOUD_RESOURCE_API_SECRET',
+]
+def integrationTestSecretsFromEnv = [
+    'clientId'    : 'IT_FIREBOLT_CLIENT_ID',
+    'clientSecret': 'IT_FIREBOLT_CLIENT_SECRET',
+]
+
 // Task to run the ScenarioLoadTest with system properties
 tasks.register('runScenarioLoadTest', JavaExec) {
     group = "Load Testing"
@@ -56,6 +83,7 @@ tasks.register('runScenarioLoadTest', JavaExec) {
     
     // Pass all system properties to the JVM
     systemProperties System.properties
+    secretSystemPropertiesFromEnv(loadTestSecretsFromEnv, it)
     
     // Set JVM arguments for better performance and logging
     jvmArgs = [
@@ -327,6 +355,7 @@ tasks.named('integrationTest', Test) {
     
     // Pass all system properties to the test JVM
     systemProperties System.properties
+    secretSystemPropertiesFromEnv(integrationTestSecretsFromEnv, it)
 
     testLogging {
         events 'started', 'passed', 'failed', 'skipped'
@@ -824,6 +853,7 @@ tasks.register('runLoadTest', JavaExec) {
     
     // Pass all system properties to the JVM
     systemProperties System.properties
+    secretSystemPropertiesFromEnv(loadTestSecretsFromEnv, it)
     
     // Set JVM arguments for better performance and logging
     jvmArgs = [

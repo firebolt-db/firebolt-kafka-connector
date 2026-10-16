@@ -89,24 +89,16 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          cache-read-only: false
 
       - name: Run Scenario Load Test
+        # Credentials reach the test JVM via the LT_* env vars below (see
+        # build.gradle), not as -D arguments on the command line.
         run: |
           ./gradlew runScenarioLoadTest \
             -Dfirebolt.jdbc.url="${LT_FIREBOLT_JDBC_URL}" \
-            -Dfirebolt.client.id="${LT_FIREBOLT_CLIENT_ID}" \
-            -Dfirebolt.client.secret="${LT_FIREBOLT_CLIENT_SECRET}" \
             -Dconfluent.environment.id="${LT_CONFLUENT_ENVIRONMENT_ID}" \
             -Dconfluent.cluster.id="${LT_CONFLUENT_CLUSTER_ID}" \
             -Dconfluent.firebolt.connector.plugin.id="${LT_CONFLUENT_FIREBOLT_CONNECTOR_PLUGIN_ID}" \
-            -Dconfluent.kafka.api.key="${LT_CONFLUENT_KAFKA_API_KEY}" \
-            -Dconfluent.kafka.api.secret="${LT_CONFLUENT_KAFKA_API_SECRET}" \
-            -Dconfluent.schema.registry.api.key="${LT_CONFLUENT_SCHEMA_REGISTRY_API_KEY}" \
-            -Dconfluent.schema.registry.api.secret="${LT_CONFLUENT_SCHEMA_REGISTRY_API_SECRET}" \
-            -Dconfluent.cloud.resource.api.key="${LT_CONFLUENT_CLOUD_RESOURCE_API_KEY}" \
-            -Dconfluent.cloud.resource.api.secret="${LT_CONFLUENT_CLOUD_RESOURCE_API_SECRET}" \
             -Dloadtest.scenario.name="${LT_LOADTEST_SCENARIO_NAME}" \
             -Dloadtest.message.count="${LT_LOADTEST_MESSAGE_COUNT}" \
             -Dloadtest.ingestion.type="${LT_LOADTEST_INGESTION_TYPE}" \

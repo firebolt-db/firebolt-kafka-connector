@@ -159,8 +159,14 @@ jobs:
         run: |
           SECRETS_FILE="src/integrationTest/docker/kafka-connect-cloud/secrets/secrets.properties"
           echo "Replacing placeholders in $SECRETS_FILE"
-          sed -i "s/\${clientId}/${FIREBOLT_CLIENT_ID}/g" "$SECRETS_FILE"
-          sed -i "s/\${clientSecret}/${FIREBOLT_CLIENT_SECRET}/g" "$SECRETS_FILE"
+          # Substitute with bash builtins rather than sed so the secrets are
+          # never part of a process's command line. The placeholders are literal.
+          # shellcheck disable=SC2016
+          id_placeholder='${clientId}' secret_placeholder='${clientSecret}'
+          content="$(<"$SECRETS_FILE")"
+          content="${content//"$id_placeholder"/"$FIREBOLT_CLIENT_ID"}"
+          content="${content//"$secret_placeholder"/"$FIREBOLT_CLIENT_SECRET"}"
+          printf '%s\n' "$content" > "$SECRETS_FILE"
           echo "Secrets replaced successfully"
 
       - name: Start Docker services
@@ -178,13 +184,15 @@ jobs:
           echo "Kafka Connect is ready!"
 
       - name: Run integration tests (excluding NOT_IMPLEMENTED and E2E)
-        run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,e2e --no-daemon -Djdbc.connection.url="jdbc:firebolt:${DATABASE_NAME}?account=${ACCOUNT_NAME}&engine=${ENGINE_NAME}&env=staging" -DclientId="${FIREBOLT_CLIENT_ID}" -DclientSecret="${FIREBOLT_CLIENT_SECRET}"
+        # The credentials reach the test JVM as the clientId/clientSecret system
+        # properties via the IT_* env vars (see build.gradle), not as -D arguments.
+        run: ./gradlew integrationTest -Djunit.jupiter.excludeTags=not_implemented,e2e --no-daemon -Djdbc.connection.url="jdbc:firebolt:${DATABASE_NAME}?account=${ACCOUNT_NAME}&engine=${ENGINE_NAME}&env=staging"
         env:
           DATABASE_NAME: ${{ steps.find-database-name.outputs.database_name }}
           ACCOUNT_NAME: ${{ steps.set-account.outputs.account }}
           ENGINE_NAME: ${{ steps.find-engine-name.outputs.engine_name }}
-          FIREBOLT_CLIENT_ID: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
-          FIREBOLT_CLIENT_SECRET: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
+          IT_FIREBOLT_CLIENT_ID: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+          IT_FIREBOLT_CLIENT_SECRET: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
           KAFKA_BOOTSTRAP_SERVERS: localhost:9092
           SCHEMA_REGISTRY_URL: http://localhost:8081
           KAFKA_CONNECT_URL: http://localhost:8083
@@ -216,6 +224,26 @@ jobs:
           fi
           
           echo "Docker logs collected successfully"
+
+      - name: Scrub credentials from logs and reports
+        # The connector was configured with the Firebolt credentials (see
+        # secrets.properties), so mask them in everything uploaded below.
+        if: always()
+        env:
+          SCRUB_CLIENT_ID: ${{ secrets.FIREBOLT_CLIENT_ID_STG_NEW_IDN }}
+          SCRUB_CLIENT_SECRET: ${{ secrets.FIREBOLT_CLIENT_SECRET_STG_NEW_IDN }}
+        run: |
+          # perl reads the values from the environment, so they stay off the command line.
+          # shellcheck disable=SC2016
+          for dir in docker-logs logs build/test-results build/reports; do
+            [ -d "$dir" ] || continue
+            find "$dir" -type f -print0 | xargs -0 -r perl -pi -e '
+              for my $name ("SCRUB_CLIENT_SECRET", "SCRUB_CLIENT_ID") {
+                my $value = $ENV{$name};
+                s/\Q$value\E/***/g if defined $value && length $value;
+              }'
+          done
+          echo "Credentials scrubbed"
 
       - name: Stop Docker services
         if: always()
