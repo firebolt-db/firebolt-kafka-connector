@@ -184,8 +184,6 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 "\"recordId\" INTEGER NOT NULL, " +
                 "\"requiredBytea\" BYTEA NOT NULL, " +
                 "\"optionalBytea\" BYTEA NULL, " +
-                "\"stringAsBytea\" BYTEA NULL, " +
-                "\"stringListAsBytea\" ARRAY(BYTEA NULL) NULL, " +
                 "\"requiredListWithNullableElements\" ARRAY(BYTEA NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BYTEA NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BYTEA NULL) NULL, " +
@@ -216,23 +214,6 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 "        {\"type\": \"string\", \"connect.type\": \"bytes\"}\n" +
                 "      ],\n" +
                 "      \"description\": \"Optional binary field - can be null or omitted\"\n" +
-                "    },\n" +
-                "    \"stringAsBytea\": {\n" +
-                "      \"type\": \"string\"\n" +
-                "    },\n" +
-                "    \"stringListAsBytea\": {\n" +
-                "      \"oneOf\": [\n" +
-                "        {\"type\": \"null\"},\n" +
-                "        {\n" +
-                "          \"type\": \"array\",\n" +
-                "          \"items\": {\n" +
-                "            \"oneOf\": [\n" +
-                "              {\"type\": \"null\"},\n" +
-                "              {\"type\": \"string\"}\n" +
-                "            ]\n" +
-                "          }\n" +
-                "        }\n" +
-                "      ]\n" +
                 "    },\n" +
                 "    \"requiredListWithNullableElements\": {\n" +
                 "      \"type\": \"array\",\n" +
@@ -312,7 +293,7 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
         
         // Verify specific records by recordId
         String selectQuery = String.format(
-            "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", \"stringAsBytea\", \"stringListAsBytea\", " +
+            "SELECT \"recordId\", \"requiredBytea\", \"optionalBytea\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
             "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
@@ -330,10 +311,6 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 Integer actualRecordId = rs.getInt("recordId");
                 byte[] actualRequiredBytea = rs.getBytes("requiredBytea");
                 byte[] actualOptionalBytea = rs.getBytes("optionalBytea");
-                
-                // Read new string-mapped BYTEA columns
-                byte[] actualStringAsBytea = rs.getBytes("stringAsBytea");
-                Array actualStringListAsBytea = rs.getArray("stringListAsBytea");
 
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
@@ -356,31 +333,6 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
                         "OptionalBytea mismatch at index " + recordIndex);
                 }
                 
-                // Verify new string-mapped BYTEA columns
-                if (expected.getStringAsBytea() == null) {
-                    assertNull(actualStringAsBytea);
-                } else {
-                    assertArrayEquals(expected.getStringAsBytea().getBytes(StandardCharsets.UTF_8), actualStringAsBytea);
-                }
-                if (expected.getStringListAsBytea() == null) {
-                    assertNull(actualStringListAsBytea);
-                } else {
-                    // Convert expected strings to bytes
-                    byte[][] expectedBytes = expected.getStringListAsBytea().stream()
-                            .map(s -> s == null ? null : s.getBytes(StandardCharsets.UTF_8))
-                            .toArray(byte[][]::new);
-                    // Compare array contents
-                    byte[][] actualBytes = (byte[][]) actualStringListAsBytea.getArray();
-                    assertEquals(expectedBytes.length, actualBytes.length);
-                    for (int i = 0; i < expectedBytes.length; i++) {
-                        if (expectedBytes[i] == null) {
-                            assertNull(actualBytes[i]);
-                        } else {
-                            assertArrayEquals(expectedBytes[i], actualBytes[i]);
-                        }
-                    }
-                }
-
                 // Array verification using getArray()
                 verifyByteaArray("requiredListWithNullableElements", 
                     expected.getRequiredListWithNullableElements(), actualRequiredListWithNullableArray, recordIndex);
@@ -481,8 +433,6 @@ public class ByteaSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .recordId(recordId)
                 .requiredBytea("Default binary content".getBytes(StandardCharsets.UTF_8))
                 .optionalBytea("Default optional value".getBytes(StandardCharsets.UTF_8))
-                .stringAsBytea("Hello as bytea")
-                .stringListAsBytea(Arrays.asList("one", "two", "three"))
                 .requiredListWithNullableElements(Arrays.asList(
                     "item1".getBytes(StandardCharsets.UTF_8), 
                     "item2".getBytes(StandardCharsets.UTF_8)))

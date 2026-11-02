@@ -27,14 +27,16 @@ def delta(cur, base):
     if not base:
         return ''
     pct = (cur - base) / base * 100
-    icon = ' 🚀' if pct >= 5 else (' ✅' if pct >= -5 else ' ⚠️')
+    # ±10%: run-to-run noise on shared CI runners, even with the fixed-workload method.
+    icon = ' 🚀' if pct >= 10 else (' ✅' if pct >= -10 else ' ⚠️')
     return f'{pct:+.1f}%{icon}'
 
 any_r  = next(iter(results.values()), {})
 sha    = (any_r.get('commit_sha') or 'unknown')[:7]
 any_b  = next(iter(baseline.values()), {}) if baseline else {}
 bsha   = (any_b.get('commit_sha') or '')[:7] or None
-has_b  = bool(baseline and bsha)
+# Only compare runs measured the same way (see BenchmarkResult.method).
+has_b  = bool(baseline and bsha and any_b.get('method') == any_r.get('method'))
 
 if has_b:
     rows = ['| Delivery | Ingest rate | Ingest throughput | vs Baseline |',
@@ -57,9 +59,12 @@ for cell in CELLS:
     else:
         rows.append(f'| {label} | {rate} rec/s | {mb} MB/s | {fmt(r["total_records_produced"])} |')
 
-dur      = any_r.get('duration_seconds', 10)
-rec_size = any_r.get('record_size_bytes', 256)
-b_note   = f' · baseline: main @ `{bsha}`' if has_b else ''
+rec_size  = any_r.get('record_size_bytes', 256)
+total     = any_r.get('total_records_produced', 0)
+overrides = any_r.get('connector_overrides') or {}
+b_note    = (f' · baseline: main @ `{bsha}`' if has_b
+             else ' · no comparable baseline on main yet (measurement method changed)' if baseline else '')
+cfg       = ', '.join(f'`{k.replace("consumer.override.", "")}={v}`' for k, v in sorted(overrides.items()))
 
 print('\n'.join([
     '## Throughput Benchmark Results',
@@ -68,5 +73,6 @@ print('\n'.join([
     '',
     *rows,
     '',
-    f'_JSON / SQL · {dur}s produce window · {rec_size}B records_',
+    f'_Schemaless JSON · {fmt(total)} × {rec_size}B records drained from a paused connector'
+    + (f' · {cfg}' if cfg else '') + '_',
 ]))

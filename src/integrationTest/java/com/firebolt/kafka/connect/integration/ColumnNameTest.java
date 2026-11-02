@@ -188,16 +188,19 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
     @AllArgsConstructor
     private static class ColumnNameRecord {
 
-        @JsonProperty("ID")
+        // The connector is state-free: it matches a JSON field to the column whose name equals it
+        // exactly (the field name is the column name). So each JsonProperty matches its column's
+        // exact case — this test now covers special-character column names, not case-insensitivity.
+        @JsonProperty("id")
         private Integer id;
 
-        @JsonProperty("Text")
+        @JsonProperty("TEXT")
         private String text;
 
-        @JsonProperty("localdate")
+        @JsonProperty("localDate")
         private LocalDate localDate;
 
-        @JsonProperty("bigInt")
+        @JsonProperty("BigInt")
         private Long bigInt;
 
         @JsonProperty("column-with-dashes")
@@ -212,7 +215,7 @@ public class ColumnNameTest extends SchemalessBaseIntegrationTest {
         @JsonProperty("column_with_underscores")
         private String columnWithUnderscore;
 
-        @JsonProperty("Case-Insensitive-Column-With-Dashes")
+        @JsonProperty("case-insensitive-column-with-dashes")
         private String caseInsensitiveColumnWithDashes;
 
         @JsonProperty("über")

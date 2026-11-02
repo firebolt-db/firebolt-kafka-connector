@@ -254,12 +254,12 @@ public class AvroTimestamptzSerializerTest extends AvroBaseIntegrationTest {
                 "  \"namespace\": \"com.firebolt.kafka.connect.integration.avro\",\n" +
                 "  \"fields\": [\n" +
                 "    {\"name\": \"recordId\", \"type\": \"int\"},\n" +
-                "    {\"name\": \"requiredTimestamptz\", \"type\": \"long\"},\n" +
-                "    {\"name\": \"optionalTimestamptz\", \"type\": [\"null\", \"long\"], \"default\": null},\n" +
-                "    {\"name\": \"requiredListWithNullableElements\", \"type\": {\"type\": \"array\", \"items\": [\"null\", \"long\"]}},\n" +
-                "    {\"name\": \"requiredListWithNonNullElements\", \"type\": {\"type\": \"array\", \"items\": \"long\"}},\n" +
-                "    {\"name\": \"optionalList\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", \"long\"]}], \"default\": null},\n" +
-                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": \"long\"}], \"default\": null},\n" +
+                "    {\"name\": \"requiredTimestamptz\", \"type\": {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}},\n" +
+                "    {\"name\": \"optionalTimestamptz\", \"type\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}], \"default\": null},\n" +
+                "    {\"name\": \"requiredListWithNullableElements\", \"type\": {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}]}},\n" +
+                "    {\"name\": \"requiredListWithNonNullElements\", \"type\": {\"type\": \"array\", \"items\": {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}}},\n" +
+                "    {\"name\": \"optionalList\", \"type\": [\"null\", {\"type\": \"array\", \"items\": [\"null\", {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}]}], \"default\": null},\n" +
+                "    {\"name\": \"optionalListWithNonNullElements\", \"type\": [\"null\", {\"type\": \"array\", \"items\": {\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}}], \"default\": null},\n" +
                 "    {\"name\": \"timestamptzAsString\", \"type\": \"string\"}\n" +
                 "  ]\n" +
                 "}";

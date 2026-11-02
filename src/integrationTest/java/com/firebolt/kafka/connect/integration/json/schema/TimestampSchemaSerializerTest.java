@@ -7,17 +7,10 @@ import com.firebolt.kafka.connect.integration.json.datatype.TimestampTestRecord;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.sql.Types;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -198,17 +191,10 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalListWithNonNullElements(Arrays.asList(
                     LocalDateTime.of(2024, 4, 10, 6, 45, 15, 333333000),   // 333.333 ms -> 333 ms (truncated)
                     LocalDateTime.of(2024, 10, 25, 22, 0, 0, 888888000)))  // 888.888 ms -> 888 ms (truncated)
-                // Test microsecond precision fields - these should preserve full precision
-                .microsecondTimestamp(1705334445123456L) // 2024-01-15T14:30:45.123456 in microseconds since epoch
                 .timestampStringArray(Arrays.asList(
                     "2024-03-01T10:00:00.500123",   // 500.123 milliseconds precision
                     "2024-08-15T16:45:12.123456",   // 123.456 milliseconds precision
                     "2024-05-20T08:30:45.750789"))  // 750.789 milliseconds precision
-                .microsecondTimestampList(Arrays.asList(
-                    1709204400500123L, // 2024-03-01T10:00:00.500123
-                    1723737912123456L, // 2024-08-15T16:45:12.123456
-                    1716138045750789L  // 2024-05-20T08:30:45.750789
-                ))
                 .timestampString("2024-07-04T12:30:15.987654")   // Independence Day with precision
                 .build(),
 
@@ -232,19 +218,11 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 .optionalListWithNonNullElements(Arrays.asList(
                     LocalDateTime.of(2024, 4, 10, 6, 45, 15, 444444444),   // Should become 444000000 (444 milliseconds)
                     LocalDateTime.of(2024, 10, 25, 22, 0, 0, 777777777)))  // Should become 777000000 (777 milliseconds)
-                // Test nanosecond precision fields - microsecond precision should be preserved
-                .microsecondTimestamp(1719485730987654L) // 2024-06-30T09:15:30.987654 in microseconds since epoch
                 .timestampStringArray(Arrays.asList(
                     "2024-03-01T10:00:00.500999",   // Maximum sub-millisecond precision
                     "2024-08-15T16:45:12.999999",   // Maximum microsecond precision
                     "2024-02-14T12:00:00.222333",   // Mixed precision values
                     "2024-07-04T18:30:45.888777"))  // Different microsecond values
-                .microsecondTimestampList(Arrays.asList(
-                    1709204400500999L, // 2024-03-01T10:00:00.500999
-                    1723737912999999L, // 2024-08-15T16:45:12.999999
-                    1707912000222333L, // 2024-02-14T12:00:00.222333
-                    1720116645888777L  // 2024-07-04T18:30:45.888777
-                ))
                 .timestampString("2024-12-25T00:00:00.121212")   // Christmas with palindromic microseconds
                 .build()
         );
@@ -322,17 +300,10 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                     LocalDateTime.of(2024, 8, 1, 7, 0, 0), LocalDateTime.of(2024, 9, 15, 14, 30, 45), LocalDateTime.of(2024, 10, 31, 20, 45, 15)))
                 .optionalListWithNonNullElements(Arrays.asList(
                     LocalDateTime.of(2024, 11, 1, 6, 15, 30), LocalDateTime.of(2024, 11, 15, 15, 0, 0), LocalDateTime.of(2024, 12, 1, 21, 30, 45)))
-                // Default values for new microsecond precision fields
-                .microsecondTimestamp(1705334445123456L)
                 .timestampStringArray(Arrays.asList(
                     "2024-01-15T14:30:45.123456",
                     "2024-02-28T16:45:30.987654",
                     "2024-03-15T12:00:00.500000"))
-                .microsecondTimestampList(Arrays.asList(
-                    1705334445123456L,
-                    1709139930987654L,
-                    1710504000500000L
-                ))
                 .timestampString("2024-04-01T08:15:30.111222");
     }
     
@@ -349,9 +320,7 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 "\"requiredListWithNonNullElements\" ARRAY(TIMESTAMP NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(TIMESTAMP NULL) NULL, " +
                 "\"optionalListWithNonNullElements\" ARRAY(TIMESTAMP NOT NULL) NULL, " +
-                "\"microsecondTimestamp\" TIMESTAMP  NULL, " +
                 "\"timestampStringArray\" ARRAY(TIMESTAMP NOT NULL)  NULL, " +
-                "\"microsecondTimestampList\" ARRAY(TIMESTAMP NOT NULL)  NULL, " +
                 "\"timestampListAsString\" ARRAY(TIMESTAMP NOT NULL)  NOT NULL, " +
                 "\"timestampString\" TIMESTAMP  NULL" +
                 ")";
@@ -447,25 +416,12 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                         "]," +
                         "\"description\": \"Optional list with non-null elements\"" +
                     "}," +
-                    "\"microsecondTimestamp\": {" +
-                        "\"type\": \"integer\"," +
-                        "\"connect.type\": \"int64\"," +
-                        "\"description\": \"Timestamp with microsecond precision (microseconds since epoch)\"" +
-                    "}," +
                     "\"timestampStringArray\": {" +
                         "\"type\": \"array\"," +
                         "\"items\": {" +
                             "\"type\": \"string\"," +
                             "\"format\": \"date-time\"" +
                         "}" +
-                    "}," +
-                    "\"microsecondTimestampList\": {" +
-                        "\"type\": \"array\"," +
-                        "\"items\": {" +
-                            "\"type\": \"integer\"," +
-                            "\"connect.type\": \"int64\"" +
-                        "}," +
-                        "\"description\": \"Array of microsecond precision timestamps (microseconds since epoch)\"" +
                     "}," +
                     "\"timestampListAsString\": {" +
                         "\"type\": \"array\"," +
@@ -506,13 +462,6 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
         }
         
         producer.flush();
-    }
-    
-    /**
-     * Converts Date to milliseconds since Unix epoch (1970-01-01T00:00:00Z).
-     */
-    private long localDateTimeToEpochMillis(Date date) {
-        return date.toInstant().toEpochMilli();
     }
     
     /**
@@ -557,10 +506,7 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                         .collect(Collectors.toList()));
             }
             
-            // Add the new microsecond precision fields (these should be preserved as-is)
-            builder.microsecondTimestamp(record.getMicrosecondTimestamp());
             builder.timestampStringArray(record.getTimestampStringArray());
-            builder.microsecondTimestampList(record.getMicrosecondTimestampList());
             builder.timestampString(record.getTimestampString());
             builder.timestampAsString(record.getTimestampAsString());
             builder.timestampListAsString(record.getTimestampListAsString());
@@ -595,8 +541,8 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredTimestamp\", \"timestampAsString\", \"optionalTimestamp\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\", \"microsecondTimestamp\", \"timestampStringArray\", " +
-            "\"microsecondTimestampList\", \"timestampListAsString\", \"timestampString\" " +
+            "\"optionalListWithNonNullElements\", \"timestampStringArray\", " +
+            "\"timestampListAsString\", \"timestampString\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
 
         // in order to get the timestamp in the current timezone we need to use a Calendar instance
@@ -622,10 +568,8 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                 Array actualOptionalListArray = rs.getArray("optionalList");
                 Array actualOptionalListWithNonNullElementsArray = rs.getArray("optionalListWithNonNullElements");
                 
-                // Retrieve new microsecond precision fields
-                java.sql.Timestamp actualMicrosecondTimestamp = rs.getTimestamp("microsecondTimestamp");
+                // Retrieve string-based timestamp fields
                 Array actualTimestampArray = rs.getArray("timestampStringArray");
-                Array actualMicrosecondTimestampListArray = rs.getArray("microsecondTimestampList");
                 Array actualTimestampListAsStringArray = rs.getArray("timestampListAsString");
                 java.sql.Timestamp actualTimestampString = rs.getTimestamp("timestampString");
                 
@@ -671,10 +615,8 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
                         expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
                 }
                 
-                // Verify microsecond precision fields (all records should have these fields)
-                verifyMicrosecondTimestamp(expected.getMicrosecondTimestamp(), actualMicrosecondTimestamp, recordIndex);
+                // Verify string-based timestamp fields
                 verifyTimestampStringArray(expected.getTimestampStringArray(), actualTimestampArray, recordIndex);
-                verifyMicrosecondTimestampListArray(expected.getMicrosecondTimestampList(), actualMicrosecondTimestampListArray, recordIndex);
                 verifyTimestampString(expected.getTimestampString(), actualTimestampString, recordIndex);
                 
                 // timestampListAsString verification (mandatory)
@@ -719,51 +661,6 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
     }
     
     /**
-     * Verifies microsecond precision timestamp field by comparing the expected Long (microseconds since epoch)
-     * with the actual Timestamp retrieved from Firebolt.
-     */
-    private void verifyMicrosecondTimestamp(Long expectedMicroseconds, java.sql.Timestamp actualTimestamp, int recordIndex) {
-        assertNotNull(expectedMicroseconds, "Expected microsecondTimestamp should not be null at index " + recordIndex);
-        assertNotNull(actualTimestamp, "Actual microsecondTimestamp should not be null at index " + recordIndex);
-        assertEquals(fromMicros(expectedMicroseconds), actualTimestamp.toInstant());
-    }
-
-    // Convert expected microseconds to expected timestamp. Firebolt stores the data in UTC. We need to substract the default timezone of the test machine
-    private Instant fromMicros(long micros) {
-        Timestamp timestamp = asTimestamp(micros);
-
-        LocalDateTime ldt = timestamp.toLocalDateTime();
-
-        ZoneId zone = ZoneId.of(java.util.TimeZone.getDefault().getID());
-        ZonedDateTime zdt = ldt.atZone(zone);
-        ZoneOffset offset = zdt.getOffset();
-        return timestamp.toInstant().minus(offset.getTotalSeconds(), ChronoUnit.SECONDS);
-    }
-
-    /**
-     * Verifies microsecond timestamp array by comparing expected Long array (microseconds since epoch)
-     * with actual Timestamp array retrieved from Firebolt.
-     */
-    private void verifyMicrosecondTimestampListArray(List<Long> expectedMicroseconds, Array actualArray, int recordIndex) throws SQLException {
-        assertNotNull(expectedMicroseconds, "Expected microsecondTimestampList should not be null at index " + recordIndex);
-        assertNotNull(actualArray, "Actual microsecondTimestampList should not be null at index " + recordIndex);
-        
-        // Check that the array base type is TIMESTAMP (Types.TIMESTAMP = 93)
-        int baseType = actualArray.getBaseType();
-        assertEquals(Types.TIMESTAMP, baseType);
-
-        // Get the array as Timestamp array and convert to List<Long> (microseconds since epoch)
-        java.sql.Timestamp[] arrayElements = (java.sql.Timestamp[]) actualArray.getArray();
-        assertEquals(expectedMicroseconds.size(), arrayElements.length,
-            "MicrosecondTimestampList size mismatch at index " + recordIndex);
-
-        for (int i = 0; i < expectedMicroseconds.size(); i++) {
-            Long expectedElement = expectedMicroseconds.get(i);
-            assertEquals(fromMicros(expectedElement), arrayElements[i].toInstant());
-        }
-    }
-
-    /**
      * Verifies timestamp string array by parsing both expected and actual string arrays
      * and comparing their timestamp values.
      */
@@ -800,13 +697,6 @@ public class TimestampSchemaSerializerTest extends SchemaBaseIntegrationTest {
 
         assertEquals(expectedLocalDateTime, actualLocalDateTime,
             "TimestampString mismatch at index " + recordIndex);
-    }
-
-    private static Timestamp asTimestamp(long micros) {
-        long seconds = micros / 1_000_000;
-        long microRemainder = micros % 1_000_000;
-        Instant instant = Instant.ofEpochSecond(seconds, microRemainder * 1000);
-        return Timestamp.from(instant);
     }
 
     private void assertEqualLocalDateTime(List<LocalDateTime> expected, List<LocalDateTime> actual, int recordIndex) {

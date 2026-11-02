@@ -1,10 +1,10 @@
 package com.firebolt.kafka.connect.integration.json.datatype;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.firebolt.kafka.connect.integration.json.datatype.serializer.DateListSerializer;
-import com.firebolt.kafka.connect.integration.json.datatype.serializer.DateSerializer;
-import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateSerializer;
-import com.firebolt.kafka.connect.integration.json.datatype.serializer.LocalDateListSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.IsoDateListSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.IsoDateSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.IsoLocalDateSerializer;
+import com.firebolt.kafka.connect.integration.json.datatype.serializer.IsoLocalDateListSerializer;
 import java.time.LocalDate;
 import java.util.Date;
 import lombok.AllArgsConstructor;
@@ -38,48 +38,48 @@ public class DateTestRecord {
      * Required date field - must not be null.
      * Maps to Firebolt DATE NOT NULL.
      */
-    @JsonSerialize(using = DateSerializer.class)
+    @JsonSerialize(using = IsoDateSerializer.class)
     private Date requiredDate;
 
     /**
      * Required array where individual date elements can be null.
      * Maps to Firebolt ARRAY(DATE NULL) NOT NULL.
      */
-    @JsonSerialize(using = DateListSerializer.class)
+    @JsonSerialize(using = IsoDateListSerializer.class)
     private List<Date> requiredListWithNullableElements;
 
     /**
      * Required array where individual date elements cannot be null.
      * Maps to Firebolt ARRAY(DATE NOT NULL) NOT NULL.
      */
-    @JsonSerialize(using = DateListSerializer.class)
+    @JsonSerialize(using = IsoDateListSerializer.class)
     private List<Date> requiredListWithNonNullElements;
 
     /**
      * Optional date field - can be null or omitted.
      * Maps to Firebolt DATE NULL.
      */
-    @JsonSerialize(using = DateSerializer.class)
+    @JsonSerialize(using = IsoDateSerializer.class)
     private Date optionalDate;
 
     /**
      * Optional array - entire array can be null/omitted, and elements can be null.
      * Maps to Firebolt ARRAY(DATE NULL) NULL.
      */
-    @JsonSerialize(using = DateListSerializer.class)
+    @JsonSerialize(using = IsoDateListSerializer.class)
     private List<Date> optionalList;
 
     /**
      * Optional array where individual date elements cannot be null.
      * Maps to Firebolt ARRAY(DATE NOT NULL) NULL.
      */
-    @JsonSerialize(using = DateListSerializer.class)
+    @JsonSerialize(using = IsoDateListSerializer.class)
     private List<Date> optionalListWithNonNullElements;
 
-    @JsonSerialize(using = LocalDateListSerializer.class)
+    @JsonSerialize(using = IsoLocalDateListSerializer.class)
     private List<LocalDate> optionalLocalDateList;
 
-    @JsonSerialize(using = LocalDateSerializer.class)
+    @JsonSerialize(using = IsoLocalDateSerializer.class)
     private LocalDate optionalLocalDate;
 
     private LocalDate localDateIso8601;

@@ -65,13 +65,6 @@ public class TimestamptzTestRecord {
      */
     private List<OffsetDateTime> optionalListWithNonNullElements;
     
-    /**
-     * Microsecond precision timestamptz field stored as Long (microseconds since epoch).
-     * Bypasses Kafka Connect's millisecond limitation to preserve full microsecond precision.
-     * Maps to Firebolt TIMESTAMPTZ NOT NULL.
-     */
-    private Long microsecondTimestamptz;
-
     private String timestamptzString;
 
     /**

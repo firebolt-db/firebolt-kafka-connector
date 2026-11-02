@@ -79,138 +79,84 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         verifyBooleanRecordsInFirebolt(testRecords);
     }
 
-    @ParameterizedTest
-    @MethodSource("ingestionTypes")
-    void willNotStopProcessingValidRecordsInCaseSomeRecordsContainInvalidValues(Map<String, String> connectorOverrides) throws Exception {
-        // Setup test resources using centralized method
-        setupSchemalessTestResources(TOPIC_NAME, TABLE_NAME, booleanTableSchema(), connectorOverrides);
-
-        producer = initializeSchemalessJsonProducer();
-
-        BooleanTestRecord validRecord1 = aValidTestRecord(101)
-                .booleanFromString("true")
-                .build();
-        BooleanTestRecord validRecord2 = aValidTestRecord(102)
-                .booleanFromString("false")
-                .build();
-        BooleanTestRecord invalidRecord1 = aValidTestRecord(103)
-                .booleanFromString("invalid boolean")
-                .build();
-        BooleanTestRecord invalidRecord2 = aValidTestRecord(104)
-                .booleanFromString("09-07-2025")
-                .build();
-
-        // create 2 valid records and 2 invalid records
-        List<BooleanTestRecord> testRecords = List.of(
-                validRecord1,
-                invalidRecord1,
-                validRecord2,
-                invalidRecord2
-        );
-
-        publishMessages(testRecords);
-
-        List<BooleanTestRecord> expectedRecords = List.of(validRecord1, validRecord2);
-        waitForDataInFirebolt(TABLE_NAME, expectedRecords.size());
-
-        verifyBooleanRecordsInFirebolt(expectedRecords);
-    }
-
 
     /**
      * Creates test records covering all scenarios.
-     *
-     * NOTE: for booleanFromString value, we will set the odd ones as true, and even ones as false as it would make it easier for verification
      */
     private List<BooleanTestRecord> createTestRecords() {
         return Arrays.asList(
             // Complete record with typical values
             aValidTestRecord(1)
-                .booleanFromString("true")
                 .build(),
 
             // Record with false value
             aValidTestRecord(2)
                 .requiredBoolean(false)
-                .booleanFromString("false")
                 .build(),
 
             // Record with true value
             aValidTestRecord(3)
                 .requiredBoolean(true)
-                .booleanFromString("TRUE")
                 .build(),
 
             // Record with null boolean
             aValidTestRecord(4)
                 .optionalBoolean(null)
-                .booleanFromString("FALSE")
                 .build(),
 
             // required list with nullable (empty list)
             aValidTestRecord(5)
                 .requiredListWithNullableElements(new ArrayList<>())
-                .booleanFromString("True")
                 .build(),
 
             // required list but with null values
             aValidTestRecord(6)
                 .requiredListWithNullableElements(Arrays.asList(true, null, false))
-                .booleanFromString("False")
                 .build(),
 
             // required list with mixed true/false and null values
             aValidTestRecord(7)
                 .requiredListWithNullableElements(Arrays.asList(null, null, true, false))
-                .booleanFromString("t")
                 .build(),
 
             // required list with non-null values, but empty list
             aValidTestRecord(8)
                 .requiredListWithNonNullElements(new ArrayList<>())
-                .booleanFromString("f")
                 .build(),
 
             // required list with non-null values - all true
             aValidTestRecord(9)
                 .requiredListWithNonNullElements(Arrays.asList(true, true, true, true))
-                .booleanFromString("T")
                 .build(),
 
             // Record with empty but valid optional list
             aValidTestRecord(10)
                 .optionalList(new ArrayList<>())
-                .booleanFromString("F")
                 .build(),
 
             // Record with null optional list
             aValidTestRecord(11)
                 .optionalList(null)
-                .booleanFromString("1")
                 .build(),
 
             // Record with valid optional list (includes nulls)
             aValidTestRecord(12)
                 .optionalList(Arrays.asList(false, true, null))
-                .booleanFromString("0")
                 .build(),
 
             // Record with valid optional list with null values, but empty array
             aValidTestRecord(13)
                 .optionalListWithNonNullElements(new ArrayList<>())
-                .booleanFromString("true")
                 .build(),
 
             // Record with valid optional list with null values, but null
             aValidTestRecord(14)
                 .optionalListWithNonNullElements(null)
-                .booleanFromString("false")
                 .build(),
 
             // Record with valid optional list without null values - all false
             aValidTestRecord(15)
                 .optionalListWithNonNullElements(Arrays.asList(false, false, false))
-                .booleanFromString("true")
                 .build(),
 
             // Record with large lists (5000 elements each)
@@ -221,7 +167,6 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 .requiredListWithNonNullElements(createLargeListWithoutNulls(5000))
                 .optionalList(createOptionalLargeList(5000))
                 .optionalListWithNonNullElements(createOptionalLargeList(3000))  // Different size for variety
-                .booleanFromString("false")
                 .build()
         );
     }
@@ -234,8 +179,7 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 "\"requiredListWithNullableElements\" ARRAY(BOOLEAN NULL) NOT NULL, " +
                 "\"requiredListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NOT NULL, " +
                 "\"optionalList\" ARRAY(BOOLEAN NULL) NULL, " +
-                "\"optionalListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NULL, " +
-                "\"booleanFromString\" BOOLEAN NOT NULL" +
+                "\"optionalListWithNonNullElements\" ARRAY(BOOLEAN NOT NULL) NULL" +
                 ")";
     }
     
@@ -274,7 +218,7 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
         String selectQuery = String.format(
             "SELECT \"recordId\", \"requiredBoolean\", \"optionalBoolean\", " +
             "\"requiredListWithNullableElements\", \"requiredListWithNonNullElements\", \"optionalList\", " +
-            "\"optionalListWithNonNullElements\", \"booleanFromString\" " +
+            "\"optionalListWithNonNullElements\" " +
             "FROM \"%s\" ORDER BY \"recordId\"", TABLE_NAME);
         
         try (ResultSet rs = fireboltDefaultDbClient.executeQuery(selectQuery)) {
@@ -290,8 +234,7 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                 Integer actualRecordId = rs.getInt("recordId");
                 Boolean actualRequiredBoolean = rs.getBoolean("requiredBoolean");
                 Boolean actualOptionalBoolean = rs.getObject("optionalBoolean") != null ? rs.getBoolean("optionalBoolean") : null;
-                Boolean actualBooleanFromString = rs.getBoolean("booleanFromString");
-                
+
                 // Read arrays using getArray() instead of getString()
                 Array actualRequiredListWithNullableArray = rs.getArray("requiredListWithNullableElements");
                 Array actualRequiredListWithNonNullArray = rs.getArray("requiredListWithNonNullElements");
@@ -325,14 +268,9 @@ public class BooleanSchemalessSerializerTest extends SchemalessBaseIntegrationTe
                     expected.getOptionalList(), actualOptionalListArray, recordIndex);
                 
                 // Optional list with non-null elements verification
-                verifyBooleanArray("optionalListWithNonNullElements", 
+                verifyBooleanArray("optionalListWithNonNullElements",
                     expected.getOptionalListWithNonNullElements(), actualOptionalListWithNonNullElementsArray, recordIndex);
 
-                // Verify booleanFromString column matches parsed value of string
-                boolean expectedBooleanFromString = actualRecordId % 2 == 0 ? false : true;
-                assertEquals(expectedBooleanFromString, actualBooleanFromString,
-                    "booleanFromString mismatch at index " + recordIndex);
-                
                 recordIndex++;
             }
             

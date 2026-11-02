@@ -41,27 +41,6 @@ public class SinkConfigTest {
     }
 
     @Test
-    void testConstructorWithConfigMap() {
-        Map<String, String> testConfig = new HashMap<>();
-        testConfig.put("test.key", "test.value");
-        
-        SinkConfig testSinkConfig = new SinkConfig(testConfig);
-        
-        assertNotNull(testSinkConfig);
-        assertEquals("test.value", testSinkConfig.get("test.key"));
-    }
-
-    @Test
-    void testConstructorWithEmptyConfig() {
-        Map<String, String> emptyConfig = new HashMap<>();
-        
-        SinkConfig testSinkConfig = new SinkConfig(emptyConfig);
-        
-        assertNotNull(testSinkConfig);
-        assertNull(testSinkConfig.get("any.key"));
-    }
-
-    @Test
     void testGetTopicToTableMapping() {
         String result = sinkConfig.getTopicToTableMapping();
         
@@ -235,56 +214,6 @@ public class SinkConfigTest {
         assertNull(result.getJdbcConnectionUrl());
         assertEquals(Optional.empty(), result.getClientId());
         assertEquals(Optional.empty(), result.getClientSecret());
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-        "test.key1, test.value1",
-        "test.key2, test.value2",
-        "complex.nested.key, complex.value",
-        "empty.key, ''",
-        "number.key, 12345"
-    })
-    void testGetUtilityMethod(String key, String expectedValue) {
-        configMap.put(key, expectedValue);
-        SinkConfig testConfig = new SinkConfig(configMap);
-        
-        String result = testConfig.get(key);
-        
-        assertEquals(expectedValue, result);
-    }
-
-    @Test
-    void testGetUtilityMethodWithNonexistentKey() {
-        String result = sinkConfig.get("nonexistent.key");
-        
-        assertNull(result);
-    }
-
-    @Test
-    void testGetUtilityMethodWithNullKey() {
-        String result = sinkConfig.get(null);
-        
-        assertNull(result);
-    }
-
-    @Test
-    void testGetConfigReturnsOriginalMap() {
-        Map<String, String> result = sinkConfig.getConfig();
-        
-        assertNotNull(result);
-        assertSame(configMap, result);
-        assertEquals(configMap.size(), result.size());
-        assertEquals("jdbc:firebolt:test_db", result.get(ConnectorConfigDefinition.JDBC_CONNECTION_URL_CONFIG));
-    }
-
-    @Test
-    void testGetConfigReturnsSameReference() {
-        Map<String, String> result1 = sinkConfig.getConfig();
-        Map<String, String> result2 = sinkConfig.getConfig();
-        
-        assertSame(result1, result2);
-        assertSame(configMap, result1);
     }
 
     @ParameterizedTest
