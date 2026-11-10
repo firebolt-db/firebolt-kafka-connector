@@ -57,6 +57,20 @@ public class ConnectorConfigDefinition {
     public static final String ERROR_TOLERANCE_DEFAULT = "none";
 
     // =========================
+    // SCHEMA REFRESH CONFIGURATION
+    // =========================
+    public static final String SCHEMA_REFRESH_ENABLED_CONFIG = "schema.refresh.enabled";
+    public static final String SCHEMA_REFRESH_ENABLED_DOC = "When true, the connector periodically re-queries Firebolt and starts populating columns " +
+            "that were added to the table after the connector started. " +
+            "When false (default), the cached schema is frozen at startup and new Firebolt columns are never picked up. " +
+            "The connector never issues DDL — all schema changes must be made directly in Firebolt.";
+    public static final boolean SCHEMA_REFRESH_ENABLED_DEFAULT = false;
+
+    public static final String SCHEMA_REFRESH_INTERVAL_MS_CONFIG = "schema.refresh.interval.ms";
+    public static final String SCHEMA_REFRESH_INTERVAL_MS_DOC = "How often (in milliseconds) to re-query Firebolt for schema changes when schema.refresh.enabled=true. Default: 300000 (5 minutes).";
+    public static final long SCHEMA_REFRESH_INTERVAL_MS_DEFAULT = 300_000L;
+
+    // =========================
     // CONFIG DEFINITION
     // =========================
     public static ConfigDef CONFIG_DEF = createConfigDef();
@@ -117,6 +131,17 @@ public class ConnectorConfigDefinition {
                         ERROR_TOLERANCE_DEFAULT,
                         ConfigDef.ValidString.in("none", "all"),
                         ConfigDef.Importance.MEDIUM,
-                        ERROR_TOLERANCE_DOC);
+                        ERROR_TOLERANCE_DOC)
+                // Schema refresh configuration
+                .define(SCHEMA_REFRESH_ENABLED_CONFIG,
+                        ConfigDef.Type.BOOLEAN,
+                        SCHEMA_REFRESH_ENABLED_DEFAULT,
+                        ConfigDef.Importance.MEDIUM,
+                        SCHEMA_REFRESH_ENABLED_DOC)
+                .define(SCHEMA_REFRESH_INTERVAL_MS_CONFIG,
+                        ConfigDef.Type.LONG,
+                        SCHEMA_REFRESH_INTERVAL_MS_DEFAULT,
+                        ConfigDef.Importance.MEDIUM,
+                        SCHEMA_REFRESH_INTERVAL_MS_DOC);
     }
 } 
