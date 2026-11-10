@@ -768,7 +768,7 @@ public class FireboltSinkTaskTest {
             java.lang.reflect.Field sinkConfigField = FireboltSinkTask.class.getDeclaredField("sinkConfig");
             sinkConfigField.setAccessible(true);
             sinkConfigField.set(fireboltSinkTask, mockSinkConfig);
-            
+
             java.lang.reflect.Field dbServiceField = FireboltSinkTask.class.getDeclaredField("fireboltDbService");
             dbServiceField.setAccessible(true);
             dbServiceField.set(fireboltSinkTask, mockDbService);
@@ -777,4 +777,191 @@ public class FireboltSinkTaskTest {
             // Tests may not work as expected but won't crash
         }
     }
-} 
+
+    // -------------------------------------------------------------------------
+    // auto.evolve unit tests
+    // -------------------------------------------------------------------------
+
+    /**
+     * Sets up the task in a state ready for auto.evolve testing.
+     * Injects mocked dependencies and configures a table schema that is missing the "extra" column.
+     *
+     * @param autoEvolveEnabled whether auto.evolve should be active
+     * @return the TableSchema injected into the task (so callers can assert column count changes)
+     */
+    private TableSchema setupForAutoEvolve(boolean autoEvolveEnabled) {
+        try {
+            // Inject sinkConfig and dbService mocks
+            java.lang.reflect.Field sinkConfigField = FireboltSinkTask.class.getDeclaredField("sinkConfig");
+            sinkConfigField.setAccessible(true);
+            sinkConfigField.set(fireboltSinkTask, mockSinkConfig);
+
+            java.lang.reflect.Field dbServiceField = FireboltSinkTask.class.getDeclaredField("fireboltDbService");
+            dbServiceField.setAccessible(true);
+            dbServiceField.set(fireboltSinkTask, mockDbService);
+
+            java.lang.reflect.Field sinkServiceField = FireboltSinkTask.class.getDeclaredField("fireboltSinkService");
+            sinkServiceField.setAccessible(true);
+            sinkServiceField.set(fireboltSinkTask, mockSinkService);
+
+            // autoEvolveEnabled flag
+            java.lang.reflect.Field evolveField = FireboltSinkTask.class.getDeclaredField("autoEvolveEnabled");
+            evolveField.setAccessible(true);
+            evolveField.set(fireboltSinkTask, autoEvolveEnabled);
+
+            // topicToTableMapping: test_topic → test_table
+            java.lang.reflect.Field mappingField = FireboltSinkTask.class.getDeclaredField("topicToTableMapping");
+            mappingField.setAccessible(true);
+            Map<String, String> mapping = new HashMap<>();
+            mapping.put("test_topic", "test_table");
+            mappingField.set(fireboltSinkTask, mapping);
+
+            // tableSchemas: test_table has only {id, name} — missing "extra"
+            TableSchema tableSchema = new TableSchema("test_table");
+            tableSchema.addColumn("id",   "INTEGER", java.sql.Types.INTEGER, false);
+            tableSchema.addColumn("name", "TEXT",    java.sql.Types.VARCHAR, true);
+
+            java.lang.reflect.Field schemasField = FireboltSinkTask.class.getDeclaredField("tableSchemas");
+            schemasField.setAccessible(true);
+            Map<String, TableSchema> schemas = new HashMap<>();
+            schemas.put("test_table", tableSchema);
+            schemasField.set(fireboltSinkTask, schemas);
+
+            when(mockSinkConfig.getJdbcConfig()).thenReturn(mockJdbcConfig);
+
+            return tableSchema;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to set up auto.evolve test state", e);
+        }
+    }
+
+    /** Builds a SinkRecord whose value schema includes {id, name, extra}. */
+    private SinkRecord recordWithExtraField() {
+        Schema schema = SchemaBuilder.struct()
+                .field("id",    Schema.INT32_SCHEMA)
+                .field("name",  Schema.STRING_SCHEMA)
+                .field("extra", Schema.OPTIONAL_STRING_SCHEMA)
+                .build();
+        Struct struct = new Struct(schema)
+                .put("id",    1)
+                .put("name",  "alice")
+                .put("extra", "val");
+        return new SinkRecord("test_topic", 0, null, null, schema, struct, 0L);
+    }
+
+    @Test
+    void autoEvolveEnabled_ddlIssuedForMissingColumn() throws Exception {
+        setupForAutoEvolve(true);
+
+        // DB service succeeds; schema refresh returns the enriched schema
+        TableSchema refreshed = new TableSchema("test_table");
+        refreshed.addColumn("id",    "INTEGER", java.sql.Types.INTEGER, false);
+        refreshed.addColumn("name",  "TEXT",    java.sql.Types.VARCHAR, true);
+        refreshed.addColumn("extra", "TEXT",    java.sql.Types.VARCHAR, true);
+        when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), anySet()))
+                .thenReturn(Map.of("test_table", refreshed));
+
+        fireboltSinkTask.put(List.of(recordWithExtraField()));
+
+        // DDL must have been executed once
+        verify(mockDbService, times(1)).executeUpdate(eq(mockJdbcConfig), contains("ADD COLUMN IF NOT EXISTS"));
+        // Schema refresh should also have been triggered
+        verify(mockDbService, times(1)).discoverTableSchemas(eq(mockJdbcConfig), anySet());
+    }
+
+    @Test
+    void autoEvolveEnabled_ddlContainsCorrectColumnDefinition() throws Exception {
+        setupForAutoEvolve(true);
+
+        when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), anySet()))
+                .thenReturn(Map.of("test_table", new TableSchema("test_table")));
+
+        fireboltSinkTask.put(List.of(recordWithExtraField()));
+
+        ArgumentCaptor<String> ddlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockDbService).executeUpdate(eq(mockJdbcConfig), ddlCaptor.capture());
+        String ddl = ddlCaptor.getValue();
+        assertTrue(ddl.contains("\"extra\""), "DDL must name the column");
+        assertTrue(ddl.contains("TEXT"),      "DDL must include the Firebolt type");
+        assertTrue(ddl.contains("NULL"),      "DDL must mark column nullable");
+        assertTrue(ddl.contains("ADD COLUMN IF NOT EXISTS"), "DDL must be idempotent");
+    }
+
+    @Test
+    void autoEvolveDisabled_noDdlIssued() throws Exception {
+        setupForAutoEvolve(false);
+
+        fireboltSinkTask.put(List.of(recordWithExtraField()));
+
+        verify(mockDbService, never()).executeUpdate(any(), anyString());
+    }
+
+    @Test
+    void autoEvolveEnabled_schemalessRecord_noDdlIssued() throws Exception {
+        setupForAutoEvolve(true);
+
+        // Schemaless record: valueSchema() == null
+        SinkRecord schemaless = new SinkRecord("test_topic", 0, null, null, null,
+                "{\"id\":1,\"extra\":\"val\"}", 0L);
+
+        fireboltSinkTask.put(List.of(schemaless));
+
+        verify(mockDbService, never()).executeUpdate(any(), anyString());
+    }
+
+    @Test
+    void autoEvolveEnabled_columnAlreadyInFirebolt_noDdlIssued() throws Exception {
+        setupForAutoEvolve(true);
+
+        // Record schema matches the table schema exactly — no missing columns
+        Schema schema = SchemaBuilder.struct()
+                .field("id",   Schema.INT32_SCHEMA)
+                .field("name", Schema.STRING_SCHEMA)
+                .build();
+        Struct struct = new Struct(schema).put("id", 1).put("name", "alice");
+        SinkRecord record = new SinkRecord("test_topic", 0, null, null, schema, struct, 0L);
+
+        fireboltSinkTask.put(List.of(record));
+
+        verify(mockDbService, never()).executeUpdate(any(), anyString());
+    }
+
+    @Test
+    void autoEvolveEnabled_ddlRetriesOnTransientFailure() throws Exception {
+        setupForAutoEvolve(true);
+
+        // First attempt fails, second succeeds
+        when(mockDbService.discoverTableSchemas(eq(mockJdbcConfig), anySet()))
+                .thenReturn(Map.of("test_table", new TableSchema("test_table")));
+        doThrow(new RuntimeException("transient"))
+                .doNothing()
+                .when(mockDbService).executeUpdate(eq(mockJdbcConfig), anyString());
+
+        fireboltSinkTask.put(List.of(recordWithExtraField()));
+
+        // DDL must have been retried (called at least twice)
+        verify(mockDbService, atLeast(2)).executeUpdate(eq(mockJdbcConfig), anyString());
+    }
+
+    @Test
+    void autoEvolveEnabled_unsupportedType_ddlSkipped() throws Exception {
+        setupForAutoEvolve(true);
+
+        // STRUCT field — ConnectToFireboltTypeMapper returns null for it
+        Schema structField = SchemaBuilder.struct().field("x", Schema.INT32_SCHEMA).build();
+        Schema schema = SchemaBuilder.struct()
+                .field("id",      Schema.INT32_SCHEMA)
+                .field("name",    Schema.STRING_SCHEMA)
+                .field("payload", structField)      // unsupported
+                .build();
+        Struct struct = new Struct(schema)
+                .put("id",      1)
+                .put("name",    "alice")
+                .put("payload", new Struct(structField).put("x", 42));
+        SinkRecord record = new SinkRecord("test_topic", 0, null, null, schema, struct, 0L);
+
+        // Should not throw; just skip the STRUCT field
+        assertDoesNotThrow(() -> fireboltSinkTask.put(List.of(record)));
+        verify(mockDbService, never()).executeUpdate(any(), anyString());
+    }
+}

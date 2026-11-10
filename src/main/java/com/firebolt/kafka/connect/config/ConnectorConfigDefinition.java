@@ -57,6 +57,17 @@ public class ConnectorConfigDefinition {
     public static final String ERROR_TOLERANCE_DEFAULT = "none";
 
     // =========================
+    // SCHEMA EVOLUTION (DDL-based)
+    // =========================
+    public static final String AUTO_EVOLVE_CONFIG = "auto.evolve";
+    public static final String AUTO_EVOLVE_DOC =
+            "When true, the connector issues ALTER TABLE ADD COLUMN in Firebolt for fields that appear " +
+            "in the Kafka Connect schema (Avro, JSON Schema, Protobuf) but are not yet present in the " +
+            "target table. Requires records to carry a schema; schemaless records are not supported. " +
+            "Only ADD COLUMN is performed — columns are never dropped or renamed.";
+    public static final boolean AUTO_EVOLVE_DEFAULT = false;
+
+    // =========================
     // CONFIG DEFINITION
     // =========================
     public static ConfigDef CONFIG_DEF = createConfigDef();
@@ -117,6 +128,12 @@ public class ConnectorConfigDefinition {
                         ERROR_TOLERANCE_DEFAULT,
                         ConfigDef.ValidString.in("none", "all"),
                         ConfigDef.Importance.MEDIUM,
-                        ERROR_TOLERANCE_DOC);
+                        ERROR_TOLERANCE_DOC)
+                // Schema evolution
+                .define(AUTO_EVOLVE_CONFIG,
+                        ConfigDef.Type.BOOLEAN,
+                        AUTO_EVOLVE_DEFAULT,
+                        ConfigDef.Importance.MEDIUM,
+                        AUTO_EVOLVE_DOC);
     }
 } 
