@@ -268,8 +268,9 @@ public class InsertPreparedStatementTest {
     }
 
     @Test
-    void willUseAllTheColumnsAsLongAsAtLeastOneHas() throws SQLException {
-        // Build two records where NAME is present but null in all records
+    void willSetSqlNullForMissingOptionalValueWhenAnotherRecordProvidesThatColumn() throws SQLException {
+        // This is the path an absent proto optional field takes once another record
+        // in the batch provides a value for the same target column.
         Map<String, SchemaKafkaMessageColumnValue> values1 = new HashMap<>();
         values1.put("id", SchemaKafkaMessageColumnValue.builder().value(1).schemaType(Schema.Type.INT32).build());
         values1.put("NAME", SchemaKafkaMessageColumnValue.builder().value("some name").schemaType(Schema.Type.STRING).build());
@@ -287,6 +288,10 @@ public class InsertPreparedStatementTest {
 
         // Verify prepared statement only includes the column with at least one non-null value ("id")
         verify(mockConnection).prepareStatement(argThat(sqlContains("INSERT INTO \"test_table\" (\"id\", \"NAME\") VALUES (?, ?)", "INSERT INTO \"test_table\" (\"NAME\", \"id\") VALUES (?, ?)")));
+        verify(mockPreparedStatement).setInt(1, 1);
+        verify(mockPreparedStatement).setString(2, "some name");
+        verify(mockPreparedStatement).setInt(1, 2);
+        verify(mockPreparedStatement).setNull(2, Types.VARCHAR);
         verify(mockPreparedStatement, times(2)).addBatch();
         verify(mockPreparedStatement).executeBatch();
     }

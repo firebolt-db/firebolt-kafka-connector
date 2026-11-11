@@ -66,7 +66,7 @@ SchemaBasedRecordConverterTest {
     @Test
     void testGetDescription() {
         String description = converter.getDescription();
-        assertEquals("Handles records with embedded schemas (typically Struct values from Avro/JSON+Schema)", description);
+        assertEquals("Handles records with embedded schemas (typically Struct values from Avro/JSON Schema/Protobuf)", description);
     }
 
     @Test
