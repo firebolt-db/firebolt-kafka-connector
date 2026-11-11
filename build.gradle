@@ -580,6 +580,9 @@ jar {
     exclude 'META-INF/maven/org.jline/jline-reader/**'
     exclude 'META-INF/maven/org.jline/jline-remote-ssh/**'
     exclude 'META-INF/maven/org.jline/jline/**'
+    // Exclude Hadoop-shaded Kerby ASN.1 stack (CVE-2026-57914); keep KDiag / KerberosUtil wrappers
+    exclude 'org/apache/hadoop/shaded/org/apache/kerby/**'
+    exclude 'META-INF/maven/org.apache.kerby/**'
     // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
     exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
     exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/AbstractYAMLBasedConfiguration*'
@@ -764,6 +767,9 @@ tasks.register('confluentJar', Jar) {
     exclude 'META-INF/maven/org.jline/jline-reader/**'
     exclude 'META-INF/maven/org.jline/jline-remote-ssh/**'
     exclude 'META-INF/maven/org.jline/jline/**'
+    // Exclude Hadoop-shaded Kerby ASN.1 stack (CVE-2026-57914); keep KDiag / KerberosUtil wrappers
+    exclude 'org/apache/hadoop/shaded/org/apache/kerby/**'
+    exclude 'META-INF/maven/org.apache.kerby/**'
     // Exclude Hadoop-shaded YAML configuration classes (CVE-2026-45205); keep non-YAML types Hadoop still references
     exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/YAMLConfiguration*'
     exclude 'org/apache/hadoop/shaded/org/apache/commons/configuration2/AbstractYAMLBasedConfiguration*'
